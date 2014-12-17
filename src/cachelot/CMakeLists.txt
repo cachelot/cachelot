@@ -15,6 +15,8 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/hash_fnv1a.h
                 ${CMAKE_CURRENT_LIST_DIR}/settings.h
                 ${CMAKE_CURRENT_LIST_DIR}/settings.cpp
+                ${CMAKE_CURRENT_LIST_DIR}/memalloc.h
+                ${CMAKE_CURRENT_LIST_DIR}/xrange.h
         )
 
 #if (CMAKE_BUILD_TYPE MATCHES DEBUG)

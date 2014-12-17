@@ -9,6 +9,7 @@ set (CACHELOT_UNIT_TEST_SOURCES
                 test_string_conv.cpp
                 test_bytes.cpp
                 test_item.cpp
+                test_hash_table.cpp
                 ${CACHELOT_SOURCES} 
         )
 
