@@ -29,7 +29,7 @@ namespace cachelot {
     template <typename Key, typename T, typename Pred = std::equal_to<Key>, typename Hash = size_t>
     class dict {
         typedef hash_table<Key, T, Pred, Hash> hash_table_type;
-        
+
         /// iterator (not STL compliant)
         class iterator {
         // TODO: iterator interface is totally ugly!!!!
@@ -39,15 +39,15 @@ namespace cachelot {
                 : m_table(nullptr)
                 , m_pos(std::numeric_limits<size_type>::max()) {
             }
-            
+
             iterator(const iterator &) noexcept = default;
-            
+
             iterator & operator= (const iterator &) = default;
-            
+
             explicit operator bool() const noexcept {
                 return m_table != nullptr && not m_table->empty_slot(m_pos);
             }
-            
+
             const Key key() const noexcept {
                 if (*this) {
                     return m_table->get_entry(m_pos).key;
@@ -55,7 +55,7 @@ namespace cachelot {
                     return Key();
                 }
             }
-            
+
             const T value() const noexcept {
                 if (*this) {
                     return m_table->get_entry(m_pos).value;
@@ -63,12 +63,12 @@ namespace cachelot {
                     return T();
                 }
             }
-            
+
             void assign(const T new_value) noexcept {
                 debug_assert(*this);
                 m_table->get_entry(m_pos).value = new_value;
             }
-            
+
         private:
             typedef typename hash_table_type::size_type size_type;
             friend class dict<Key, T, Pred, Hash>;
@@ -88,7 +88,7 @@ namespace cachelot {
     private:
         static constexpr size_type default_initial_size = 16;
         typedef typename hash_table_type::entry_type entry;
-       
+
     public:
         /// constructor
         dict(const size_type initial_size = default_initial_size)
@@ -122,7 +122,7 @@ namespace cachelot {
                 }
             }
         }
-        
+
         /// return either iterator referencing existing entry or pointer to insertion position
         tuple<bool, iterator> entry_for(key_type key, hash_type hash) noexcept {
             if (not is_expanding()) {
@@ -161,7 +161,7 @@ namespace cachelot {
             debug_assert(raw_pointer(m_primary_tbl) == table ||  raw_pointer(m_secondary_tbl) == table);
             return table->remove(where.m_pos);
         }
-        
+
         /// @copydoc hash_table::contains
         bool contains(key_type key, hash_type hash) const noexcept {
             if (not is_expanding()) {
@@ -175,7 +175,7 @@ namespace cachelot {
         size_type capacity() const noexcept {
             return m_primary_tbl->capacity();
         }
-        
+
         /// number of stored items
         size_type size() const noexcept {
             size_type num_elements = m_primary_tbl->size();
@@ -194,7 +194,7 @@ namespace cachelot {
         static iterator iter(std::unique_ptr<hash_table_type> & table, size_type pos_in_table) {
             return iterator(raw_pointer(table), pos_in_table);
         }
-    
+
         tuple<bool, iterator> search_primary(key_type key, hash_type hash) noexcept {
             bool found; size_t at;
             tie(found, at) = m_primary_tbl->entry_for(key, hash);
@@ -208,7 +208,7 @@ namespace cachelot {
             }
             return make_tuple(found, iter(m_primary_tbl, at)); // TODO: weak_ptr?
         }
-        
+
         tuple<bool, iterator> search_secondary(key_type key, hash_type hash) noexcept {
             rehash_some();
             if (is_expanding()) {  // are we still expanding after rehash
@@ -225,7 +225,7 @@ namespace cachelot {
                 return search_primary(key, hash);
             }
         }
-    
+
         void begin_expand() {
             debug_assert(not is_expanding());
             m_expand_pos = 0;
@@ -238,14 +238,14 @@ namespace cachelot {
             m_hashpower += 1;
             rehash_some();
         }
-    
+
         void end_expand() {
             debug_assert(is_expanding());
             debug_assert(m_secondary_tbl->empty());
             m_secondary_tbl.reset(nullptr);
             m_expand_pos = 0;
         }
-    
+
         void rehash_some() {
             const size_type batch_size = std::min<size_type>(512, m_secondary_tbl->size());
             size_type elements_moved = 0;
@@ -266,7 +266,7 @@ namespace cachelot {
                 end_expand();
             }
         }
-    
+
         bool is_expanding() const noexcept { return m_secondary_tbl != nullptr; }
 
     private:

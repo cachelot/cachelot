@@ -6,7 +6,7 @@ namespace {
 
 using namespace cachelot;
 
-typedef hash_table<string, void *, std::equal_to<string>, size_t> table_type;
+typedef hash_table<string, void *, std::equal_to<string>> table_type;
 typedef table_type::hash_type hash_type;
 
 BOOST_AUTO_TEST_SUITE(test_hash_table)
@@ -28,7 +28,7 @@ BOOST_AUTO_TEST_CASE(test_hash_table_operations) {
     BOOST_CHECK(the_dict.capacity() == DefaultCapacity);
     BOOST_CHECK(the_dict.size() == 0);
     for (auto i : xrange<size_t>(DefaultCapacity)) {
-        BOOST_CHECK(the_dict.empty_slot(i));
+        BOOST_CHECK(the_dict.empty_at(i));
     }
     // store value
     string the_key = "some key";
