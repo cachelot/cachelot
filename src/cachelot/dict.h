@@ -23,12 +23,36 @@ namespace cachelot {
      *
      * @tparam Key - key type
      * @tparam T - value type
-     * @tparam Pred - key equality predicate
-     * @tparam Hash - hash type
+     * @tparam KeyEqual - key equality predicate
+     * @tparam Entry - class representing entry of the hash_table, 
+     *                 must have following interface:
+     * @code
+     *  template <typename Key, typename T> struct hash_table_entry {
+     *      // constructor
+     *      explicit hash_table_entry(const Key & the_key, const T & the_value);
+     *      // key getter
+     *      const Key & key() const noexcept;
+     *      // value getter
+     *      const T & value() const noexcept { return m_value; }
+     *  };
+     * @endcode
+     * @tparam Options - options of the hash_table:
+     * @code
+     *  struct Options {
+     *      // size type (must be unsigned integer)
+     *      typedef size_t size_type;
+     *      // hash value type (must be unsigned integer)
+     *      typedef size_t hash_type;
+     *      // percentage of hash table fill untill threshold, must be in (0, 100) range
+     *      static constexpr size_type max_load_factor_percent = 93;
+     *  };
+     * @endcode
+     *
      */
-    template <typename Key, typename T, typename Pred = std::equal_to<Key>, typename Hash = size_t>
+    template <typename Key, typename T, typename KeyEqual = std::equal_to<Key>,
+              class Entry = internal::hash_table_entry<Key, T>, class Options = internal::DefaultOptions>
     class dict {
-        typedef hash_table<Key, T, Pred, Hash> hash_table_type;
+        typedef hash_table<Key, T, KeyEqual, Entry, Options> hash_table_type;
 
         /// iterator (not STL compliant)
         class iterator {
@@ -71,7 +95,7 @@ namespace cachelot {
 
         private:
             typedef typename hash_table_type::size_type size_type;
-            friend class dict<Key, T, Pred, Hash>;
+            friend class dict<Key, T, KeyEqual, Entry, Options>;
             iterator(hash_table_type * t, size_type p) noexcept : m_table(t), m_pos(p) {}
             hash_table_type * m_table;
             size_type m_pos;
@@ -250,15 +274,15 @@ namespace cachelot {
             const size_type batch_size = std::min<size_type>(512, m_secondary_tbl->size());
             size_type elements_moved = 0;
             while (elements_moved < batch_size) {
-                while (m_secondary_tbl->empty_slot(m_expand_pos)) {
+                while (m_secondary_tbl->empty_at(m_expand_pos)) {
                     m_expand_pos += 1;
                 }
                 debug_assert(m_expand_pos < m_secondary_tbl->capacity());
                 const hash_table_type * old = m_secondary_tbl.get();
-                hash_type hash = old->get_hash(m_expand_pos);
-                const entry_type & e = old->get_entry(m_expand_pos);
-                debug_assert(not m_primary_tbl->contains(e.key, hash));
-                m_primary_tbl->put(e.key, hash, e.value);
+                hash_type hash = old->hash_at(m_expand_pos);
+                const entry_type & e = old->entry_at(m_expand_pos);
+                debug_assert(not m_primary_tbl->contains(e.key(), hash));
+                m_primary_tbl->put(e.key(), hash, e.value());
                 m_secondary_tbl->remove(m_expand_pos);
                 elements_moved += 1;
             }
