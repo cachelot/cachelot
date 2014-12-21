@@ -26,7 +26,7 @@ namespace {namespace} {{
 #ifndef {guard}
 #define {guard}
 
-/// @ingroup doxygen_group
+/// @ingroup <?doxygroup?>
 /// @{{
 
 {optional_namespace_declaration}
