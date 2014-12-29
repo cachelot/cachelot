@@ -314,7 +314,7 @@ namespace cachelot {
         };
 
     public:
-        block_by_size_table();
+        block_by_size_table() = default;
 
         /// capacity of the table
         uint32 capacity() const noexcept { return const_::block_table_size; };
@@ -439,7 +439,7 @@ namespace cachelot {
 
 //////// memalloc //////////////////////////////////////
 
-    inline memalloc::memalloc(void * arena, const size_t arena_size, bool allow_evictions) noexcept {
+    memalloc::memalloc(void * arena, const size_t arena_size, bool allow_evictions) noexcept {
         static_assert(valid_alignment(memblock::alignment), "memblock::meta must define proper alignment");
         const size_t min_arena_size = sizeof(block_by_size_table) * 2 + sizeof(memblock) * 2 + 1024;
         debug_assert(arena_size >= min_arena_size);

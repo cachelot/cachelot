@@ -11,6 +11,7 @@ set (CACHELOT_UNIT_TEST_SOURCES
                 test_item.cpp
                 test_hash_table.cpp
                 test_dict.cpp
+                test_memalloc.cpp
                 ${CACHELOT_SOURCES} 
         )
 
