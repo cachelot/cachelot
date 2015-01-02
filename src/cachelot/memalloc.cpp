@@ -52,12 +52,11 @@ namespace cachelot {
             debug_assert(size <= const_::max_block_size);
             // set debug marker
             debug_only(meta.dbg_marker = const_::DBG_MARKER);
-            // check previous block for consistency
-            debug_only(prev_contiguous_block->test_check());
-            debug_assert(reinterpret_cast<const uint8 *>(prev_contiguous_block) + prev_contiguous_block->size_with_meta() == reinterpret_cast<uint8 *>(this));
             meta.size = size;
             meta.used = false;
             meta.prev_contiguous_block_offset = prev_contiguous_block->size_with_meta();
+            // check previous block for consistency
+            debug_only(prev_contiguous_block->test_check());
         }
         ///@}
 
@@ -230,7 +229,7 @@ namespace cachelot {
      * There are two bit indexes intended to minimize cache misses and to speed up search of block of maximal size.
      * In each bitmask: set bit indicates that there is *probably* block of corresponding size
      * unset bit indicates that there is *definitely* no blocks of corresponding size
-     *  - Each bit in first level index `pow_index` refers group of size classes which in corresponding power of 2
+     *  - Each bit in first level index `pow_index` refers group of size classes of corresponding power of 2
      * @code
        // depends on min_power_of_2
        0000 0001 => [32..64)
@@ -283,10 +282,16 @@ namespace cachelot {
 
             /// calc size class of a corresponding block
             uint32 block_size() const noexcept {
-                debug_assert(pow_index < const_::num_powers_of_2);
-                debug_assert(sub_index < const_::num_blocks_per_pow2);
+                debug_only(test_check());
                 const uint32 power_of_2 = const_::min_power_of_2 + pow_index;
-                return pow2(power_of_2) + (sub_index * const_::sub_block_size_of_pow2(power_of_2));
+                uint32 size = pow2(power_of_2) + (sub_index * const_::sub_block_size_of_pow2(power_of_2));
+                debug_assert(const_::min_block_size <= size && size <= const_::max_block_size);
+                return size;
+            }
+
+            /// return maximal available position
+            static constexpr iterator max() noexcept {
+                return iterator(const_::num_powers_of_2 - 1, const_::num_blocks_per_pow2 - 1);
             }
 
         private:
@@ -302,6 +307,19 @@ namespace cachelot {
                 debug_assert(pow_index < const_::num_powers_of_2);
                 debug_assert(sub_index < const_::num_blocks_per_pow2);
                 debug_assert(absolute() < const_::block_table_size);
+            }
+
+            // debug only check if size within this iterator size class
+            void test_size_check(const uint32 size) const noexcept {
+                debug_assert(size >= block_size());
+                if (pow_index < max().pow_index && sub_index < max().sub_index) {
+                    iterator this_plus_one = *this;
+                    this_plus_one.increment();
+                    debug_assert(size < this_plus_one.block_size());
+                } else {
+                    debug_assert(size == const_::max_block_size);
+                    debug_assert(size == block_size());
+                }
             }
 
         private:
@@ -396,7 +414,7 @@ namespace cachelot {
         /// store `block` at position `pos`
         void put_block_at(memblock * block, const iterator pos) noexcept {
             debug_only(block->test_check());
-            debug_assert(block->size() == pos.block_size());
+            debug_only(pos.test_size_check(block->size()));
             debug_only(pos.test_check());
             memalloc::memblock_list & target_list = table[pos.absolute()];
             target_list.put(block);
@@ -412,6 +430,7 @@ namespace cachelot {
             iterator pos = pos_from_size(block->size());
             // pos_from_size() calculates position of block that is satsfied (>= of) requested size,
             // this block can be smaller and hence stored right before calculated position
+            std::cout << "Block: " << block->size() << " Slot: " << pos.block_size() << std::endl;
             if (block->size() < pos.block_size()) {
                 pos.decrement();
             }
@@ -421,7 +440,7 @@ namespace cachelot {
         /// store `block` of a maximal available size at the end of the table
         void put_biggest_block(memblock * block) noexcept {
             debug_assert(block->size() == const_::max_block_size);
-            put_block_at(block, iterator(const_::num_powers_of_2 - 1, const_::num_blocks_per_pow2 - 1));
+            put_block_at(block, iterator::max());
         }
 
     private:
@@ -471,7 +490,7 @@ namespace cachelot {
         // split all arena on blocks and store them in free blocks table
 
         // first dummy border blocks
-        // left border to prevent block merge underflow
+        // left technical border block to prevent block merge underflow
         available += unaligned_bytes(available, memblock::alignment); // alignment
         memblock * left_border = new (available) memblock();
         memblock::checkout(left_border); // mark block as used so it will not be merged with others
@@ -484,19 +503,25 @@ namespace cachelot {
         memblock * prev_allocated_block = left_border;
         while (static_cast<size_t>(EOM - available) >= const_::max_block_size + memblock::meta_size) {
             memblock * huge_block = new (available) memblock(const_::max_block_size, prev_allocated_block);
+            // temporarily create block on the right to pass block consistency test
+            debug_only(new (huge_block->next_contiguous()) memblock(0, huge_block));
+            // store block at max pos of table
             free_blocks->put_biggest_block(huge_block);
             available += huge_block->size_with_meta();
             prev_allocated_block = huge_block;
         }
-        // allocate space that's left
+        // allocate space what's left
         const uint32 leftover_size = EOM - available - memblock::meta_size;
         if (leftover_size >= memblock::split_threshold) {
             memblock * leftover_block = new (available) memblock(leftover_size, prev_allocated_block);
+            // temporarily create block on the right to pass block consistency test
+            debug_only(new (leftover_block->next_contiguous()) memblock(0, leftover_block));
             free_blocks->put_block(leftover_block);
             prev_allocated_block = leftover_block;
         } else {
             EOM = available;
         }
+        // right technical border block to prevent block merge overflow
         memblock * right_border = new (EOM) memblock(0, prev_allocated_block);
         memblock::checkout(right_border);
     }
