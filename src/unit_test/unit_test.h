@@ -23,20 +23,23 @@ namespace cachelot {
     class random_int {
     public:
         explicit random_int(IntType minval, IntType maxval)
-            : m_rnd_engine()
-            , m_rnd_gen(minval, maxval) {
+            : m_rnd_gen(minval, maxval) {
         }
 
         random_int(const random_int &) = default;
         random_int & operator= (const random_int &) = default;
 
         IntType operator() () {
-            return m_rnd_gen(m_rnd_engine);
+            return m_rnd_gen(random_engine);
         }
     private:
-        std::random_device m_rnd_engine;
+        typedef std::minstd_rand random_engine_type;
+        static random_engine_type random_engine;
         std::uniform_int_distribution<IntType> m_rnd_gen;
     };
+
+    template <typename IntType>
+    typename random_int<IntType>::random_engine_type random_int<IntType>::random_engine;
 
     /// generate random string of `length` chars
     inline string random_string(size_t length) {
