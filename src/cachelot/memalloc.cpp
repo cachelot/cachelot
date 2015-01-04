@@ -515,16 +515,19 @@ namespace cachelot {
             // store block at max pos of table
             free_blocks->put_biggest_block(huge_block);
             available += huge_block->size_with_meta();
+            debug_assert(available < EOM);
             prev_allocated_block = huge_block;
         }
         // allocate space what's left
-        const uint32 leftover_size = EOM - available - memblock::meta_size;
+        uint32 leftover_size = EOM - available - memblock::meta_size;
+        leftover_size -= unaligned_bytes(leftover_size, memblock::alignment);
         if (leftover_size >= memblock::split_threshold) {
             memblock * leftover_block = new (available) memblock(leftover_size, prev_allocated_block);
             // temporarily create block on the right to pass block consistency test
             debug_only(new (leftover_block->next_contiguous()) memblock(0, leftover_block));
             free_blocks->put_block(leftover_block);
             prev_allocated_block = leftover_block;
+            EOM = available + leftover_block->size_with_meta();
         } else {
             EOM = available;
         }

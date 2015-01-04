@@ -107,9 +107,9 @@ namespace cachelot {
         return (alignment == (UIntT(1)) || (sizeof(void *) <= alignment)) && ispow2(alignment);
     }
 
-    /// return number of bytes necessary to feet given `size` into the given `alignment`
+    /// return number of bytes necessary to align `size` according to the given `alignment`
     inline size_t unaligned_bytes(const size_t size, const size_t alignment) noexcept {
-        return size & (alignment - 1u); // size % alignment
+        return reinterpret_cast<size_t>((size + (alignment - 1u)) & -alignment) - size;
     }
 
     /// return number of bytes necessary to align given `addr` according to the given `alignment`
