@@ -11,19 +11,19 @@ namespace cachelot {
     // constants
     namespace const_ {
         debug_only(static constexpr uint64 DBG_MARKER = 0x00B00B1E500;)
-        // minimal block size is `2**min_power_of_2`
-        static constexpr uint32 min_power_of_2 = 6;  // limited 2**min_power_of_2 >= sizeof(memblock)
-        // maximal block size is `2**max_power_of_2`
+        // minimal block size is `2^min_power_of_2`
+        static constexpr uint32 min_power_of_2 = 6;  // limited to 2^min_power_of_2 >= sizeof(memblock)
+        // maximal block size is `2^max_power_of_2`
         static constexpr uint32 max_power_of_2 = 30; // can not be changed (memblock::size is 31 bit)
         static constexpr uint32 num_powers_of_2 = max_power_of_2 - min_power_of_2;
         // number of second level cells per first level cell (first level cells are powers of 2 in range `[min_power_of_2..max_power_of_2]`)
         static constexpr uint32 num_blocks_per_pow2 = 8; // bigger value means less memory overhead but increases table size
 
         constexpr uint32 sub_block_size_of_pow2(uint32 power) {
-            // Formula: ((power + 1)**2 - power**2) / num_blocks_per_pow2)
+            // Formula: (2^(power + 1) - 2^power) / num_blocks_per_pow2)
             // bit magic: x/(2^n) <=> x >> n
             // TODO: check if compiler does this optimization by itself
-            return static_cast<uint32>((pow2(power + 1) - pow2(power)) >> log2u(num_blocks_per_pow2));
+            return (pow2(power + 1) - pow2(power)) >> log2u(num_blocks_per_pow2);
         }
 
         // minimal size of block, blocks of `min_block_size` will be provided even on attempt to allocate less memory
