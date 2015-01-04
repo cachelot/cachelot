@@ -46,6 +46,16 @@ BOOST_AUTO_TEST_CASE(test_bit_basic) {
     BOOST_CHECK(i == 0);
 }
 
+BOOST_AUTO_TEST_CASE(test_alignment) {
+    BOOST_CHECK_EQUAL(unaligned_bytes(4, 4), 0);
+    BOOST_CHECK_EQUAL(unaligned_bytes(3, 4), 1);
+    BOOST_CHECK_EQUAL(unaligned_bytes(64, 8), 0);
+    BOOST_CHECK_EQUAL(unaligned_bytes(65, 8), 7);
+    BOOST_CHECK_EQUAL(unaligned_bytes(65, 16), 15);
+    BOOST_CHECK_EQUAL(unaligned_bytes((const void *)0, 128), 0);
+    BOOST_CHECK_EQUAL(unaligned_bytes((const void *)65, 16), 15);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 }
