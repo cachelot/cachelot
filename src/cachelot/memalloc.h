@@ -10,7 +10,8 @@ namespace cachelot {
 
     // constants
     namespace const_ {
-        debug_only(static constexpr uint64 DBG_MARKER = 0x00B00B1E500;)
+        debug_only(static constexpr uint64 DBG_MARKER = 1234567890987654321;)
+        debug_only(static constexpr char DBG_FILLER = 'X';)
         // minimal block size is `2^min_power_of_2`
         static constexpr uint32 min_power_of_2 = 6;  // limited to 2^min_power_of_2 >= sizeof(memblock)
         // maximal block size is `2^max_power_of_2`

@@ -54,6 +54,8 @@ namespace cachelot {
             debug_assert(size <= const_::max_block_size);
             // set debug marker
             debug_only(meta.dbg_marker = const_::DBG_MARKER);
+            // Fill-in memory with debug pattern
+            debug_only(std::memset(memory_, const_::DBG_FILLER, size));
             meta.size = size;
             meta.used = false;
             meta.prev_contiguous_block_offset = prev_contiguous_block->size_with_meta();
@@ -109,6 +111,11 @@ namespace cachelot {
                 debug_assert(non_const->next_contiguous()->prev_contiguous() == this);
                 debug_assert(non_const->prev_contiguous()->meta.dbg_marker == const_::DBG_MARKER);
                 debug_assert(non_const->prev_contiguous()->next_contiguous() == this);
+                if (is_free()) {
+                    // ensure that user memory is filled with debug pattern
+                    uint32 half_size = (size() - sizeof(link)) / 2;
+                    debug_assert(std::memcmp(memory_ + sizeof(link), memory_ + sizeof(link) + half_size, half_size) == 0);
+                }
             }
         }
 
@@ -125,7 +132,6 @@ namespace cachelot {
             debug_only(block->test_check());
             debug_assert(not block->meta.used);
             block->meta.used = true;
-            debug_only(std::memset(block->memory_, 0x0C, block->size()));
             return block->memory_;
         }
 
@@ -134,7 +140,7 @@ namespace cachelot {
             debug_only(block->test_check());
             debug_assert(block->is_used());
             block->meta.used = false;
-            debug_only(std::memset(block->memory_, 0x0D, block->size()));
+            debug_only(std::memset(block->memory_, const_::DBG_FILLER, block->size()));
         }
 
         /// split given `block` to the smaller block of `new_size`, returns splited block and leftover space as a block
@@ -149,7 +155,7 @@ namespace cachelot {
                 memalloc::memblock * block_after_next = block->next_contiguous();
                 block->set_size(new_round_size);
                 leftover = new (block->next_contiguous()) memalloc::memblock(old_size - new_round_size - memalloc::memblock::meta_size, block);
-                block_after_next->meta.prev_contiguous_block_offset = leftover->size() + memalloc::memblock::meta_size;
+                block_after_next->meta.prev_contiguous_block_offset = leftover->size_with_meta();
                 debug_only(leftover->test_check());
                 return make_tuple(block, leftover);
             }
@@ -164,10 +170,11 @@ namespace cachelot {
             debug_assert(right_block->prev_contiguous() == left_block);
             debug_assert(left_block->next_contiguous() == right_block);
             debug_assert(left_block->is_free()); debug_assert(right_block->is_free());
-            debug_assert(left_block->size() + right_block->size() + memalloc::memblock::meta_size < const_::max_block_size);
+            debug_assert(left_block->size() + right_block->size_with_meta() < const_::max_block_size);
             memalloc::memblock * block_after_right = right_block->next_contiguous();
-            left_block->set_size(left_block->size() + right_block->size() + memalloc::memblock::meta_size);
-            block_after_right->meta.prev_contiguous_block_offset = left_block->size() + memalloc::memblock::meta_size;
+            left_block->set_size(left_block->size() + right_block->size_with_meta());
+            debug_only(std::memset(right_block, const_::DBG_FILLER, sizeof(memblock)));
+            block_after_right->meta.prev_contiguous_block_offset = left_block->size_with_meta();
             return left_block;
         }
     };
@@ -253,37 +260,15 @@ namespace cachelot {
         /**
          * position in table
          */
-        class iterator {
-            explicit constexpr iterator(const uint32 power_index, const uint32 sub_block_index)
+        class position {
+            explicit constexpr position(const uint32 power_index, const uint32 sub_block_index)
                 : pow_index(power_index), sub_index(sub_block_index) {
                 debug_only(test_check());
             }
         public:
-            iterator() noexcept { /* do nothing */ };
-            constexpr iterator(const iterator &) noexcept = default;
-            iterator & operator= (const iterator &) noexcept = default;
-
-            /// increase position by 1
-            void increment() noexcept {
-                if (sub_index < const_::num_blocks_per_pow2 - 1) {
-                    sub_index += 1;
-                } else {
-                    debug_assert(pow_index < const_::num_powers_of_2 - 1);
-                    pow_index += 1;
-                    sub_index = 0;
-                }
-            }
-
-            /// decrease position by 1
-            void decrement() noexcept {
-                if (sub_index > 0) {
-                    sub_index -= 1;
-                } else {
-                    debug_assert(pow_index > 0);
-                    pow_index -= 1;
-                    sub_index = const_::num_blocks_per_pow2 - 1;
-                }
-            }
+            position() noexcept { /* do nothing */ };
+            constexpr position(const position &) noexcept = default;
+            position & operator= (const position &) noexcept = default;
 
             /// calc size class of a corresponding block
             uint32 block_size() const noexcept {
@@ -295,8 +280,8 @@ namespace cachelot {
             }
 
             /// return maximal available position
-            static constexpr iterator max() noexcept {
-                return iterator(const_::num_powers_of_2 - 1, const_::num_blocks_per_pow2 - 1);
+            static constexpr position max() noexcept {
+                return position(const_::num_powers_of_2 - 1, const_::num_blocks_per_pow2 - 1);
             }
 
         private:
@@ -307,6 +292,20 @@ namespace cachelot {
                 return abs_index;
             }
 
+            // debug only return next position
+            position next() const noexcept {
+                uint32 next_pow_index, next_sub_index;
+                if (sub_index < const_::num_blocks_per_pow2 - 1) {
+                    next_pow_index = pow_index;
+                    next_sub_index = sub_index + 1;
+                } else {
+                    debug_assert(pow_index < const_::num_powers_of_2 - 1);
+                    next_pow_index = pow_index + 1;
+                    next_sub_index = 0;
+                }
+                return position(next_pow_index, next_sub_index);
+            }
+
             // debug only self-check
             void test_check() const noexcept {
                 debug_assert(pow_index < const_::num_powers_of_2);
@@ -314,14 +313,12 @@ namespace cachelot {
                 debug_assert(absolute() < const_::block_table_size);
             }
 
-            // debug only check if size within this iterator size class
+            // debug only check if size within this position size class
             void test_size_check(const uint32 size) const noexcept {
                 debug_assert(size >= block_size());
-                const auto last_pos = iterator::max();
+                const auto last_pos = position::max();
                 if ((pow_index < last_pos.pow_index) || (pow_index == last_pos.pow_index && sub_index < last_pos.sub_index)) {
-                    iterator this_plus_one = *this;
-                    this_plus_one.increment();
-                    debug_assert(size < this_plus_one.block_size());
+                    debug_assert(size < next().block_size());
                 } else {
                     debug_assert(pow_index == last_pos.pow_index && sub_index == last_pos.sub_index);
                     debug_assert(size == const_::max_block_size);
@@ -338,7 +335,7 @@ namespace cachelot {
             friend class block_by_size_table;
         };
 
-        iterator search_pos(const uint32 requested_size) const noexcept {
+        position search_pos(const uint32 requested_size) const noexcept {
             debug_assert(const_::min_block_size <= requested_size && requested_size <= const_::max_block_size);
             const uint32 log_num_blocks_per_pow2 = log2u(const_::num_blocks_per_pow2);
             const uint32 power = log2u(requested_size);
@@ -349,27 +346,24 @@ namespace cachelot {
             debug_assert(power2_idx > log_num_blocks_per_pow2);
             uint32 sub_block_idx = (roundup_size >> (power2_idx - log_num_blocks_per_pow2)) - const_::num_blocks_per_pow2;
             power2_idx = power2_idx - const_::min_power_of_2;
-            return iterator(power2_idx, sub_block_idx);
+            return position(power2_idx, sub_block_idx);
         }
 
-        iterator insert_pos(const uint32 requested_size) const noexcept {
+        position insert_pos(const uint32 requested_size) const noexcept {
             debug_assert(const_::min_block_size <= requested_size && requested_size <= const_::max_block_size);
             // we don't need to roundup size on insert
             uint32 power2_idx = log2u(requested_size);
             debug_assert(power2_idx > log2u(const_::num_blocks_per_pow2));
             uint32 sub_block_idx = (requested_size >> (power2_idx - log2u(const_::num_blocks_per_pow2))) - const_::num_blocks_per_pow2;
             power2_idx = power2_idx - const_::min_power_of_2;
-            return iterator(power2_idx, sub_block_idx);
+            return position(power2_idx, sub_block_idx);
         }
 
     public:
         block_by_size_table() = default;
 
-        /// capacity of the table
-        uint32 capacity() const noexcept { return const_::block_table_size; };
-
         /// try to retrieve block at position `pos`, return `nullptr` if there are no blocks
-        memblock * block_at(const iterator pos) noexcept {
+        memblock * block_at(const position pos) noexcept {
             debug_only(pos.test_check());
             memblock * block;
             memblock_list & list = table[pos.absolute()];
@@ -395,7 +389,7 @@ namespace cachelot {
         /// try to get block of a `requested_size`, return `nullptr` on fail
         memblock * try_get_block(const uint32 requested_size) noexcept {
             debug_assert(requested_size <= const_::max_block_size);
-            iterator pos = search_pos(requested_size);
+            position pos = search_pos(requested_size);
             // access indexes first, unset bits clearly indicate that corresponding cell is empty
             if (bit::isset(first_level_bit_index, pos.pow_index) && bit::isset(second_level_bit_index[pos.pow_index], pos.sub_index)) {
                 return block_at(pos);
@@ -414,7 +408,7 @@ namespace cachelot {
                 // 2. retrieve the biggest block among group sub-blocks
                 debug_assert(second_level_bit_index[pow_index] > 0);
                 const uint32 sub_index = bit::most_significant(second_level_bit_index[pow_index]);
-                const iterator biggest_block_pos = iterator(pow_index, sub_index);
+                const position biggest_block_pos = position(pow_index, sub_index);
                 // there is biggest block, but does it have sufficient size?
                 if (biggest_block_pos.block_size() >= requested_size) {
                     return block_at(biggest_block_pos);
@@ -424,7 +418,7 @@ namespace cachelot {
         }
 
         /// store `block` at position `pos`
-        void put_block_at(memblock * block, const iterator pos) noexcept {
+        void put_block_at(memblock * block, const position pos) noexcept {
             debug_only(block->test_check());
             debug_only(pos.test_size_check(block->size()));
             debug_only(pos.test_check());
@@ -439,15 +433,15 @@ namespace cachelot {
         void put_block(memblock * block) {
             debug_assert(not block->is_technical());
             debug_only(block->test_check());
-            iterator pos = insert_pos(block->size());
+            position pos = insert_pos(block->size());
             put_block_at(block, pos);
         }
 
         /// store `block` of a maximal available size at the end of the table
         void put_biggest_block(memblock * block) noexcept {
             debug_assert(block->size() == const_::max_block_size);
-            debug_assert(iterator::max().block_size() == block->size());
-            put_block_at(block, iterator::max());
+            debug_assert(position::max().block_size() == block->size());
+            put_block_at(block, position::max());
         }
 
     private:
@@ -538,16 +532,18 @@ namespace cachelot {
 
 
     inline memalloc::memblock * memalloc::merge_unused(memalloc::memblock * block) noexcept {
+        // merge left until used block or max_block_size
         while ((block->size() < const_::max_block_size) && block->prev_contiguous()->is_free()) {
-            if (block->size() + block->prev_contiguous()->size() + memblock::meta_size < const_::max_block_size) {
+            if (block->size() + block->prev_contiguous()->size_with_meta() <= const_::max_block_size) {
                 memblock_list::unlink(block->prev_contiguous());
                 block = memblock::merge(block->prev_contiguous(), block);
             } else {
                 break;
             }
         }
+        // merge right until used block or max_block_size
         while ((block->size() < const_::max_block_size) && block->next_contiguous()->is_free()) {
-            if (block->size() + block->next_contiguous()->size() + memblock::meta_size < const_::max_block_size) {
+            if (block->size() + block->next_contiguous()->size_with_meta() <= const_::max_block_size) {
                 memblock_list::unlink(block->next_contiguous());
                 block = memblock::merge(block, block->next_contiguous());
             } else {
