@@ -11,6 +11,9 @@ namespace cachelot {
 
     namespace cache {
 
+        /// Initialize Item memory manager
+        void InitItemMemory(size_t size_in_bytes);
+
         /**
          * Item represents cache item with key, value, flags, cas, expiration, etc.
          *

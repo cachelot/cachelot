@@ -16,7 +16,7 @@ namespace cachelot {
 // Normaly all elements are stored in the primary table and there is no secondary table,
 // but when load factor of primary table exceds threshold, primary becomes the secondary,
 // new table allocated as a new primary and every update operation on dict moves some
-// items from the secondary table back to the primary, util only primary table is left
+// items from the secondary table back to the primary, util only primary table will left
 
     /**
      * dict is an unordered key-value associative container
@@ -206,6 +206,7 @@ namespace cachelot {
             if (is_expanding()) {
                 num_elements += m_secondary_tbl->size();
             }
+            debug_assert(num_elements <= capacity());
             return num_elements;
         }
 

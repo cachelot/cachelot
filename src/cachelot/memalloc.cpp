@@ -1,15 +1,18 @@
 #include <cachelot/cachelot.h>
 #include <cachelot/memalloc.h>
+#include <boost/intrusive/list.hpp>
 
 namespace cachelot {
 
 //////// memblock //////////////////////////////////////
 
+    typedef boost::intrusive::list_member_hook<> link_type;
+
     /// single allocation chunk with metadata
     class memalloc::memblock {
         struct {
-            bool used : 1;      // indicate whether block is used
             uint32 size : 31;   // amount of memory available to user
+            bool used : 1;      // indicate whether block is used
             uint32 prev_contiguous_block_offset;  // offset of previous block in continuous arena
             debug_only(uint64 dbg_marker;) // debug constant marker to identify invalid blocks
         } meta;
@@ -111,11 +114,6 @@ namespace cachelot {
                 debug_assert(non_const->next_contiguous()->prev_contiguous() == this);
                 debug_assert(non_const->prev_contiguous()->meta.dbg_marker == const_::DBG_MARKER);
                 debug_assert(non_const->prev_contiguous()->next_contiguous() == this);
-                if (is_free()) {
-                    // ensure that user memory is filled with debug pattern
-                    uint32 half_size = (size() - sizeof(link)) / 2;
-                    debug_assert(std::memcmp(memory_ + sizeof(link), memory_ + sizeof(link) + half_size, half_size) == 0);
-                }
             }
         }
 
@@ -132,6 +130,9 @@ namespace cachelot {
             debug_only(block->test_check());
             debug_assert(not block->meta.used);
             block->meta.used = true;
+            // ensure that user memory is still filled with debug pattern
+            debug_only(uint32 half_size = block->size() > 0 ? (block->size() - sizeof(link)) / 2 : 0;)
+            debug_assert(std::memcmp(block->memory_ + sizeof(link), block->memory_ + sizeof(link) + half_size, half_size) == 0);
             return block->memory_;
         }
 
@@ -240,18 +241,18 @@ namespace cachelot {
      * unset bit indicates that there is *definitely* no blocks of corresponding size
      *  - Each bit in first level index `pow_index` refers group of size classes of corresponding power of 2
      * @code
-       // depends on min_power_of_2
-       0000 0001 => [32..64)
-       0000 0010 => [64..128)
-       // ... and so on until max_power_of_2
+     *  // depends on min_power_of_2
+     *  0000 0001 => [32..64)
+     *  0000 0010 => [64..128)
+     *  // ... and so on until max_power_of_2
      * @endcode
      *  - Each bit of second level index refers to the corresponding size class (sub-block in power of 2)
      * @code
-     *  [0000 0000][0000 0001] => 32 // zero sub-block of min_power_of_2
-     *  [0000 0000][0000 0010] => 36 // 1st sub-block of min_power_of_2
-     *  [0000 0000][0000 0100] => 40 // 2nd sub-block
+     *  [0000 0000][0000 0001] => [32..36) // zero sub-block of min_power_of_2
+     *  [0000 0000][0000 0010] => [36..40) // 1st sub-block of min_power_of_2
+     *  [0000 0000][0000 0100] => [40..44) // 2nd sub-block
      *  // ...
-     *  [0000 0001][0000 0000] => 64 // zero sub-block of next power of 2
+     *  [0000 0001][0000 0000] => [64..72) // zero sub-block of next power of 2
      *  // and so on until max_block_size
      * @endcode
      */

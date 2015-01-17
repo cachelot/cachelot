@@ -10,7 +10,6 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/bytes.h
                 ${CMAKE_CURRENT_LIST_DIR}/error.h
                 ${CMAKE_CURRENT_LIST_DIR}/error.cpp
-                ${CMAKE_CURRENT_LIST_DIR}/item.h
                 ${CMAKE_CURRENT_LIST_DIR}/dict.h
                 ${CMAKE_CURRENT_LIST_DIR}/hash_fnv1a.h
                 ${CMAKE_CURRENT_LIST_DIR}/settings.h
@@ -18,6 +17,7 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/memalloc.h
                 ${CMAKE_CURRENT_LIST_DIR}/memalloc.cpp
                 ${CMAKE_CURRENT_LIST_DIR}/xrange.h
+                ${CMAKE_CURRENT_LIST_DIR}/item.h
         )
 
 #if (CMAKE_BUILD_TYPE MATCHES DEBUG)
