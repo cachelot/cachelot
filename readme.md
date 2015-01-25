@@ -14,14 +14,19 @@ ____________
  * optionally [Doxygen](http://doxygen.org/) to build docs
 
 ### Build
+Clone project repository
+
+    $ hg clone https://d.rider@bitbucket.org/d.rider/cachelot
+    $ cd cachelot
+
 Generate project files for your favorite IDE or Makefile by running `cmake -G "{generator}"` in main project directory.
 For example:
 
-    cmake -G "Unix Makefiles"
+    $ cmake -G "Unix Makefiles"
 
 or
-    
-    cmake -G "Xcode"
+
+    $ cmake -G "Xcode"
 
 It's possible to configure build by passing parameters to cmake:
 
@@ -40,8 +45,17 @@ Build with IDE or by running `make` in root project directory. All binaries (mai
 Assume you have working clang and libc++ (including libc++ ABI with headers) at this point
 Generate Makefile:
 
-    CC=clang CXX=clang++ cmake -G "Unix Makefiles" -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXX_LIBCXXABI_INCLUDE_PATHS="${path_to}/libcxxabi/include"
+    $ CC=clang CXX=clang++ cmake -G "Unix Makefiles" -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXX_LIBCXXABI_INCLUDE_PATHS="${path_to}/libcxxabi/include"
 
+
+Contact
+-------
+ * [Facebook](https://www.facebook.com/cachelot.io)
+ * [Bitbucket](https://bitbucket.org/d.rider/cachelot)
+
+Limitations
+-----------
+*TODO*: contents
 
 Found a Bug?
 ------------
