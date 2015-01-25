@@ -55,9 +55,9 @@ namespace cachelot {
     *  - has small overhead (only 8 bytes of metadata per allocation)
     */
     class memalloc {
-        class memblock_list;
-        class memblock;
-        class block_by_size_table;
+        class block;
+        class block_list;
+        class group_by_size;
     public:
         static const size_t allocation_limit = const_::allocation_limit;
 
@@ -87,18 +87,23 @@ namespace cachelot {
         inline bool valid_addr(void * ptr) const noexcept;
 
         /// coalesce adjacent unused blocks (up to `const_::max_block_size`) and return resulting block
-        memblock * merge_unused(memblock * block) noexcept;
+        block * merge_unused(block * block) noexcept;
 
         /// check whether evictions are supported
         bool has_evictions() const noexcept { return used_blocks != nullptr; }
+
+        // disallow copying
+        memalloc(const memalloc &) = delete;
+        memalloc & operator=(const memalloc &) = delete;
 
     private:
         // global arena boundaries
         uint8 const * arena_begin;
         uint8 const * arena_end;
+        size_t user_available_memory_size;  // amount of memory excluding internal memalloc structures
         // all memory blocks are located in table, grouped by block size
-        block_by_size_table * free_blocks; // free blocks are stored here
-        block_by_size_table * used_blocks; // used for block eviction
+        group_by_size * free_blocks; // free blocks are stored here
+        group_by_size * used_blocks; // used for block eviction
         // stats
         struct {
             uint64 num_malloc;
@@ -113,6 +118,7 @@ namespace cachelot {
             uint64 num_block_table_merges;
         } stats;
     };
+
 
 } // namespace cachelot
 
