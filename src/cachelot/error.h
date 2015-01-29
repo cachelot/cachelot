@@ -38,7 +38,7 @@ namespace cachelot {
 
             class application_error_category : public error_category {
             public:
-                application_error_category() noexcept = default;
+                application_error_category() = default;
 
                 virtual const char * name() const noexcept override { return "Application Error"; }
 

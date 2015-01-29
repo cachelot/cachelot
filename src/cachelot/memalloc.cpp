@@ -47,7 +47,7 @@ namespace cachelot {
         }
 
         /// constructor used for normal blocks
-        explicit block(const uint32 size, const block * left_adjacent_block) noexcept {
+        explicit block(const uint32 sz, const block * left_adjacent_block) noexcept {
             // User memory must be properly aligned
             debug_assert(unaligned_bytes(memory_, alignof(void *)) == 0);
             // check size
@@ -57,7 +57,7 @@ namespace cachelot {
             debug_only(meta.dbg_marker = const_::DBG_MARKER);
             // Fill-in memory with debug pattern
             debug_only(std::memset(memory_, const_::DBG_FILLER, size));
-            meta.size = size;
+            meta.size = sz;
             meta.used = false;
             meta.left_adjacent_offset = left_adjacent_block->size_with_meta();
             // check previous block for consistency
@@ -107,7 +107,7 @@ namespace cachelot {
             debug_assert(meta.size <= const_::max_block_size);
             if (not is_technical()) {
                 // allow test_check() to be `const`
-                block * non_const = const_cast<block *>(this);
+                debug_only(block * non_const = const_cast<block *>(this));
                 debug_assert(non_const->right_adjacent()->meta.dbg_marker == const_::DBG_MARKER);
                 debug_assert(non_const->right_adjacent()->left_adjacent() == this);
                 debug_assert(non_const->left_adjacent()->meta.dbg_marker == const_::DBG_MARKER);
@@ -324,6 +324,7 @@ namespace cachelot {
                     debug_assert(size == const_::max_block_size);
                     debug_assert(size == block_size());
                 }
+                (void) size;
             }
 
         private:
@@ -462,7 +463,7 @@ namespace cachelot {
 
     memalloc::memalloc(void * arena, const size_t arena_size, bool allow_evictions) noexcept {
         static_assert(valid_alignment(block::alignment), "block::meta must define proper alignment");
-        const size_t min_arena_size = sizeof(group_by_size) * 2 + sizeof(block) * 2 + 1024;
+        debug_only(const size_t min_arena_size = sizeof(group_by_size) * 2 + sizeof(block) * 2 + 1024);
         debug_assert(arena_size >= min_arena_size);
         // pointer to currently non-used memory
         uint8 * available = reinterpret_cast<uint8 *>(arena);
