@@ -15,23 +15,19 @@ namespace cachelot {
             debug_only(uint64 dbg_marker;) // debug constant marker to identify invalid blocks
         } meta;
 
-        // link for circular list of free blocks
         struct link_type {
             link_type * prev, * next;
-        };
+        } link;             // link for circular list of free blocks (free / used group_by_size lists)
 
-        union {
-            link_type link;
-            uint8 memory_[1];  // pointer to actual memory given to user
-        };
+        uint8 memory_[1];   // pointer to actual memory given to user
 
         friend class memalloc::block_list;
 
     public:
         /// public size of block metadata
-        constexpr static const uint32 meta_size = sizeof(meta);
+        constexpr static const uint32 meta_size = sizeof(meta) + sizeof(link_type);
         /// value of block alignment
-        constexpr static const uint32 alignment = sizeof(meta);
+        constexpr static const uint32 alignment = alignof(decltype(meta));
         /// minimal block size to split
         constexpr static const uint32 split_threshold = const_::min_block_size + meta_size;
 
@@ -47,7 +43,7 @@ namespace cachelot {
         }
 
         /// constructor used for normal blocks
-        explicit block(const uint32 sz, const block * left_adjacent_block) noexcept {
+        explicit block(const uint32 size, const block * left_adjacent_block) noexcept {
             // User memory must be properly aligned
             debug_assert(unaligned_bytes(memory_, alignof(void *)) == 0);
             // check size
@@ -57,7 +53,7 @@ namespace cachelot {
             debug_only(meta.dbg_marker = const_::DBG_MARKER);
             // Fill-in memory with debug pattern
             debug_only(std::memset(memory_, const_::DBG_FILLER, size));
-            meta.size = sz;
+            meta.size = size;
             meta.used = false;
             meta.left_adjacent_offset = left_adjacent_block->size_with_meta();
             // check previous block for consistency
@@ -107,7 +103,7 @@ namespace cachelot {
             debug_assert(meta.size <= const_::max_block_size);
             if (not is_technical()) {
                 // allow test_check() to be `const`
-                debug_only(block * non_const = const_cast<block *>(this));
+                block * non_const = const_cast<block *>(this);
                 debug_assert(non_const->right_adjacent()->meta.dbg_marker == const_::DBG_MARKER);
                 debug_assert(non_const->right_adjacent()->left_adjacent() == this);
                 debug_assert(non_const->left_adjacent()->meta.dbg_marker == const_::DBG_MARKER);
@@ -232,7 +228,7 @@ namespace cachelot {
 //////// group_by_size ///////////////////////////
 
     /**
-     * Segreagation table of block_list, index matches size of stored blocks
+     * Segreagation table of block_list, index matches size class of stored blocks
      *
      * It is organized as a continuous array where cells are lists of blocks within a size class.
      * There are two bit indexes intended to minimize cache misses and to speed up search of block of maximal size.
@@ -266,7 +262,10 @@ namespace cachelot {
                 debug_only(test_check());
             }
         public:
-            position() noexcept { /* do nothing */ };
+            constexpr position() noexcept
+                : pow_index(std::numeric_limits<decltype(pow_index)>::max())
+                , sub_index(std::numeric_limits<decltype(sub_index)>::max())
+                { /* do nothing */ };
             constexpr position(const position &) noexcept = default;
             position & operator= (const position &) noexcept = default;
 
@@ -324,7 +323,6 @@ namespace cachelot {
                     debug_assert(size == const_::max_block_size);
                     debug_assert(size == block_size());
                 }
-                (void) size;
             }
 
         private:
@@ -364,14 +362,15 @@ namespace cachelot {
         group_by_size() = default;
 
         /// try to get block of a `requested_size`, return `nullptr` on fail
-        block * try_get_block(const uint32 requested_size) noexcept {
+        tuple<block *, position> try_get_block(const uint32 requested_size) noexcept {
+            static const auto None = tuple<block *, position>(nullptr, position());
             debug_assert(requested_size <= const_::max_block_size);
             position pos = search_pos(requested_size);
             // access indexes first, unset bits clearly indicate that corresponding cell is empty
             if (bit::isset(first_level_bit_index, pos.pow_index) && bit::isset(second_level_bit_index[pos.pow_index], pos.sub_index)) {
-                return block_at(pos);
+                return tuple<block *, position>(block_at(pos), pos);
             } else {
-                return nullptr;
+                return None;
             }
         }
 
@@ -379,7 +378,7 @@ namespace cachelot {
         block * try_get_biggest_block(const uint32 requested_size) noexcept {
             debug_assert(requested_size <= const_::max_block_size);
             // accessing indexes first
-            if (first_level_bit_index > 0) {
+            while (first_level_bit_index > 0) {
                 // 1. retrieve maximal non-empty cells group among powers of 2
                 const uint32 pow_index = bit::most_significant(first_level_bit_index);
                 // 2. retrieve the biggest block among group sub-blocks
@@ -390,6 +389,7 @@ namespace cachelot {
                 if (biggest_block_pos.block_size() >= requested_size) {
                     return block_at(biggest_block_pos);
                 }
+                // TODO: DBG_loopBracker(100000000);
             }
             return nullptr;
         }
@@ -461,8 +461,7 @@ namespace cachelot {
 
 //////// memalloc //////////////////////////////////////
 
-    memalloc::memalloc(void * arena, const size_t arena_size, bool allow_evictions) noexcept {
-        static_assert(valid_alignment(block::alignment), "block::meta must define proper alignment");
+    memalloc::memalloc(void * arena, const size_t arena_size) noexcept {
         debug_only(const size_t min_arena_size = sizeof(group_by_size) * 2 + sizeof(block) * 2 + 1024);
         debug_assert(arena_size >= min_arena_size);
         // pointer to currently non-used memory
@@ -484,11 +483,7 @@ namespace cachelot {
         };
 
         free_blocks = allocate_block_table();
-        if (allow_evictions) {
-            used_blocks = allocate_block_table();
-        } else {
-            used_blocks = nullptr;
-        }
+        used_blocks = allocate_block_table();
 
         // split all arena on blocks and store them in free blocks table
 
@@ -574,20 +569,24 @@ namespace cachelot {
         debug_assert(size > 0);
         const uint32 nsize = size > const_::min_block_size ? static_cast<uint32>(size) : const_::min_block_size;
         // 1. Try to get block of corresponding size from table
-        block * free_block = free_blocks->try_get_block(nsize);
-        if (free_block != nullptr) {
-            return block::checkout(free_block);
+        block * found_block;
+        group_by_size::position found_block_pos;
+        tie(found_block, found_block_pos) = free_blocks->try_get_block(nsize);
+        if (found_block != nullptr) {
+            used_blocks->put_block_at(found_block, found_block_pos);
+            return block::checkout(found_block);
         }
         // 2. Try to split the biggest available block
         block * big_block = free_blocks->try_get_biggest_block(nsize);
         if (big_block != nullptr) {
             debug_assert(big_block->size() >= nsize);
             block * leftover;
-            tie(free_block, leftover) = block::split(big_block, nsize);
+            tie(found_block, leftover) = block::split(big_block, nsize);
             if (leftover) {
                 free_blocks->put_block(leftover);
             }
-            return block::checkout(free_block);
+            used_blocks->put_block(found_block);
+            return block::checkout(found_block);
         }
         return nullptr;
     }
@@ -629,6 +628,8 @@ namespace cachelot {
     void memalloc::free(void * ptr) noexcept {
         debug_assert(valid_addr(ptr));
         block * blk = block::from_user_ptr(ptr);
+        // remove from the used_block group_by_size table
+        block_list::unlink(blk);
         block::unuse(blk);
         // try to merge it
         blk = merge_unused(blk);
