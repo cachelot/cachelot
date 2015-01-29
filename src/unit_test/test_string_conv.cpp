@@ -17,6 +17,7 @@ void check_int_to_string(NumType number) {
     constexpr size_t MAXLEN = 32;
     char my_value[MAXLEN];
     size_t my_value_length = int_to_str<NumType, char *>(number, my_value);
+    BOOST_ASSERT(my_value_length > 0);
     BOOST_ASSERT(my_value_length < MAXLEN);
     my_value[my_value_length] = '\0';
     BOOST_CHECK_EQUAL(my_value, their_value);
