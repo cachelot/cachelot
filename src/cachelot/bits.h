@@ -100,13 +100,6 @@ namespace cachelot {
         return ispow2(value) ? value : pow2(log2u(value) + 1u);
     }
 
-    /// determine whether given `alignment` is valid
-    template <typename UIntT,
-              class = typename std::enable_if<std::is_unsigned<UIntT>::value>::type>
-    constexpr UIntT valid_alignment(const UIntT alignment) noexcept {
-        return (alignment == (UIntT(1)) || (sizeof(void *) <= alignment)) && ispow2(alignment);
-    }
-
     /// return number of bytes necessary to align `size` according to the given `alignment`
     inline size_t unaligned_bytes(const size_t size, const size_t alignment) noexcept {
         return reinterpret_cast<size_t>((size + (alignment - 1u)) & -alignment) - size;
