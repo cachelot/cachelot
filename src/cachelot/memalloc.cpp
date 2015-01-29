@@ -43,17 +43,17 @@ namespace cachelot {
         }
 
         /// constructor used for normal blocks
-        explicit block(const uint32 size, const block * left_adjacent_block) noexcept {
+        explicit block(const uint32 sz, const block * left_adjacent_block) noexcept {
             // User memory must be properly aligned
             debug_assert(unaligned_bytes(memory_, alignof(void *)) == 0);
             // check size
-            debug_assert(size >= const_::min_block_size || size == 0);
-            debug_assert(size <= const_::max_block_size);
+            debug_assert(sz >= const_::min_block_size || sz == 0);
+            debug_assert(sz <= const_::max_block_size);
             // set debug marker
             debug_only(meta.dbg_marker = const_::DBG_MARKER);
             // Fill-in memory with debug pattern
-            debug_only(std::memset(memory_, const_::DBG_FILLER, size));
-            meta.size = size;
+            debug_only(std::memset(memory_, const_::DBG_FILLER, sz));
+            meta.size = sz;
             meta.used = false;
             meta.left_adjacent_offset = left_adjacent_block->size_with_meta();
             // check previous block for consistency
@@ -103,7 +103,7 @@ namespace cachelot {
             debug_assert(meta.size <= const_::max_block_size);
             if (not is_technical()) {
                 // allow test_check() to be `const`
-                block * non_const = const_cast<block *>(this);
+                debug_only(block * non_const = const_cast<block *>(this));
                 debug_assert(non_const->right_adjacent()->meta.dbg_marker == const_::DBG_MARKER);
                 debug_assert(non_const->right_adjacent()->left_adjacent() == this);
                 debug_assert(non_const->left_adjacent()->meta.dbg_marker == const_::DBG_MARKER);
@@ -313,7 +313,7 @@ namespace cachelot {
             }
 
             // debug only check if size within this position size class
-            void test_size_check(const uint32 size) const noexcept {
+            void test_size_check(const uint32 debug_only(size)) const noexcept {
                 debug_assert(size >= block_size());
                 const auto last_pos = position::max();
                 if ((pow_index < last_pos.pow_index) || (pow_index == last_pos.pow_index && sub_index < last_pos.sub_index)) {
