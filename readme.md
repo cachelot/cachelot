@@ -1,11 +1,10 @@
 Cachelot                         {#mainpage}
 ========
 
-Cachelot is main memory key-value cache. It is [memcached](http://memcached.org/) compatible, including protocols and set of commands.
-*TODO*: documentation
+*Cachelot* is memory key-value cache. It is compatible with [memcached](http://memcached.org/), but introduces higher performance, less memory consumption and new features.
 
-How To Build
-____________
+
+## How To Build
 
 ### Prerequisites
  * C++11 capable compiler

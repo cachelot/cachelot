@@ -65,7 +65,7 @@ namespace cachelot {
         /// @p arena - pointer to memory to work with
         /// @p arena_size - size of `arena` in bytes
         /// @p evictions - enable / disable evictions of allocated blocks
-        explicit memalloc(void * arena, const size_t arena_size, bool evictions = false) noexcept;
+        explicit memalloc(void * arena, const size_t arena_size) noexcept;
 
         /// try to allocate memory of requested `size`, return `nullptr` on fail
         void * alloc(const size_t size) noexcept;
@@ -88,9 +88,6 @@ namespace cachelot {
 
         /// coalesce adjacent unused blocks (up to `const_::max_block_size`) and return resulting block
         block * merge_unused(block * block) noexcept;
-
-        /// check whether evictions are supported
-        bool has_evictions() const noexcept { return used_blocks != nullptr; }
 
         // disallow copying
         memalloc(const memalloc &) = delete;
