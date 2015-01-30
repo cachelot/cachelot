@@ -1,4 +1,4 @@
-// memalloc implementation
+// memalloc implementation
 
 namespace cachelot {
 
@@ -136,7 +136,7 @@ namespace cachelot {
         }
 
         /// mark block as free
-        static void * unuse(block * blk) noexcept {
+        static void unuse(block * blk) noexcept {
             debug_only(blk->test_check());
             debug_assert(blk->is_used());
             blk->meta.used = false;
