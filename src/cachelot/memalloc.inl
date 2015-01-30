@@ -522,7 +522,6 @@ namespace cachelot {
 //////// memalloc //////////////////////////////////////
 
     inline memalloc::memalloc(void * arena, const size_t arena_size) noexcept {
-        std::cout << sizeof(group_by_size) << std::endl;
         debug_only(const size_t min_arena_size = sizeof(group_by_size) * 2 + sizeof(block) * 2 + 4096);
         debug_assert(arena_size >= min_arena_size);
         // pointer to currently non-used memory
