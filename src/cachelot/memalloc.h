@@ -67,11 +67,19 @@ namespace cachelot {
         /// @p evictions - enable / disable evictions of allocated blocks
         explicit memalloc(void * arena, const size_t arena_size) noexcept;
 
-        /// try to allocate memory of requested `size`, return `nullptr` on fail
-        void * alloc(const size_t size) noexcept;
+        /// Try to allocate `size` bytes, return `nullptr` on fail
+        void * alloc(const size_t size) noexcept {
+            return alloc_or_evict(size, false, [=](void *) -> void {});
+        }
 
-        /// try to evict existing chunk of requested `size`, return `nullptr` on fail
-        void * evict(const size_t size) noexcept;
+        /// allocate memory or evict previously allocated block(s) if necessary
+        /// @p size - amount of memory in bytes
+        /// @p evict_if_necessary - do item eviction if there is no free memory
+        /// @p on_free_block - in case of eviction call this function for each freed block
+        /// @tparam ForeachFreed - `void on_free(void * ptr)`
+        template <typename ForeachFreed>
+        void * alloc_or_evict(const size_t size, bool evict_if_necessary = false,
+                              ForeachFreed on_free_block = [=](void *) -> void {}) noexcept;
 
         /// try to extend previously allocated memory up to `new_size`, return `nullptr` on fail
         void * try_realloc_inplace(void * ptr, const size_t new_size) noexcept;
@@ -81,6 +89,9 @@ namespace cachelot {
 
         /// return size of previously allocate memory including technical alignment bytes
         size_t _reveal_actual_size(void * ptr) const noexcept;
+
+        /// touch previously allocated item to increase it's chance to avoid eviction
+        void touch(void * ptr) noexcept;
 
     private:
         /// check whether given `ptr` whithin arena bounaries and block information can be retrieved from it
@@ -120,5 +131,7 @@ namespace cachelot {
 } // namespace cachelot
 
 /// @}
+
+#include <cachelot/memalloc.inl>
 
 #endif // CACHELOT_MEMALLOC_H_INCLUDED

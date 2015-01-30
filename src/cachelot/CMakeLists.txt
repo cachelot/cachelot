@@ -15,7 +15,7 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/settings.h
                 ${CMAKE_CURRENT_LIST_DIR}/settings.cpp
                 ${CMAKE_CURRENT_LIST_DIR}/memalloc.h
-                ${CMAKE_CURRENT_LIST_DIR}/memalloc.cpp
+                ${CMAKE_CURRENT_LIST_DIR}/memalloc.inl
                 ${CMAKE_CURRENT_LIST_DIR}/xrange.h
                 ${CMAKE_CURRENT_LIST_DIR}/item.h
         )
