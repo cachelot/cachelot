@@ -8,7 +8,7 @@ namespace {
 using namespace cachelot;
 
 static constexpr size_t MEMSIZE = 1024 * 1024 * 64; // 4Mb
-static constexpr size_t NUM_ALLOC = 1000000;
+static constexpr size_t NUM_ALLOC = 100000;
 static constexpr size_t NUM_REPEAT = 5;
 static constexpr size_t MIN_ALLOC_SIZE = 4;
 static constexpr size_t MAX_ALLOC_SIZE = 1024 * 1024;
