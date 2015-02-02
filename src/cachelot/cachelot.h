@@ -31,12 +31,6 @@
 #include <cstdlib>  // strtol, strtoul
 #include <stdexcept>// exception / runtime_error, etc
 #include <tuple>    // std::tuple
-#include <chrono>   // std::chrono
-
-// Boost
-#include <boost/system/error_code.hpp>   // error_code, error_category
-#include <boost/system/system_error.hpp> // system_error exception
-
 
 #if defined(DEBUG) && defined(_MSC_VER)
 #  include <crtdbg.h>  // Enable MSVC CRT memory checks
@@ -80,36 +74,13 @@ namespace cachelot {
     template <typename ... Args> inline tuple<Args&...> tie(Args&... args) { return std::tie(args...); }
     template <typename ... Args> inline tuple<Args...> make_tuple(Args... args) { return std::make_tuple(args...); }
 
-    /// chrono chrortcuts
-    using std::chrono::steady_clock;
-    // common duration types
-    using std::chrono::nanoseconds;
-    using std::chrono::microseconds;
-    using std::chrono::milliseconds;
-    using std::chrono::seconds;
-    using std::chrono::minutes;
-    using std::chrono::hours;
-
-    /// system error handling
-    using boost::system::error_code;      // boost::error is used rather than std's because it is used by boost::asio
-    using boost::system::error_category;
-    using boost::system::system_error;
-
     /// get raw pointer on type from a smart pointer such as std::unique_ptr
     template <class SmartPointer>
     auto raw_pointer(const SmartPointer & ptr) -> decltype(ptr.get()) {
         return ptr.get();
     }
 
-    /// core types
-    typedef steady_clock clock;
-    typedef clock::time_point time_point;
-    typedef uint16 opaque_flags_type;
-    typedef uint64 cas_value_type;
-
-    static constexpr size_t max_key_length = 250;
-    static constexpr size_t max_value_length = 128 * 1024 * 1024;
-    constexpr size_t cpu_cache_line = 64;
+    constexpr size_t cpu_l1d_cache_line = 64;
     constexpr int the_answer_to_life_the_universe_and_everything = 42;
 
 } // namespace cachelot
