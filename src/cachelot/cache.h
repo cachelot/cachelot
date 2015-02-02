@@ -1,44 +1,72 @@
 #ifndef CACHELOT_CACHE_H_INCLUDED
 #define CACHELOT_CACHE_H_INCLUDED
 
-#include <cachelot/memalloc.h>
-#include <cachelot/item.h>
-#include <cachelot/dict.h>
+#ifndef CACHELOT_MEMALLOC_H_INCLUDED
+#  include <cachelot/memalloc.h>
+#endif
+#ifndef CACHELOT_CACHE_ITEM_H_INCLUDED
+#  include <cachelot/item.h>
+#endif
+#ifndef CACHELOT_DICT_H_INCLUDED
+#  include <cachelot/dict.h>
+#endif
+#ifndef CACHELOT_ERROR_H_INCLUDED
+#  include <cachelot/error.h>
+#endif
+#ifndef CACHELOT_SETTINGS_H_INCLUDED
+#  include <cachelot/settings.h>
+#endif
 
 /// @defgroup cache Cache implementation
 /// @{
 
 namespace cachelot {
 
-
     namespace cache {
+
+        /// Pointer to single cache Item
+        typedef Item * ItemPtr;
+        /// Hash value type
+        typedef Item::hash_type hash_type;
+        /// Clock to maintain expiration
+        typedef Item::clock clock;
+        /// Expiration time point
+        typedef Item::expiration_time_point expiration_time_point;
+        /// User defined flags
+        typedef Item::opaque_flags_type opaque_flags_type;
+        /// Value type of CAS operation
+        typedef Item::cas_value_type cas_value_type;
+        /// Maximum key length in bytes
+        static constexpr auto max_key_length = Item::max_key_length;
+        /// Maximum value length in bytes
+        static constexpr auto max_value_length = Item::max_value_length;
 
         /// Single entry in the main cache dict
         class ItemDictEntry {
         public:
-            constexpr ItemDictEntry() = default;
-            explicit constexpr ItemDictEntry(const Key &, const T & the_item) noexcept : m_item(the_item) {}
-            constexpr ItemDictEntry(this_type &&) noexcept = default;
-            ItemDictEntry & operator=(this_type &&) noexcept = default;
+            ItemDictEntry() = default;
+            explicit constexpr ItemDictEntry(const bytes &, const ItemPtr & the_item) noexcept : m_item(the_item) {}
+            constexpr ItemDictEntry(ItemDictEntry &&) noexcept = default;
+            ItemDictEntry & operator=(ItemDictEntry &&) noexcept = default;
 
             // disallow copying
-            ItemDictEntry(const this_type &) = delete;
-            ItemDictEntry & operator=(const this_type &) = delete;
+            ItemDictEntry(const ItemDictEntry &) = delete;
+            ItemDictEntry & operator=(const ItemDictEntry &) = delete;
 
             // key getter
-            const Key & key() const noexcept {
+            const bytes key() const noexcept {
                 debug_assert(m_item);
                 return m_item->key();
             }
 
             // value getter
-            const T & value() const noexcept {
+            const ItemPtr & value() const noexcept {
                 debug_assert(m_item);
-                return m_item->value();
+                return m_item;
             }
 
             // swap with other entry
-            void swap(this_type & other) {
+            void swap(ItemDictEntry & other) {
                 using std::swap;
                 swap(m_item, other.m_item);
             }
@@ -46,7 +74,7 @@ namespace cachelot {
             ItemPtr m_item;
         };
 
-        template <typename Key, typename T>
+
         void swap(ItemDictEntry & left, ItemDictEntry & right) {
             left.swap(right);
         }
@@ -54,27 +82,18 @@ namespace cachelot {
         /// Options of the underlying hash table
         struct DictOptions {
             typedef uint32 size_type;
-            typedef uint32 hash_type;
+            typedef hash_type hash_type;
             static constexpr size_type max_load_factor_percent = 93;
         };
 
 
         /**
-         * Cache manages all Items, gives acces by key, maintains item expiration
+         * Cache class to rule them all
          */
         class Cache {
            // Underlying dictionary
             typedef dict<bytes, ItemPtr, bytes::equal_to, ItemDictEntry, DictOptions> dict_type;
             typedef dict_type::iterator iterator;
-            // Clock types
-            typedef chrono::steady_clock clock_type;
-            typedef clock_type::time_point expiration_time_type;
-        public:
-            typedef dict_type::hash_type hash_type;
-            typedef chrono::seconds seconds;
-            typedef uint16 flags_type;
-            typedef uint64 cas_type;
-
         public:
             /**
              * constructor
@@ -84,20 +103,18 @@ namespace cachelot {
              */
             Cache(size_t memory_size, size_t initial_dict_size);
 
-            /// destructor
-            ~Cache();
 
             /**
-             * Request to retrieve item
+             * `xxx` -  retrieve item
              *
              * @tparam Callback - callback will be called when request is completed
              * Callback must have following signature:
              * @code
-             *    void on_get(error_code error, bool found, bytes value, flags_type flags, cas_type cas_value)
+             *    void on_get(error_code error, bool found, bytes value, opaque_flags_type flags, cas_value_type cas_value)
              * @endcode
              */
             template <typename Callback>
-            void async_get(const bytes key, const hash_type hash, Callback on_get) noexcept;
+            void do_get(const bytes key, const hash_type hash, Callback on_get) noexcept;
 
 
             /**
@@ -111,55 +128,55 @@ namespace cachelot {
              */
 
             /**
-             * Request to unconditionally store item
+             * `set` - store item unconditionally
              *
              * @copydoc doxygen_store_command
              */
             template <typename Callback>
-            void async_set(const bytes key, const hash_type hash, bytes value, flags_type flags, seconds expires_after, cas_type cas_value, Callback on_set) noexcept;
+            void do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_set) noexcept;
 
             /**
-             * Request to store non-existing item
+             * `add` - store non-existing item
              *
              * @copydoc doxygen_store_command
              */
             template <typename Callback>
-            void async_add(const bytes key, const hash_type hash, bytes value, flags_type flags, seconds expires_after, cas_type cas_value, Callback on_add) noexcept;
+            void do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_add) noexcept;
 
             /**
-             * Request to modify existing item
+             * `replace` - modify existing item
              *
              * @copydoc doxygen_store_command
              */
             template <typename Callback>
-            void async_replace(const bytes key, const hash_type hash, bytes value, flags_type flags, seconds expires_after, cas_type cas_value, Callback on_replace) noexcept;
+            void do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_replace) noexcept;
 
             /**
-             * Request to compare-and-swap items
+             * `cas` - compare-and-swap items
              *
              * @copydoc doxygen_store_command
              */
             template <typename Callback>
-            void async_cas(const bytes key, const hash_type hash, bytes value, flags_type flags, seconds expires_after, cas_type cas_value, Callback on_cas) noexcept;
+            void do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_cas) noexcept;
 
             /**
-             * Request to store non-existing item
+             * `append` - write additional data 'after' existing item data
              *
              * @copydoc doxygen_store_command
              */
             template <typename Callback>
-            void async_append(const bytes key, const hash_type hash, bytes value, flags_type flags, seconds expires_after, cas_type cas_value, Callback on_append) noexcept;
+            void do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_append) noexcept;
 
             /**
-             * Request to store non-existing item
+             * `prepend` - write additional data 'before' existing item data
              *
              * @copydoc doxygen_store_command
              */
             template <typename Callback>
-            void async_prepend(const bytes key, const hash_type hash, bytes value, flags_type flags, seconds expires_after, cas_type cas_value, Callback on_prepend) noexcept;
+            void do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_prepend) noexcept;
 
             /**
-             * Request to delete item
+             * `del` - delete existing item
              *
              * @tparam Callback - callback will be called when request is completed
              * Callback must have following signature:
@@ -168,10 +185,10 @@ namespace cachelot {
              * @endcode
              */
             template <typename Callback>
-            void async_del(const bytes key, const hash_type hash, Callback on_del) noexcept;
+            void do_del(const bytes key, const hash_type hash, Callback on_del) noexcept;
 
             /**
-             * Request to prolong item lifetime
+             * `touch` - prolong item lifetime
              *
              * @tparam Callback - callback will be called when request is completed
              * Callback must have following signature:
@@ -180,51 +197,201 @@ namespace cachelot {
              * @endcode
              */
             template <typename Callback>
-            void async_touch(const bytes key, const hash_type hash, seconds expires_after, Callback on_touch) noexcept;
+            void do_touch(const bytes key, const hash_type hash, seconds expires, Callback on_touch) noexcept;
 
         private:
             /**
-             * retrieve item from storage taking in account its expiration time,
-             * expired items will be immediately removed and retrieve_item() will report that item has not found
+             * utility function to create point in time from duration in seconds
              */
-            tuple<bool, dict_type::iterator> retrieve_item(const bytes key, const hash_type hash) noexcept;
+            static expiration_time_point time_from(seconds expire_after) {
+                return expire_after == seconds(0) ? expiration_time_point::max() : clock::now() + expire_after;
+            }
 
-            /// process `get` request
-            void do_get(const GetRequest & req) noexcept;
+            /**
+             * Create new Item using memalloc for allocation
+             * throws std::bad_alloc on allocation failure
+             */
+            ItemPtr item_new(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value);
 
-            /// process `set` request
-            void do_set(const StoreRequest & req) noexcept;
+            /**
+             * Free existing Item and return memory to the memalloc
+             */
+            void item_free(ItemPtr item) noexcept;
 
-            /// process `add` request
-            void do_add(const StoreRequest & req) noexcept;
+            /**
+             * Try to assign new fields to the existing Item in dict at given position
+             * throws std::bad_alloc on allocation failure
+             */
+            void item_reassign_at(const iterator at, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value);
 
-            /// process `replace` request
-            void do_replace(const StoreRequest & req) noexcept;
-
-            /// process `cas` request
-            void do_cas(const StoreRequest & req) noexcept;
-
-            /// process `append` request
-            void do_append(const StoreRequest & req) noexcept;
-
-            /// process `prepend` request
-            void do_prepend(const StoreRequest & req) noexcept;
-
-            /// process `del` request
-            void do_del(const DelRequest & req) noexcept;
-
-            /// process `touch` request
-            void do_touch(const TouchRequest & req) noexcept;
-
-            /// process next request from the queue
-            bool process_request() noexcept;
+            /**
+             * retrieve item from cache taking in account its expiration time,
+             * expired items will be immediately removed and retrieve_item() will report that item was not found
+             */
+            tuple<bool, dict_type::iterator> retrieve_item(const bytes key, const hash_type hash, bool readonly = false);
 
         private:
-            std::unique_ptr<byte[]> memory_arena;
+            std::unique_ptr<uint8[]> memory_arena;
             memalloc m_allocator;
             dict_type m_dict;
-            mpsc_queue<AsyncRequest> m_requests;
         };
+
+
+        inline tuple<bool, Cache::dict_type::iterator> Cache::retrieve_item(const bytes key, const hash_type hash, bool readonly) {
+            bool found; iterator at;
+            tie(found, at) = m_dict.entry_for(key, hash, readonly);
+            if (found && at.value()->is_expired()) {
+                m_dict.remove(at);
+                item_free(at.value());
+                found = false;
+            }
+            return make_tuple(found, at);
+        }
+
+
+        template <typename Callback>
+        inline void Cache::do_get(const bytes key, const hash_type hash, Callback on_get) noexcept {
+            // try to retrieve existing item
+            bool found; iterator at; bool readonly = true;
+            tie(found, at) = retrieve_item(key, hash, readonly);
+            if (found) {
+                auto item = at.value();
+                debug_assert(item->key().equals(key));
+                debug_assert(item->hash() == hash);
+                on_get(error::success, true, item->value(), item->opaque_flags(), item->cas_value());
+            } else {
+                on_get(error::success, false, bytes(), opaque_flags_type(), cas_value_type());
+            }
+        }
+
+
+        template <typename Callback>
+        inline void Cache::do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_set) noexcept {
+            bool found; iterator at;
+            try {
+                tie(found, at) = retrieve_item(key, hash);
+                if (not found) {
+                    auto item = item_new(key, hash, value, flags, expires, cas_value);
+                    m_dict.insert(at, key, hash, item);
+                } else {
+                    item_reassign_at(at, value, flags, expires, cas_value);
+                }
+                on_set(error::success, true);
+            } catch (const std::bad_alloc &) {
+                on_set(error::out_of_memory, false);
+            }
+        }
+
+
+        template <typename Callback>
+        inline void Cache::do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_add) noexcept {
+            bool found; iterator at;
+            try {
+                tie(found, at) = retrieve_item(key, hash);
+                if (not found) {
+                    auto item = item_new(key, hash, value, flags, expires, cas_value);
+                    m_dict.insert(at, key, hash, item);
+                }
+                on_add(error::success, not found);
+            } catch (const std::bad_alloc &) {
+                on_add(error::out_of_memory, false);
+            }
+        }
+
+
+        template <typename Callback>
+        inline void Cache::do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_replace) noexcept {
+            bool found; iterator at;
+            try {
+                tie(found, at) = retrieve_item(key, hash);
+                if (found) {
+                    item_reassign_at(at, value, flags, expires, cas_value);
+                }
+                on_replace(error::success, found);
+            } catch (const std::bad_alloc &) {
+                on_replace(error::out_of_memory, false);
+            }
+        }
+
+
+//        template <typename Callback>
+//        inline void Cache::do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_cas) noexcept {
+//
+//        }
+//
+//
+//        template <typename Callback>
+//        inline void Cache::do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_append) noexcept {
+//
+//        }
+//
+//
+//        template <typename Callback>
+//        inline void Cache::do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_prepend) noexcept {
+//
+//        }
+
+
+        template <typename Callback>
+        inline void Cache::do_del(const bytes key, const hash_type hash, Callback on_del) noexcept {
+            bool found; iterator at; const bool readonly = true;
+            tie(found, at) = retrieve_item(key, hash, readonly);
+            if (found) {
+                m_dict.remove(at);
+                item_free(at.value());
+            }
+            on_del(error::success, found);
+        }
+        
+
+        template <typename Callback>
+        inline void Cache::do_touch(const bytes key, const hash_type hash, seconds expires, Callback on_touch) noexcept {
+            bool found; iterator at; const bool readonly = true;
+            tie(found, at) = retrieve_item(key, hash, readonly);
+            if (found) {
+                at.value()->touch(time_from(expires));
+            }
+            on_touch(error::success, found);
+        }
+
+
+        inline ItemPtr Cache::item_new(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) {
+            void * memory;
+            const size_t size_required = Item::CalcSizeRequired(key, value, cas_value);
+            auto on_delete = [=](void * ptr) -> void {
+                auto i = reinterpret_cast<Item *>(ptr);
+                debug_only(bool deleted = ) this->m_dict.del(i->key(), i->hash());
+                debug_assert(deleted);
+            };
+            memory = m_allocator.alloc_or_evict(size_required, settings.cache.has_evictions, on_delete);
+            if (memory != nullptr) {
+                return new (memory) Item(key, hash, value, flags, time_from(expires), cas_value);
+            } else {
+                throw std::bad_alloc();
+            }
+        }
+
+
+        inline void Cache::item_free(ItemPtr item) noexcept {
+            debug_assert(not m_dict.contains(item->key(), item->hash()));
+            m_allocator.free(item);
+        }
+
+
+        inline void Cache::item_reassign_at(const iterator at, bytes new_value, opaque_flags_type new_flags, seconds new_expires, cas_value_type new_cas_value) {
+            Item * item = at.value();
+            const size_t size_required = Item::CalcSizeRequired(item->key(), new_value, new_cas_value);
+            // Try to resize Item's memory without touching contents
+            if (m_allocator.try_realloc_inplace(item, size_required)) {
+                item->reassign(new_value, new_flags, time_from(new_expires), new_cas_value);
+            } else {
+                auto new_item = item_new(item->key(), item->hash(), new_value, new_flags, new_expires, new_cas_value);
+                m_dict.remove(at);
+                item_free(item);
+                m_dict.insert(at, new_item->key(), new_item->hash(), new_item);
+            }
+        }
+
 
 
     } // namespace cache

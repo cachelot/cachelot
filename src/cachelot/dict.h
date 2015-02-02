@@ -24,7 +24,7 @@ namespace cachelot {
      * @tparam Key - key type
      * @tparam T - value type
      * @tparam KeyEqual - key equality predicate
-     * @tparam Entry - class representing entry of the hash_table, 
+     * @tparam Entry - class representing entry of the hash_table,
      *                 must have following interface:
      * @code
      *  template <typename Key, typename T> struct hash_table_entry {
@@ -69,12 +69,12 @@ namespace cachelot {
             iterator & operator= (const iterator &) = default;
 
             explicit operator bool() const noexcept {
-                return m_table != nullptr && not m_table->empty_slot(m_pos);
+                return m_table != nullptr && not m_table->empty_at(m_pos);
             }
 
             const Key key() const noexcept {
                 if (*this) {
-                    return m_table->get_entry(m_pos).key;
+                    return m_table->entry_at(m_pos).key();
                 } else {
                     return Key();
                 }
@@ -82,7 +82,7 @@ namespace cachelot {
 
             const T value() const noexcept {
                 if (*this) {
-                    return m_table->get_entry(m_pos).value;
+                    return m_table->entry_at(m_pos).value();
                 } else {
                     return T();
                 }
@@ -90,7 +90,7 @@ namespace cachelot {
 
             void assign(const T new_value) noexcept {
                 debug_assert(*this);
-                m_table->get_entry(m_pos).value = new_value;
+                m_table->entry_at(m_pos).value = new_value;
             }
 
         private:
@@ -148,9 +148,9 @@ namespace cachelot {
         }
 
         /// return either iterator referencing existing entry or pointer to insertion position
-        tuple<bool, iterator> entry_for(key_type key, hash_type hash) noexcept {
+        tuple<bool, iterator> entry_for(key_type key, hash_type hash, bool readonly = false) {
             if (not is_expanding()) {
-                return search_primary(key, hash);
+                return search_primary(key, hash, readonly);
             } else {
                 // dict expansion is in progress
                 return search_secondary(key, hash);
@@ -220,12 +220,14 @@ namespace cachelot {
             return iterator(raw_pointer(table), pos_in_table);
         }
 
-        tuple<bool, iterator> search_primary(key_type key, hash_type hash) noexcept {
+        tuple<bool, iterator> search_primary(key_type key, hash_type hash, bool readonly) {
             bool found; size_t at;
             tie(found, at) = m_primary_tbl->entry_for(key, hash);
             if (not found) {
                 if (m_primary_tbl->threshold_reached()) {
-                    begin_expand();
+                    if (not readonly) {
+                        begin_expand();
+                    }
                     // search for free entry again after resize
                     tie(found, at) = m_primary_tbl->entry_for(key, hash);
                     debug_assert(not found);
@@ -247,7 +249,7 @@ namespace cachelot {
                     return make_tuple(found, iter(m_primary_tbl, at)); // TODO: weak_ptr?
                 }
             } else {
-                return search_primary(key, hash);
+                return search_primary(key, hash, false);
             }
         }
 
@@ -256,22 +258,24 @@ namespace cachelot {
             m_expand_pos = 0;
             m_primary_tbl.swap(m_secondary_tbl);
             m_primary_tbl.reset(new hash_table_type(pow2(m_hashpower + 1)));
-            if (!m_primary_tbl->ok()) {
+            if (m_primary_tbl && m_primary_tbl->ok()) {
+                m_hashpower += 1;
+                rehash_some();
+            } else {
                 m_primary_tbl.swap(m_secondary_tbl);
+                m_secondary_tbl.reset(nullptr);
                 throw std::bad_alloc();
             }
-            m_hashpower += 1;
-            rehash_some();
         }
 
-        void end_expand() {
+        void end_expand() noexcept {
             debug_assert(is_expanding());
             debug_assert(m_secondary_tbl->empty());
             m_secondary_tbl.reset(nullptr);
             m_expand_pos = 0;
         }
 
-        void rehash_some() {
+        void rehash_some() noexcept {
             const size_type batch_size = std::min<size_type>(512, m_secondary_tbl->size());
             size_type elements_moved = 0;
             while (elements_moved < batch_size) {

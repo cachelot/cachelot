@@ -1,26 +1,28 @@
-#pragma once
-
 #ifndef CACHELOT_ERROR_H_INCLUDED
 #define CACHELOT_ERROR_H_INCLUDED
 
-#include <boost/system/error_code.hpp>
+#include <boost/system/error_code.hpp>   // error_code, error_category
+#include <boost/system/system_error.hpp> // system_error exception
 
 /// @ingroup common
 /// @{
 
 namespace cachelot {
 
-    using boost::system::error_code;
-    using boost::system::error_category;
+    // error handling mechanism based on `error_code` and `error_category`
 
     // Application level errors defined here
+    // Note: all error codes declared in `error` namespace, so use as `error::unknown_error`
     #define APPLICATION_ERROR_ENUM(apply) \
         apply(unknown_error, "Unknown error") \
         apply(out_of_memory, "Out of memory")
 
-    /**
-     * error handling mechanism based on `error_code` and `error_category`
-     */
+    /// system error handling
+    using boost::system::error_code;      // boost::error is used rather than std's because it is used by boost::asio
+    using boost::system::error_category;
+    using boost::system::system_error;
+
+    /// defines standard and custom error codes
     namespace error {
 
         /// error_code identifies no error
