@@ -60,10 +60,8 @@ namespace cachelot {
             return category_instance;
         }
 
-        static const error_category & application_error_category = get_application_error_category();
-
-        inline error_code make_error(application_error_code ec) {
-            return error_code(static_cast<int>(ec), application_error_category);
+        inline error_code make_error_code(application_error_code ec) {
+            return error_code(static_cast<int>(ec), get_application_error_category());
         }
 
     } // namespace error

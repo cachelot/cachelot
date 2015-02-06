@@ -95,13 +95,16 @@ namespace cachelot {
             typedef dict<bytes, ItemPtr, bytes::equal_to, ItemDictEntry, DictOptions> dict_type;
             typedef dict_type::iterator iterator;
         public:
+            typedef dict_type::hash_type hash_type;
+            typedef dict_type::size_type size_type;
+        public:
             /**
              * constructor
              *
              * @param memory_size - amount of memory available for storage use
              * @param initial_dict_size - number of reserved items in dictionary
              */
-            Cache(size_t memory_size, size_t initial_dict_size);
+            explicit Cache(size_t memory_size, size_t initial_dict_size);
 
 
             /**
@@ -235,6 +238,13 @@ namespace cachelot {
             memalloc m_allocator;
             dict_type m_dict;
         };
+
+
+        inline Cache::Cache(size_t memory_size, size_t initial_dict_size)
+            : memory_arena(new uint8[memory_size])
+            , m_allocator(raw_pointer(memory_arena), memory_size)
+            , m_dict(initial_dict_size) {
+        }
 
 
         inline tuple<bool, Cache::dict_type::iterator> Cache::retrieve_item(const bytes key, const hash_type hash, bool readonly) {

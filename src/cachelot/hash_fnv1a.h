@@ -18,7 +18,7 @@ namespace cachelot {
             typedef HashType hash_type;
             hash_type operator()(const bytes data) const noexcept {
                 hash_type checksum = Seed;
-                for (byte one_byte : data) {
+                for (uint8 one_byte : data) {
                     checksum = (checksum ^ one_byte) * Prime;
                 }
                 return checksum;
