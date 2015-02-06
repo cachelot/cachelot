@@ -32,15 +32,17 @@ namespace cachelot {
     typename random_int<IntType>::random_engine_type random_int<IntType>::random_engine;
 
     /// generate random string of `length` chars from pre-defined alphabet
-    inline string random_string(size_t length) {
+    inline string random_string(size_t minlen, size_t maxlen) {
         static const char charset[] =
         "0123456789"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz";
-        random_int<size_t> rnd_gen(0, sizeof(charset) - 1);
-        auto randchar = [&rnd_gen]() -> char {
+        static random_int<size_t> rnd_gen(0, sizeof(charset) - 1);
+        auto randchar = [=]() -> char {
             return charset[ rnd_gen() ];
         };
+        static random_int<size_t> rnd_length(minlen, maxlen);
+        auto const length = rnd_length();
         string str(length, 0);
         std::generate_n(str.begin(), length, randchar);
         return str;
