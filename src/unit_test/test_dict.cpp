@@ -1,5 +1,6 @@
 #include "unit_test.h"
 #include <cachelot/dict.h>
+#include <cachelot/random.h>
 #include <unordered_map>
 #include <functional>
 
@@ -20,8 +21,8 @@ BOOST_AUTO_TEST_CASE(test_dict_basic) {
     std::hash<string> hasher;
     // fill the tables
     for (uint i = 0; i < num_elements; ++i) {
-        string key = random_string(32);
-        string value = random_string(400);
+        string key = random_string(14, 45);
+        string value = random_string(4, 400);
         stock_map.insert(std::make_pair(key, value));
         bool found; dict_type::iterator at; auto hash = hasher(key);
         tie(found, at) = the_dict.entry_for(key, hash);
