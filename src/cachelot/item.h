@@ -129,7 +129,6 @@ namespace cachelot {
             debug_assert(m_key_length > 0);
             auto key_begin = reinterpret_cast<const char *>(this) + KeyOffset(this);
             bytes k(key_begin, key_begin + m_key_length);
-            debug_assert(my_memory().contains(k));
             return k;
         }
 
@@ -138,7 +137,6 @@ namespace cachelot {
             const char * value_begin = reinterpret_cast<const char *>(this) + ValueOffset(this);
             // ensure that we're whithin item memory bounds
             bytes v(value_begin, value_begin + m_value_length);
-            debug_assert(my_memory().contains(v));
             return v;
         }
 

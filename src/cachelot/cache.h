@@ -207,6 +207,8 @@ namespace cachelot {
              * utility function to create point in time from duration in seconds
              */
             static expiration_time_point time_from(seconds expire_after) {
+                // TODO: !Important check that duration will not overflow
+                //if (std::numeric_limits<seconds::rep>::max() - expire_after.count() )
                 return expire_after == seconds(0) ? expiration_time_point::max() : clock::now() + expire_after;
             }
 
@@ -251,8 +253,9 @@ namespace cachelot {
             bool found; iterator at;
             tie(found, at) = m_dict.entry_for(key, hash, readonly);
             if (found && at.value()->is_expired()) {
+                Item * item = at.value();
                 m_dict.remove(at);
-                item_free(at.value());
+                item_free(item);
                 found = false;
             }
             return make_tuple(found, at);
@@ -347,8 +350,9 @@ namespace cachelot {
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
+                Item * item = at.value();
                 m_dict.remove(at);
-                item_free(at.value());
+                item_free(item);
             }
             on_del(error::success, found);
         }
