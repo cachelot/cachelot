@@ -42,7 +42,7 @@ typedef std::tuple<string, string> kv_type;
 typedef std::vector<kv_type> array_type;
 typedef array_type::const_iterator iterator;
 
-constexpr cache::seconds forever = cache::seconds::max();
+constexpr cache::seconds forever = cache::seconds(0);
 
 class CacheWrapper {
 public:
