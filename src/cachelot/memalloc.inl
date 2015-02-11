@@ -263,10 +263,11 @@ namespace cachelot {
 
     private:
         static void unlink(block::link_type * link) noexcept {
+            debug_assert(link != nullptr);
             debug_assert(link->prev != link && link->next != link);
             link->prev->next = link->next;
             link->next->prev = link->prev;
-            debug_only(link->next = link->prev = nullptr);
+            debug_only(link->next = link->prev = link);
         }
 
         static block * block_from_link(block::link_type * link) noexcept {
@@ -336,8 +337,12 @@ namespace cachelot {
             static constexpr position max() noexcept {
                 return position(const_::num_powers_of_2 - 1, const_::num_blocks_per_pow2 - 1);
             }
+            
+            void debug_print() {
+                std::cout << pow_index << ":" << sub_index << std::endl;
+            }
 
-        private:
+        //private:
             /// calculate index of target list in the linear table
             uint32 absolute() const noexcept {
                 const uint32 abs_index = pow_index * const_::num_blocks_per_pow2 + sub_index;
@@ -423,7 +428,7 @@ namespace cachelot {
             if (bit::isset(first_level_bit_index, pos.pow_index) && bit::isset(second_level_bit_index[pos.pow_index], pos.sub_index)) {
                 return tuple<block *, position>(get_block_at(pos), pos);
             } else {
-                return tuple<block *, position>(nullptr, position());
+                return tuple<block *, position>(nullptr, pos);
             }
         }
 
@@ -637,6 +642,8 @@ namespace cachelot {
             used_blocks->put_block_at(found_blk, found_blk_pos);
             return block::checkout(found_blk);
         }
+
+        ////////////////////////////////
         // 2. Try to split the biggest available block
         block * big_block = free_blocks->try_get_biggest_block(nsize);
         if (big_block != nullptr) {
