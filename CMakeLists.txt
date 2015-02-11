@@ -2,7 +2,7 @@
 #       Cmake basic setup
 ###########################################################################
 if (NOT CMAKE_GENERATOR STREQUAL "Unix Makefiles")
-    set (CMAKE_CONFIGURATION_TYPES "debug;release;asan" CACHE TYPE INTERNAL FORCE)
+    set (CMAKE_CONFIGURATION_TYPES "debug;release;relwithdebuginfo;asan" CACHE TYPE INTERNAL FORCE)
     mark_as_advanced (CMAKE_CONFIGURATION_TYPES)
 else ()
    # Unix Makefiles support only single build configuration - release by default
@@ -46,6 +46,7 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4 -std=c++11")
     set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -DDEBUG")
     set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
+    set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO "${CMAKE_CXX_FLAGS_RELEASE} -O2 -DNDEBUG -g")
     set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES)
     # Flags for address sanitizer build type
     set (ADRESS_SANITIZER_FLAGS "-O1 -g -DDEBUG -DADDRESS_SANITIZER -fno-optimize-sibling-calls")
@@ -79,7 +80,7 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
         mark_as_advanced(CMAKE_CXX_FLAGS_ASAN)
         # Update the documentation string of CMAKE_BUILD_TYPE for GUIs
         set (CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
-            "Choose the type of build, options are: debug release asan."
+            "Choose the type of build, options are: debug release relwithdebuginfo  asan."
             FORCE)
     endif ()
 else ()
