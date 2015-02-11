@@ -1,0 +1,14 @@
+#!/bin/sh
+
+dir=$1
+
+[ -z "$dir" ] && exit 1
+
+let "loc = 0"
+
+sources=$(find "$dir" -name "*.h" -or -name "*.cpp" -or -name "*.inl")
+for f in $sources; do
+    loc_in_file=$(sed 's://.*$::' $f | sed '/^[ \t]*$/d' | wc -l)
+    let "loc += loc_in_file"
+done
+echo $loc

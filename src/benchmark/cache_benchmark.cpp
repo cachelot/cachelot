@@ -4,6 +4,7 @@
 #include <cachelot/hash_fnv1a.h>
 
 #include <iostream>
+#include <iomanip>
 
 using namespace cachelot;
 
@@ -13,7 +14,7 @@ using std::chrono::seconds;
 using std::chrono::minutes;
 using std::chrono::hours;
 
-constexpr size_t num_items = 2000000;
+constexpr size_t num_items = 20000000;
 constexpr size_t cache_memory = 64 * 1024 * 1024;
 constexpr size_t hash_initial = 131072;
 constexpr uint8 min_key_len = 14;
@@ -53,18 +54,18 @@ public:
         bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
         m_cache.do_set(k, calc_hash(k), v, 0, forever, 0,
                        [=](error_code error, bool /*stored*/) {
-                if (not error) {
-                    stats.num_set += 1;
-                } else {
-                    stats.num_error += 1;
-                }
-            });
+                           stats.num_set += 1;
+                           if (error) {
+                               stats.num_error += 1;
+                           }
+                       });
     }
 
     void get(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         m_cache.do_get(k, calc_hash(k),
                     [=](error_code error, bool found, bytes, cache::opaque_flags_type, cache::cas_value_type) {
+                        stats.num_get += 1;
                         if (not error) {
                             auto & counter = found ? stats.num_cache_hit : stats.num_cache_miss;
                             counter += 1;
@@ -78,8 +79,9 @@ public:
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         m_cache.do_del(k, calc_hash(k),
                        [=](error_code error, bool deleted) {
+                           stats.num_del += 1;
                            if (not error) {
-                               auto & counter = deleted ? stats.num_del : stats.num_cache_miss;
+                               auto & counter = deleted ? stats.num_cache_hit : stats.num_cache_miss;
                                counter += 1;
                            } else {
                                stats.num_error += 1;
@@ -125,26 +127,30 @@ int main(int /*argc*/, char * /*argv*/[]) {
     warmup();
     reset_stats();
     auto start_time = std::chrono::high_resolution_clock::now();
-    for (iterator kv = data_array.begin(); kv < data_array.end(); ++kv) {
-        if (chance() > 70) {
+    for (int i=0; i<3; ++i) {
+        for (iterator kv = data_array.begin(); kv < data_array.end(); ++kv) {
             csh.set(kv);
-        } else if (chance() > 20) {
-            csh.get(kv);
-        } else {
-            csh.del(kv);
+            if (chance() > 70) {
+                csh.del(random_pick());
+            }
+            if (chance() > 30) {
+                csh.get(random_pick());
+            }
         }
     }
-    auto time_passed = std::chrono::duration_cast<seconds>(std::chrono::high_resolution_clock::now() - start_time);
-
-    std::cout << "get: "        << stats.num_get << std::endl;
-    std::cout << "set: "        << stats.num_set << std::endl;
-    std::cout << "del: "        << stats.num_del << std::endl;
-    std::cout << "cache_hit: "  << stats.num_cache_hit << std::endl;
+    auto time_passed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+    const double sec = time_passed.count() / 1000000;
+    std::cout << std::fixed << std::setprecision(3);
+    std::cout << "Time spent: " << sec << "s" << std::endl;
+    std::cout << "get:        " << stats.num_get << std::endl;
+    std::cout << "set:        " << stats.num_set << std::endl;
+    std::cout << "del:        " << stats.num_del << std::endl;
+    std::cout << "cache_hit:  " << stats.num_cache_hit << std::endl;
     std::cout << "cache_miss: " << stats.num_cache_miss << std::endl;
-    std::cout << "error: "      << stats.num_error << std::endl;
-    const auto RPS = static_cast<uint>((stats.num_get + stats.num_set + stats.num_del) / time_passed.count());
-    std::cout << "RPS: " << RPS << std::endl;
-    std::cout << "cost: "<< static_cast<unsigned>(100 / RPS) << "ms" << std::endl;
+    std::cout << "error:      " << stats.num_error << std::endl;
+    const double RPS = (stats.num_get + stats.num_set + stats.num_del) / sec;
+    std::cout << "rps:        " << RPS << std::endl;
+    std::cout << "avg. cost:  " << static_cast<unsigned>(1000000000 / RPS) << "us" << std::endl;
 
     return 0;
 }
