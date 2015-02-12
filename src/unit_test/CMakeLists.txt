@@ -13,7 +13,8 @@ set (CACHELOT_UNIT_TEST_SOURCES
                 test_dict.cpp
                 test_memalloc.cpp
                 test_cache.cpp
-                ${CACHELOT_SOURCES} 
+                test_io_buffer.cpp
+                ${CACHELOT_SOURCES}
         )
 
 list (REMOVE_ITEM CACHELOT_UNIT_TEST_SOURCES main.cpp) # remove cachelot executable entry point
