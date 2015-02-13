@@ -22,6 +22,7 @@
 
 namespace cachelot {
 
+    /// @ref cache
     namespace cache {
 
         /// Pointer to single cache Item
@@ -75,7 +76,7 @@ namespace cachelot {
         };
 
 
-        void swap(ItemDictEntry & left, ItemDictEntry & right) {
+        inline void swap(ItemDictEntry & left, ItemDictEntry & right) {
             left.swap(right);
         }
 
@@ -89,6 +90,8 @@ namespace cachelot {
 
         /**
          * Cache class to rule them all
+         *
+         * @note Cache is *not* thread safe
          */
         class Cache {
            // Underlying dictionary
@@ -108,7 +111,7 @@ namespace cachelot {
 
 
             /**
-             * `xxx` -  retrieve item
+             * `get` -  retrieve item
              *
              * @tparam Callback - callback will be called when request is completed
              * Callback must have following signature:
@@ -356,7 +359,7 @@ namespace cachelot {
             }
             on_del(error::success, found);
         }
-        
+
 
         template <typename Callback>
         inline void Cache::do_touch(const bytes key, const hash_type hash, seconds expires, Callback on_touch) noexcept {
