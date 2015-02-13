@@ -1,136 +1,117 @@
 #ifndef CACHELOT_CACHE_ASYNC_API_H_INCLUDED
 #define CACHELOT_CACHE_ASYNC_API_H_INCLUDED
 
+#ifndef CACHELOT_CACHE_H_INCLUDED
+#  include <cachelot/cache.h>
+#endif
+#ifndef CACHELOT_MPSC_QUEUE_H_INCLUDED
+#  include <cachelot/mpsc_queue.h>
+#endif
+#include <thread>       // worker thread
+#include <functional>   // std::function for callbacks
+
 /// @ingroup cache
 /// @{
 
-namespace cachelot {
+namespace cachelot { 
     
-    namespace cache { namespace api {
-
-        /// Request types
-        struct GetRequest;      /// < `get`
-        struct StoreRequest;    /// < `set` / `replace` / `add` / `prepend` / `append`
-        struct DelRequest;      /// < `del`
-        struct TouchRequest;    /// < `touch`
-        struct CasRequest;      /// < `cas`
-        struct IncDecRequest;   /// < `inc` / `dec`
-        struct InternalRequest; /// < `stat` / `flush`
-
+    namespace cache { 
         /**
-         * AsyncRequest is internally used by Storage to hold requests in a queue
+         * Thread safe asynchronous cache API
+         * @see Cache
          */
-        struct AsyncRequest : public mpsc_queue<AsyncRequest>::node {
-            /// type of the request
-            const atom_type type;
-            /// requested item key
-            const bytes key;
-            /// requested item hash
-            const Storage::hash_type hash;
+        class AsyncCacheAPI {
+            // Underlying dictionary
+            typedef dict<bytes, ItemPtr, bytes::equal_to, ItemDictEntry, DictOptions> dict_type;
+            typedef dict_type::iterator iterator;
+        public:
+            typedef dict_type::hash_type hash_type;
+            typedef dict_type::size_type size_type;
+        public:
+            /// @copydoc Cache::Cache()
+            explicit AsyncCacheAPI(size_t memory_size, size_t initial_dict_size);
 
-            /// constructor
-            explicit AsyncRequest(const atom_type the_type, const bytes the_key, const Storage::hash_type the_hash)
-            : type(the_type)
-            , key(the_key)
-            , hash(the_hash) {
-            }
-
-            // disallow copying
-            AsyncRequest(const AsyncRequest &) = delete;
-            AsyncRequest & operator= (const AsyncRequest &) = delete;
-
-            /// virtual destructor
-            virtual ~AsyncRequest() {}
-
-            /// constructor
-            template <class SpecificRequest>
-            SpecificRequest & as() noexcept {
-                static_assert(std::is_base_of<Storage::AsyncRequest, SpecificRequest>::value, "Invalid request class provided");
-                return static_cast<SpecificRequest &>(*this);
-            }
-
-            /// utility function to create point in time from duration in seconds
-            static Storage::expiration_time_type time_from_duration(chrono::seconds expire_after) {
-                return expire_after == chrono::seconds(0) ? Storage::expiration_time_type::max() : Storage::clock_type::now() + expire_after;
-            }
-        };
-
-        /// GetRequest is a specific AsyncRequest for get operation
-        struct Storage::GetRequest : public Storage::AsyncRequest {
-            /// callback to notify operation completion
-            std::function<void (error_code /*error*/, bool /*found*/, bytes /*value*/, Storage::flags_type /*flags*/, Storage::cas_type /*cas_value*/)> callback;
-
-            /// constructor
+            /// stop processing requests
+            void terminate();
+            
+            /// @copydoc Cache::do_get()
             template <typename Callback>
-            explicit GetRequest(const bytes the_key, const Storage::hash_type the_hash, Callback the_callback)
-            : Storage::AsyncRequest(atom("get"), the_key, the_hash)
-            , callback(the_callback) {
-            }
-        };
-
-        /// StoreRequest is a specific AsyncRequest for one of the store operations
-        struct Storage::StoreRequest : public Storage::AsyncRequest {
-            /// value of a stored item
-            bytes value;
-
-            /// opaque user defined bit flags
-            Storage::flags_type flags;
-
-            /// expiration time point
-            Storage::expiration_time_type expiration_time;
-
-            /// unique value for the `CAS` operation
-            Storage::cas_type cas_value;
-
-            /// callback to notify operation completion
-            std::function<void (error_code /*error*/, bool /*stored*/)> callback;
-
-            /// constructor
+            void do_get(const bytes key, const hash_type hash, Callback on_get) noexcept;
+            
+            /// @copydoc Cache::do_set()
             template <typename Callback>
-            explicit StoreRequest(const atom_type the_type, const bytes the_key, const Storage::hash_type the_hash,
-                                  bytes the_value, Storage::flags_type the_flags, Storage::seconds expires_after,
-                                  Storage::cas_type the_cas_value, Callback the_callback)
-            : Storage::AsyncRequest(the_type, the_key, the_hash)
-            , value(the_value)
-            , flags(the_flags)
-            , expiration_time(time_from_duration(expires_after))
-            , callback(the_callback) {
-            }
-        };
-
-        /// DelRequest is a specific AsyncRequest for del operation
-        struct Storage::DelRequest : public Storage::AsyncRequest {
-            /// callback to notify operation completion
-            std::function<void (error_code /*error*/, bool /*deleted*/)> callback;
-
-            /// constructor
+            void do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_set) noexcept;
+            
+            /// @copydoc Cache::do_add()
             template <typename Callback>
-            explicit DelRequest(const bytes the_key, const Storage::hash_type the_hash, Callback the_callback)
-            : Storage::AsyncRequest(atom("del"), the_key, the_hash)
-            , callback(the_callback) {
-            }
-        };
+            void do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_add) noexcept;
+            
+            /// @copydoc Cache::do_replace()
+            template <typename Callback>
+            void do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_replace) noexcept;
+            
+            /// @copydoc Cache::do_cas()
+            template <typename Callback>
+            void do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_cas) noexcept;
+            
+            /// @copydoc Cache::do_append()
+            template <typename Callback>
+            void do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_append) noexcept;
+            
+            /// @copydoc Cache::do_prepend()
+            template <typename Callback>
+            void do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_prepend) noexcept;
+            
+            /// @copydoc Cache::do_del()
+            template <typename Callback>
+            void do_del(const bytes key, const hash_type hash, Callback on_del) noexcept;
+            
+            /// @copydoc Cache::do_touch()
+            template <typename Callback>
+            void do_touch(const bytes key, const hash_type hash, seconds expires, Callback on_touch) noexcept;
         
-        struct Storage::TouchRequest : public Storage::AsyncRequest {
-            /// expiration time point
-            Storage::expiration_time_type expiration_time;
+        private:
+            void process_requests();
+        
+        private:
+            /// Request arguments holder
+            struct RequestArgs;         /// < base class
+            struct GetRequestArgs;      /// < `get`
+            struct StoreRequestArgs;    /// < `set` / `replace` / `add` / `prepend` / `append`
+            struct DelRequestArgs;      /// < `del`
+            struct TouchRequestArgs;    /// < `touch`
+            struct CasRequestArgs;      /// < `cas`
+            struct IncDecRequestArgs;   /// < `inc` / `dec`
+            struct InternalRequestArgs; /// < `stat` / `flush`
             
-            /// callback to notify operation completion
-            std::function<void (error_code /*error*/, bool /*touched*/)> callback;
+            /// Request types
+            enum RequestType {
+                REQ_GET,
+                REQ_SET,
+                REQ_ADD,
+                REQ_REPLACE,
+                REQ_APPEND,
+                REQ_PREPEND,
+                REQ_DEL,
+                REQ_CAS,
+                REQ_INC,
+                REQ_DEC,
+                REQ_STAT,
+                REQ_FLUSH,
+                NUM_REQ
+            };
             
-            /// constructor
-            template <typename Callback>
-            explicit TouchRequest(const bytes the_key, const Storage::hash_type the_hash, Storage::seconds expires_after, Callback the_callback)
-            : Storage::AsyncRequest(atom("touch"), the_key, the_hash)
-            , expiration_time(time_from_duration(expires_after))
-            , callback(the_callback) {
-            }
+            /// Asynchronous request to store in requests queue
+            class AsyncRequest;
+        
+        private:
+            Cache m_cache;
+            mpsc_queue<AsyncRequest> m_requests;
+            std::thread m_worker;
+            bool m_termination_requested;
         };
 
-            
-    } } // namespace cache::api
-
-} // namespace cachelot
+} } // namespace cachelot::cache
 
 /// @}
 

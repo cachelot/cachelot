@@ -14,6 +14,7 @@ set (CACHELOT_UNIT_TEST_SOURCES
                 test_memalloc.cpp
                 test_cache.cpp
                 test_io_buffer.cpp
+                test_mpsc_queue.cpp
                 ${CACHELOT_SOURCES}
         )
 

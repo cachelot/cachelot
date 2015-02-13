@@ -23,6 +23,7 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/item.h
                 ${CMAKE_CURRENT_LIST_DIR}/cache.h
                 ${CMAKE_CURRENT_LIST_DIR}/cache_async_api.h
+                ${CMAKE_CURRENT_LIST_DIR}/cache_async_api.cpp
         )
 
 #if (CMAKE_BUILD_TYPE MATCHES DEBUG)
