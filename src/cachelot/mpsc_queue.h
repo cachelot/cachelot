@@ -70,9 +70,10 @@ namespace cachelot {
             if (tail == m_head.load(std::memory_order_relaxed)) {
                 enqueue_node(&stub);
                 next = tail->next;
-                debug_assert(next != nullptr);
-                m_tail = next;
-                return reinterpret_cast<pointer>(tail);
+                if (next != nullptr) {
+                    m_tail = next;
+                    return reinterpret_cast<pointer>(tail);
+                }
             }
             return nullptr;
         }
