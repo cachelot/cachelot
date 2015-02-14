@@ -330,22 +330,22 @@ namespace cachelot {
         }
 
 
-//        template <typename Callback>
-//        inline void Cache::do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_cas) noexcept {
-//
-//        }
-//
-//
-//        template <typename Callback>
-//        inline void Cache::do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_append) noexcept {
-//
-//        }
-//
-//
-//        template <typename Callback>
-//        inline void Cache::do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_prepend) noexcept {
-//
-//        }
+        template <typename Callback>
+        inline void Cache::do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_cas) noexcept {
+            (void)key; (void)hash; (void)value; (void)flags; (void)expires; (void)cas_value;
+        }
+
+
+        template <typename Callback>
+        inline void Cache::do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_append) noexcept {
+            (void)key; (void)hash; (void)value; (void)flags; (void)expires; (void)cas_value;
+        }
+
+
+        template <typename Callback>
+        inline void Cache::do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_prepend) noexcept {
+            (void)key; (void)hash; (void)value; (void)flags; (void)expires; (void)cas_value;
+        }
 
 
         template <typename Callback>

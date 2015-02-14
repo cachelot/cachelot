@@ -3,100 +3,117 @@
 
 namespace cachelot { namespace cache {
 
-    struct AsyncCacheAPI::RequestArgs {
-        /// requested item key
-        const bytes key;
-        /// requested item hash
-        const hash_type hash;
+    AsyncCacheAPI::AsyncCacheAPI(size_t memory_size, size_t initial_dict_size)
+        : m_cache(memory_size, initial_dict_size)
+        , m_requests()
+        //, m_pool()
+        , m_terminated(false)
+        , m_worker(&AsyncCacheAPI::background_process_requests, this)
+    {}
 
-        /// constructor
-        explicit RequestArgs(const bytes the_key, const hash_type the_hash) noexcept
-            : key(the_key)
-            , hash(the_hash) {}
 
-        // disallow copying
-        RequestArgs(const RequestArgs &) = delete;
-        RequestArgs & operator= (const RequestArgs &) = delete;
-
-        /// convert to the specific request type arguments
-        template <class SpecificRequestArgs>
-        SpecificRequestArgs & as() noexcept {
-            static_assert(std::is_base_of<RequestArgs, SpecificRequestArgs>::value, "Invalid request class provided");
-            return static_cast<SpecificRequestArgs &>(*this);
+    AsyncCacheAPI::~AsyncCacheAPI() {
+        // interrupt worker thread
+        debug_assert(not m_terminated);
+        m_terminated = true;
+        try { m_worker.join(); } catch (...) { /* DO NOTHING */ }
+        // delete unprocessed requests
+        AsyncRequest * req = m_requests.dequeue();
+        while (req != nullptr) {
+            FreeAsyncRequest(req);
+            req = m_requests.dequeue();
         }
-    };
+    }
 
-    struct AsyncCacheAPI::GetRequestArgs : public RequestArgs {
-        /// callback to notify operation completion
-        std::function<void (error_code /*error*/, bool /*found*/, bytes /*value*/, opaque_flags_type /*flags*/, cas_value_type /*cas_value*/)> callback;
-
-        /// constructor
-        template <typename Callback>
-        explicit GetRequestArgs(const bytes the_key, const hash_type the_hash, Callback the_callback) noexcept
-            : RequestArgs(the_key, the_hash)
-            , callback(the_callback) {
+    AsyncCacheAPI::AsyncRequest * AsyncCacheAPI::AllocateAsyncRequest(const RequestType rtype) {
+        void * memory = (AsyncRequest *)std::malloc(sizeof(AsyncRequest));
+        if (memory != nullptr) {
+            return new (memory) AsyncRequest(rtype);
+        } else {
+            throw std::bad_alloc();
         }
-    };
-    
-    struct AsyncCacheAPI::StoreRequestArgs : public RequestArgs {
-        /// value of a stored item
-        bytes value;
+    }
 
-        /// opaque user defined bit flags
-        opaque_flags_type flags;
 
-        /// expiration time point
-        seconds expires;
+    void AsyncCacheAPI::FreeAsyncRequest(AsyncCacheAPI::AsyncRequest * req) {
+        debug_assert(req != nullptr);
+        std::free(req);
+    }
 
-        /// unique value for the `CAS` operation
-        cas_value_type cas_value;
-
-        /// callback to notify operation completion
-        std::function<void (error_code /*error*/, bool /*stored*/)> callback;
-
-        /// constructor
-        template <typename Callback>
-        explicit StoreRequestArgs(const bytes the_key, const hash_type the_hash,
-                                  bytes the_value, opaque_flags_type the_flags, seconds expires_after,
-                                  cas_value_type the_cas_value, Callback the_callback) noexcept
-            : RequestArgs(the_key, the_hash)
-            , value(the_value)
-            , flags(the_flags)
-            , expires(expires_after)
-            , cas_value(the_cas_value)
-            , callback(the_callback) {
-        }
-    
-    };
-    
-    struct AsyncCacheAPI::DelRequestArgs : public RequestArgs {
-        /// callback to notify operation completion
-        std::function<void (error_code /*error*/, bool /*deleted*/)> callback;
-
-        /// constructor
-        template <typename Callback>
-        explicit DelRequestArgs(const bytes the_key, const hash_type the_hash, Callback the_callback) noexcept
-            : RequestArgs(the_key, the_hash)
-            , callback(the_callback) {
-        }
-    };
-    
-    struct AsyncCacheAPI::TouchRequestArgs : public RequestArgs {
-        /// expiration time point
-        seconds expires;
-
-        /// callback to notify operation completion
-        std::function<void (error_code /*error*/, bool /*touched*/)> callback;
-
-        /// constructor
-        template <typename Callback>
-        explicit TouchRequestArgs(const bytes the_key, const hash_type the_hash, seconds expires_after, Callback the_callback) noexcept
-            : RequestArgs(the_key, the_hash)
-            , expires(expires_after)
-            , callback(the_callback) {
-        }
-    };
-
+    void AsyncCacheAPI::background_process_requests() {
+        do {
+            AsyncRequest * req = m_requests.dequeue();
+            if (req != nullptr) {
+                switch (req->type) {
+                case REQ_GET: {
+                    auto & args = req->get_args;
+                    m_cache.do_get(args.key, args.hash, args.callback);
+                    args.~GetRequestArgs();
+                    break;
+                }
+                case REQ_SET: {
+                    auto & args = req->store_args;
+                    m_cache.do_set(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                    args.~StoreRequestArgs();
+                    break;
+                }
+                case REQ_ADD: {
+                    auto & args = req->store_args;
+                    m_cache.do_add(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                    args.~StoreRequestArgs();
+                    break;
+                }
+                case REQ_REPLACE: {
+                    auto & args = req->store_args;
+                    m_cache.do_replace(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                    args.~StoreRequestArgs();
+                    break;
+                }
+                case REQ_APPEND: {
+                    auto & args = req->store_args;
+                    m_cache.do_append(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                    args.~StoreRequestArgs();
+                    break;
+                }
+                case REQ_PREPEND: {
+                    auto & args = req->store_args;
+                    m_cache.do_prepend(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                    args.~StoreRequestArgs();
+                    break;
+                }
+                case REQ_CAS: {
+                    auto & args = req->store_args;
+                    m_cache.do_cas(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                    args.~StoreRequestArgs();
+                    break;
+                }
+                case REQ_DEL: {
+                    auto & args = req->del_args;
+                    m_cache.do_del(args.key, args.hash, args.callback);
+                    args.~DelRequestArgs();
+                    break;
+                }
+                case REQ_TOUCH: {
+                    auto & args = req->touch_args;
+                    m_cache.do_touch(args.key, args.hash, args.expires, args.callback);
+                    args.~TouchRequestArgs();
+                    break;
+                }
+                case REQ_INC:
+                    break;
+                case REQ_DEC:
+                    break;
+                case REQ_STAT:
+                    break;
+                case REQ_FLUSH:
+                    break;
+                }
+                FreeAsyncRequest(req);
+            } else {
+                /* TODO: SLEEP */
+            }
+        } while (not m_terminated);
+    }
 
 
 } } // namespace cachelot::cache
