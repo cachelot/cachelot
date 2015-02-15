@@ -207,7 +207,8 @@ namespace cachelot {
 
         inline bytes Item::my_memory() const noexcept {
             auto this_ = reinterpret_cast<const char *>(this);
-            const size_t my_size = CalcSizeRequired(key(), value(), m_ignore_cas);
+            const size_t my_size = sizeof(Item) + m_key_length + m_value_length +
+                            static_cast<uint>(m_ignore_cas) * sizeof(cas_value_type);
             return bytes(this_, my_size);
         }
 
