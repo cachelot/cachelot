@@ -37,60 +37,58 @@ namespace cachelot { namespace cache {
             std::unique_ptr<AsyncRequest> req(m_requests.dequeue());
             if (req != nullptr) {
                 switch (req->type) {
-                case REQ_GET: {
+                case GET: {
                     auto & args = req->get_args;
                     m_cache.do_get(args.key, args.hash, args.callback);
                     break;
                 }
-                case REQ_SET: {
+                case SET: {
                     auto & args = req->store_args;
                     m_cache.do_set(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
                     break;
                 }
-                case REQ_ADD: {
+                case ADD: {
                     auto & args = req->store_args;
                     m_cache.do_add(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
                     break;
                 }
-                case REQ_REPLACE: {
+                case REPLACE: {
                     auto & args = req->store_args;
                     m_cache.do_replace(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
                     break;
                 }
-                case REQ_APPEND: {
+                case APPEND: {
                     auto & args = req->store_args;
                     m_cache.do_append(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
                     break;
                 }
-                case REQ_PREPEND: {
+                case PREPEND: {
                     auto & args = req->store_args;
                     m_cache.do_prepend(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
                     break;
                 }
-                case REQ_CAS: {
+                case CAS: {
                     auto & args = req->store_args;
                     m_cache.do_cas(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
                     break;
                 }
-                case REQ_DEL: {
+                case DELETE: {
                     auto & args = req->del_args;
                     m_cache.do_del(args.key, args.hash, args.callback);
                     break;
                 }
-                case REQ_TOUCH: {
+                case TOUCH: {
                     auto & args = req->touch_args;
                     m_cache.do_touch(args.key, args.hash, args.expires, args.callback);
                     break;
                 }
-                case REQ_INC:
+                case SYNC: {
+                    auto & args = req->sync_args;
+                    args.callback(error::success);
                     break;
-                case REQ_DEC:
-                    break;
-                case REQ_STAT:
-                    break;
-                case REQ_FLUSH:
-                    break;
+                }
                 default:
+                    debug_assert(false && "Unknown request");
                     break;
                 }
             } else {

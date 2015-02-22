@@ -32,6 +32,11 @@
 #include <stdexcept>// exception / runtime_error, etc
 #include <tuple>    // std::tuple
 
+#define __CACHELOT_PP_STR1(X) #X
+#define CACHELOT_PP_STR(X) __CACHELOT_PP_STR1(X)
+#define __CACHELOT_PP_CC(a, b) a ## b
+#define CACHELOT_PP_CC(a, b) __CACHELOT_PP_CC(a, b)
+
 #if defined(DEBUG) && defined(_MSC_VER)
 #  include <crtdbg.h>  // Enable MSVC CRT memory checks
 #  define enable_memory_debug() \

@@ -1,7 +1,12 @@
 #ifndef CACHELOT_IO_SERIALIZATION_H_INCLUDED
 #define CACHELOT_IO_SERIALIZATION_H_INCLUDED
 
-#include <cachelot/io_buffer.h>
+#ifndef CACHELOT_IO_BUFFER_H_INCLUDED
+#  include <cachelot/io_buffer.h>
+#endif
+#ifndef CACHELOT_STRING_CONV_H_INCLUDED
+#  include <cachelot/string_conv.h>
+#endif
 
 /**
  * @defgroup io IO

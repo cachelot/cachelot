@@ -2,7 +2,7 @@
 #define CACHELOT_NET_ASYNC_CONNECTION_H_INCLUDED
 
 #ifndef CACHELOT_NETWORK_H_INCLUDED
-#  include <cachelot/net/network.h>
+#  include <cachelot/network.h>
 #endif
 
 /**
@@ -68,7 +68,7 @@ namespace cachelot {
         /// schedule function into IO loop. In multithreaded environment all
         /// function calls of the single connection will be executed one by the same thread
         template <typename Function>
-        void delayed_call(Function fun) noexcept { m_strand.post(fun); }
+        void post(Function fun) noexcept { m_strand.post(fun); }
 
     private:
         bytes receive_buffer() const noexcept;
@@ -117,7 +117,7 @@ namespace cachelot {
         debug_assert(n > 0);
         if (m_rcv_buf.unread() >= n) {
             // we already have requested data in buffer after previous read
-            on_complete(success, m_rcv_buf.read(n));
+            on_complete(error::success, m_rcv_buf.read(n));
         } else {
             size_t bytes_to_receive = n - m_rcv_buf.unread();
             asio::async_read(m_socket, asio::buffer(m_rcv_buf.begin_write(bytes_to_receive), bytes_to_receive), transfer_exactly(bytes_to_receive),
