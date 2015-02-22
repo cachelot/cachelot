@@ -76,6 +76,11 @@ namespace cachelot {
             return false;
         }
 
+        /// check if this range contents are the same as `other` (memory comparisson)
+        bool operator!=(const bytes & other) const noexcept {
+            return not operator==(other);
+        }
+
         /// search for given range `what` in this bytes
         bytes search(const bytes what) const noexcept {
             if (what.length() <= length()) {
