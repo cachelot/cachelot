@@ -12,9 +12,6 @@ namespace cachelot {
 
     namespace cache {
 
-        /// Initialize Item memory manager
-        void InitItemMemory(size_t size_in_bytes);
-
         /**
          * Item represents cache item with key, value, flags, cas, expiration, etc.
          *
@@ -31,6 +28,12 @@ namespace cachelot {
          * the value bytes sequence
          */
         class Item {
+        public:
+
+             /// Item lock to synchronise Item across asynchronous operation calls
+            class Lock {
+                /// TODO: Ensure that we need to lock items
+            };
         public:
             // There are primary type specifications
             // Modify with care! Memory Layout and Alignment!
