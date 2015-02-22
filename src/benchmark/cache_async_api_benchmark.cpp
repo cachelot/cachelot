@@ -15,7 +15,7 @@ using std::chrono::minutes;
 using std::chrono::hours;
 
 constexpr int num_ld_threads = 2;
-constexpr size_t num_items = 2000000;
+constexpr size_t num_items = 1000000;
 constexpr size_t cache_memory = 64 * 1024 * 1024;
 constexpr size_t hash_initial = 131072;
 constexpr uint8 min_key_len = 14;
