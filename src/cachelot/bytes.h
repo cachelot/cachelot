@@ -64,6 +64,18 @@ namespace cachelot {
             return not empty();
         }
 
+        /// check if this range contents are the same as `other` (memory comparisson)
+        bool operator==(const bytes & other) const noexcept {
+            if (length() == other.length()) {
+                if (begin() == other.begin() && end() == other.end()) {
+                    return true;
+                } else {
+                    return std::equal(begin(), end(), other.begin());
+                }
+            }
+            return false;
+        }
+
         /// search for given range `what` in this bytes
         bytes search(const bytes what) const noexcept {
             if (what.length() <= length()) {
@@ -77,18 +89,6 @@ namespace cachelot {
                 }
             }
             return bytes();
-        }
-
-        /// check if this range contents are the same as `other` (memory comparisson)
-        bool equals(const bytes other) const noexcept {
-            if (length() == other.length()) {
-                if (begin() == other.begin() && end() == other.end()) {
-                    return true;
-                } else {
-                    return std::equal(begin(), end(), other.begin());
-                }
-            }
-            return false;
         }
 
         /// returns `true` if this bytes contents contains given `subrange`
@@ -111,7 +111,7 @@ namespace cachelot {
             if (what.length() <= length()) {
                 bytes _, xtail;
                 tie(_, xtail) = split_at(length() - what.length());
-                return xtail.equals(what);
+                return xtail == what;
             }
             return false;
         }
@@ -163,14 +163,6 @@ namespace cachelot {
         string str() const {
             return string(begin(), end());
         }
-
-        /// functor to use bytes as a key in containers
-        struct equal_to {
-            equal_to() {}
-            bool operator() (const bytes l, const bytes r) const {
-                return l.equals(r);
-            }
-        };
 
         /**
          * construct bytes from an ASCII string literal

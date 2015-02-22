@@ -95,7 +95,7 @@ namespace cachelot {
          */
         class Cache {
            // Underlying dictionary
-            typedef dict<bytes, ItemPtr, bytes::equal_to, ItemDictEntry, DictOptions> dict_type;
+            typedef dict<bytes, ItemPtr, std::equal_to<bytes>, ItemDictEntry, DictOptions> dict_type;
             typedef dict_type::iterator iterator;
         public:
             typedef dict_type::hash_type hash_type;
@@ -272,7 +272,7 @@ namespace cachelot {
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
                 auto item = at.value();
-                debug_assert(item->key().equals(key));
+                debug_assert(item->key() == key);
                 debug_assert(item->hash() == hash);
                 on_get(error::success, true, item->value(), item->opaque_flags(), item->cas_value());
             } else {
