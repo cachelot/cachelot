@@ -7,8 +7,13 @@
 #ifndef CACHELOT_MPSC_QUEUE_H_INCLUDED
 #  include <cachelot/mpsc_queue.h>
 #endif
+
+#include <atomic>
 #include <thread>       // worker thread
+#include <mutex>        // wait mutex
+#include <condition_variable> // wait_condition
 #include <functional>   // std::function for callbacks
+
 
 /// @ingroup cache
 /// @{
@@ -22,7 +27,7 @@ namespace cachelot {
          */
         class AsyncCacheAPI {
             // Underlying dictionary
-            typedef dict<bytes, ItemPtr, bytes::equal_to, ItemDictEntry, DictOptions> dict_type;
+            typedef dict<bytes, ItemPtr, std::equal_to<bytes>, ItemDictEntry, DictOptions> dict_type;
             typedef dict_type::iterator iterator;
         public:
             typedef dict_type::hash_type hash_type;
@@ -72,6 +77,7 @@ namespace cachelot {
             void do_touch(const bytes key, const hash_type hash, seconds expires, Callback on_touch) noexcept;
 
         private:
+            /// thread function
             void background_process_requests();
 
         private:
@@ -99,28 +105,28 @@ namespace cachelot {
                 REQ_DEC,
                 REQ_STAT,
                 REQ_FLUSH,
+                // number
+                NUM_REQUESTS
             };
 
             /// Asynchronous request to store in requests queue
             struct AsyncRequest;
 
-            /// allocate new AsyncRequest, may throw std::bad_alloc
-            AsyncRequest * AllocateAsyncRequest(const RequestType rtype);
-
-            /// free AsyncRequest memory
-            void FreeAsyncRequest(AsyncRequest * req);
-
         private:
+            /// put AsyncRequest into execution queue
+            void enqueue(AsyncRequest * req) noexcept;
+
             /// create one of store requests
             template <typename Callback>
             void do_store(const RequestType rtype, const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_store) noexcept;
 
-
         private:
             Cache m_cache;
             mpsc_queue<AsyncRequest> m_requests;
-            //mpsc_queue<AsyncRequest> m_pool;
-            volatile bool m_terminated;
+            std::atomic_bool m_terminated;
+            std::atomic_bool m_waiting;
+            std::mutex m_wait_mutex;
+            std::condition_variable m_waiting_cndvar;
             std::thread m_worker;
         };
 
@@ -138,6 +144,10 @@ namespace cachelot {
             // disallow copying
             RequestArgs(const RequestArgs &) = delete;
             RequestArgs & operator=(const RequestArgs &) = delete;
+
+            // allow moving
+            RequestArgs(RequestArgs &&) = default;
+            RequestArgs & operator=(RequestArgs &&) = default;
         };
 
         struct AsyncCacheAPI::GetRequestArgs : public RequestArgs {
@@ -215,6 +225,9 @@ namespace cachelot {
 
 
         struct AsyncCacheAPI::AsyncRequest : public mpsc_queue<AsyncCacheAPI::AsyncRequest>::node {
+            /// type of request
+            const RequestType type;
+
             /// request arguments
             union {
                 GetRequestArgs get_args;
@@ -223,25 +236,56 @@ namespace cachelot {
                 TouchRequestArgs touch_args;
             };
 
-            /// type of request
-            const RequestType type;
-            
-            /// constructor
-            explicit AsyncRequest(const RequestType the_type) noexcept
-                : type(the_type) {
+            /// @{
+            /// constructors
+            explicit AsyncRequest(const RequestType the_type, GetRequestArgs && args) noexcept
+                : type(the_type)
+                , get_args(std::move(args)){
             }
+
+            explicit AsyncRequest(const RequestType the_type, StoreRequestArgs && args) noexcept
+                : type(the_type)
+                , store_args(std::move(args)){
+            }
+
+            explicit AsyncRequest(const RequestType the_type, DelRequestArgs && args) noexcept
+                : type(the_type)
+                , del_args(std::move(args)){
+            }
+
+            explicit AsyncRequest(const RequestType the_type, TouchRequestArgs && args) noexcept
+                : type(the_type)
+                , touch_args(std::move(args)){
+            }
+            /// @}
             
             /// destructor
-            ~AsyncRequest() {}
+            ~AsyncRequest() {
+                switch (type) {
+                    case REQ_GET:
+                        get_args.~GetRequestArgs();
+                        break;
+                    case REQ_SET: case REQ_ADD: case REQ_REPLACE: case REQ_APPEND: case REQ_PREPEND: case REQ_CAS:
+                        store_args.~StoreRequestArgs();
+                        break;
+                    case REQ_DEL:
+                        del_args.~DelRequestArgs();
+                        break;
+                    case REQ_TOUCH:
+                        touch_args.~TouchRequestArgs();
+                        break;
+                    default:
+                        break;
+                }
+            }
         };
 
         template <typename Callback>
         inline void AsyncCacheAPI::do_get(const bytes key, const hash_type hash, Callback on_get) noexcept {
             debug_assert(not m_terminated);
             try {
-                AsyncRequest * req = AllocateAsyncRequest(REQ_GET);
-                new (&req->get_args) GetRequestArgs(key, hash, on_get);
-                m_requests.enqueue(req);
+                auto * req = new AsyncRequest(REQ_GET, std::move(GetRequestArgs(key, hash, on_get)));
+                enqueue(req);
             } catch (const std::bad_alloc &) {
                 on_get(error::out_of_memory, false, bytes(), opaque_flags_type(), cas_value_type());
             }
@@ -251,9 +295,8 @@ namespace cachelot {
         inline void AsyncCacheAPI::do_store(const RequestType rtype, const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_store) noexcept {
             debug_assert(not m_terminated);
             try {
-                AsyncRequest * req = AllocateAsyncRequest(rtype);
-                new (&req->store_args) StoreRequestArgs(key, hash, value, flags, expires, cas_value, on_store);
-                m_requests.enqueue(req);
+                auto * req = new AsyncRequest(rtype, std::move(StoreRequestArgs(key, hash, value, flags, expires, cas_value, on_store)));
+                enqueue(req);
             } catch (const std::bad_alloc &) {
                 on_store(error::out_of_memory, false);
             }
@@ -299,9 +342,8 @@ namespace cachelot {
         inline void AsyncCacheAPI::do_del(const bytes key, const hash_type hash, Callback on_del) noexcept {
             debug_assert(not m_terminated);
             try {
-                AsyncRequest * req = AllocateAsyncRequest(REQ_DEL);
-                new (&req->del_args) DelRequestArgs(key, hash, on_del);
-                m_requests.enqueue(req);
+                auto * req = new AsyncRequest(REQ_DEL, std::move(DelRequestArgs(key, hash, on_del)));
+                enqueue(req);
             } catch (const std::bad_alloc &) {
                 on_del(error::out_of_memory, false);
             }
@@ -312,9 +354,8 @@ namespace cachelot {
         inline void AsyncCacheAPI::do_touch(const bytes key, const hash_type hash, seconds expires, Callback on_touch) noexcept {
             debug_assert(not m_terminated);
             try {
-                AsyncRequest * req = AllocateAsyncRequest(REQ_TOUCH);
-                new (&req->touch_args) TouchRequestArgs(key, hash, expires, on_touch);
-                m_requests.enqueue(req);
+                auto * req = new AsyncRequest(REQ_TOUCH, std::move(TouchRequestArgs(key, hash, expires, on_touch)));
+                enqueue(req);
             } catch (const std::bad_alloc &) {
                 on_touch(error::out_of_memory, false);
             }
