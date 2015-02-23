@@ -2,7 +2,7 @@
 #define CACHELOT_NET_TCP_SERVER_H_INCLUDED
 
 #ifndef CACHELOT_NETWORK_H_INCLUDED
-#  include <cachelot/net/network.h>
+#  include <cachelot/network.h>
 #endif
 
 /**

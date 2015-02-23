@@ -16,6 +16,13 @@ namespace cachelot {
         class fnv1a_hasher {
         public:
             typedef HashType hash_type;
+
+            /// @{ constructors
+            fnv1a_hasher() = default;
+            fnv1a_hasher(const fnv1a_hasher &) = default;
+            /// @}
+
+            /// operator() produces hash value
             hash_type operator()(const bytes data) const noexcept {
                 hash_type checksum = Seed;
                 for (uint8 one_byte : data) {

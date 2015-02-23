@@ -9,13 +9,15 @@ namespace cachelot {
     struct settings {
         struct {
             size_t memory_limit = 64 * 1024 * 1024; // 64Mb
-            size_t initial_hash_table_size = 512;
+            size_t initial_hash_table_size = 1048576; // ~1M cells
             bool has_CAS = true;
             bool has_evictions = true;
         } cache;
         struct {
+            size_t number_of_threads = std::thread::hardware_concurrency() * 2 - 1;
             bool has_TCP = true;
-            tuple<string, string> TCP_interface = tuple<string, string>("localhost", "11211");
+            string TCP_interface = "localhost";
+            uint16 TCP_port = 11211;
             bool hasUDP = true;
             tuple<string, string> UDP_interface = tuple<string, string>("localhost", "11212");
             bool has_unix_socket = false;

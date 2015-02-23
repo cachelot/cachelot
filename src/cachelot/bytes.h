@@ -177,7 +177,7 @@ namespace cachelot {
          * @note resulting bytes will not include leading zero char
          */
         template <size_t N>
-        static bytes from_literal(const char (&literal)[N]) {
+        static constexpr bytes from_literal(const char (&literal)[N]) {
             return bytes(literal, N-1); // leave out '\0' terminator
         }
 

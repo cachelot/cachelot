@@ -31,6 +31,7 @@
 #include <cstdlib>  // strtol, strtoul
 #include <stdexcept>// exception / runtime_error, etc
 #include <tuple>    // std::tuple
+#include <thread>   // std::thread std::this_thread
 
 #define __CACHELOT_PP_STR1(X) #X
 #define CACHELOT_PP_STR(X) __CACHELOT_PP_STR1(X)
