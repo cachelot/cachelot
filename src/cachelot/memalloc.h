@@ -131,7 +131,7 @@ namespace cachelot {
 
     private:
         // unit tests
-        friend class test_memalloc::test_block_list;
+        friend struct test_memalloc::test_block_list;
     };
 
 
