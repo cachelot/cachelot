@@ -86,14 +86,6 @@ namespace cachelot {
         return ptr.get();
     }
 
-    /// Efficient O(1) `erase` operation for std::vector, but it doesn't maintain original item order
-    template<typename T, typename A>
-    void erase_drop_order(std::vector<T, A> & vec, typename std::vector<T, A>::const_iterator where) {
-        using std::swap;
-        swap(*where, vec.back());
-        vec.pop_back();
-    }
-
     constexpr size_t cpu_l1d_cache_line = 64;
     constexpr int the_answer_to_life_the_universe_and_everything = 42;
 
