@@ -318,9 +318,10 @@ namespace cachelot {
             }
         public:
             constexpr position() noexcept
-                : pow_index(std::numeric_limits<decltype(pow_index)>::max())
-                , sub_index(std::numeric_limits<decltype(sub_index)>::max())
-                { /* do nothing */ };
+                : pow_index(const_::num_powers_of_2)
+                , sub_index(const_::num_blocks_per_pow2) {
+                };
+
             constexpr position(const position &) noexcept = default;
             position & operator= (const position &) noexcept = default;
 
@@ -364,6 +365,13 @@ namespace cachelot {
                 return position(next_pow_index, next_sub_index);
             }
 
+            bool operator<(const position & other) const noexcept { return absolute() < other.absolute(); }
+            bool operator<=(const position & other) const noexcept { return absolute() <= other.absolute(); }
+            bool operator>(const position & other) const noexcept { return absolute() > other.absolute(); }
+            bool operator>=(const position & other) const noexcept { return absolute() >= other.absolute(); }
+            bool operator==(const position & other) const noexcept { return absolute() == other.absolute(); }
+            bool operator!=(const position & other) const noexcept { return absolute() != other.absolute(); }
+
             // debug only self-check
             void test_check() const noexcept {
                 debug_assert(pow_index < const_::num_powers_of_2);
@@ -393,6 +401,7 @@ namespace cachelot {
             friend class group_by_size;
         };
 
+        /// calculate size class by `requested_size` while searching for block
         position search_pos(const uint32 requested_size) const noexcept {
             debug_assert(const_::min_block_size <= requested_size && requested_size <= const_::max_block_size);
             const uint32 log_num_blocks_per_pow2 = log2u(const_::num_blocks_per_pow2);
@@ -407,6 +416,7 @@ namespace cachelot {
             return position(power2_idx, sub_block_idx);
         }
 
+        /// calculate size class by `requested_size` while inserting block
         position insert_pos(const uint32 requested_size) const noexcept {
             debug_assert(const_::min_block_size <= requested_size && requested_size <= const_::max_block_size);
             // we don't need to roundup size on insert
@@ -417,22 +427,46 @@ namespace cachelot {
             return position(power2_idx, sub_block_idx);
         }
 
+        /// check if table cell at `pos` is non empty according to the bit index
+        /// @return `true` cell is marked as non empty, `false` otherwise
+        constexpr bool bit_index_probe(position pos) const noexcept {
+            return bit::isset(first_level_bit_index, pos.pow_index) && bit::isset(second_level_bit_index[pos.pow_index], pos.sub_index);
+        }
+
+        /// mark cell at `pos` as empty in bit index
+        void bit_index_mark_empty(position pos) noexcept {
+            // 1. update second level index
+            second_level_bit_index[pos.pow_index] = bit::unset(second_level_bit_index[pos.pow_index], pos.sub_index);
+            // 2. update first level index (only if all corresponding powers of 2 are empty)
+            if (second_level_bit_index[pos.pow_index] == 0) {
+                first_level_bit_index = bit::unset(first_level_bit_index, pos.pow_index);
+            }
+        }
+
+        /// mark cell at `pos` as non empty in bit index
+        void bit_index_mark_non_empty(position pos) noexcept {
+            second_level_bit_index[pos.pow_index] = bit::set(second_level_bit_index[pos.pow_index], pos.sub_index);
+            first_level_bit_index = bit::set(first_level_bit_index, pos.pow_index);
+        }
+
     public:
         group_by_size() = default;
 
-        /// try to get block of a `requested_size`, return `nullptr` on fail
+        /// try to get block of a `requested_size`
+        /// @return block pointer or `nullptr` if fail
         tuple<block *, position> try_get_block(const uint32 requested_size) noexcept {
             debug_assert(requested_size <= const_::max_block_size);
             position pos = search_pos(requested_size);
             // access indexes first, unset bits clearly indicate that corresponding size_class is empty
-            if (bit::isset(first_level_bit_index, pos.pow_index) && bit::isset(second_level_bit_index[pos.pow_index], pos.sub_index)) {
+            if (bit_index_probe(pos)) {
                 return tuple<block *, position>(get_block_at(pos), pos);
             } else {
                 return tuple<block *, position>(nullptr, pos);
             }
         }
 
-        /// try to get the biggest available block, at least of `requested_size`, return `nullptr` on fail
+        /// try to get the biggest available block, at least of `requested_size`
+        /// @return block pointer or `nullptr` if fail
         block * try_get_biggest_block(const uint32 requested_size) noexcept {
             debug_assert(requested_size <= const_::max_block_size);
             // accessing indexes first
@@ -445,13 +479,32 @@ namespace cachelot {
                 const position biggest_block_pos = position(pow_index, sub_index);
                 // there is biggest block, but does it have sufficient size?
                 if (biggest_block_pos.block_size() >= requested_size) {
-                    return get_block_at(biggest_block_pos);
+                    // get_block_at will update bit indexes if there's no block
+                    block * big_block = get_block_at(biggest_block_pos);
+                    if (big_block) {
+                        return big_block;
+                    }
                 } else {
                     return nullptr;
                 }
                 // TODO: DBG_loopBracker(100000000);
             }
             return nullptr;
+        }
+
+        /// try to get block after given `pos`
+        /// @return block pointer or `nullptr` if fail
+        block * try_get_block_after(position pos) noexcept {
+            return nullptr;
+        }
+
+        /// determine whether cell at `pos` is empty
+        bool empty_at(position pos) const noexcept {
+            debug_only(pos.test_check());
+            if (bit_index_probe(pos)) {
+                return table[pos.absolute()].empty();
+            }
+            return true;
         }
 
         /// store block `blk` at position corresponding to its size
@@ -489,12 +542,7 @@ namespace cachelot {
             }
             // we must update bit indexes if there are no free blocks left
             if (size_class.empty()) {
-                // 1. update second level index
-                second_level_bit_index[pos.pow_index] = bit::unset(second_level_bit_index[pos.pow_index], pos.sub_index);
-                // 2. update first level index (only if all corresponding powers of 2 are empty)
-                if (second_level_bit_index[pos.pow_index] == 0) {
-                    first_level_bit_index = bit::unset(first_level_bit_index, pos.pow_index);
-                }
+                bit_index_mark_empty(pos);
             }
             return blk;
         }
@@ -507,8 +555,12 @@ namespace cachelot {
             memalloc::block_list & size_class = size_class_at(pos);
             size_class.push_front(blk);
             // unconditionally update bit index
-            second_level_bit_index[pos.pow_index] = bit::set(second_level_bit_index[pos.pow_index], pos.sub_index);
-            first_level_bit_index = bit::set(first_level_bit_index, pos.pow_index);
+            bit_index_mark_non_empty(pos);
+        }
+
+        /// determine if there are blocks after given `pos` according to the bit index
+        constexpr bool has_blocks_after(position pos) const noexcept {
+            return (first_level_bit_index > pos.pow_index) || (second_level_bit_index[pos.pow_index] > pos.sub_index);
         }
 
     private:
@@ -630,7 +682,7 @@ namespace cachelot {
 
 
     template <typename ForeachFreed>
-    inline void * memalloc::alloc_or_evict(const size_t size, bool evict_if_necessary,ForeachFreed on_free_block) noexcept {
+    inline void * memalloc::alloc_or_evict(const size_t size, bool evict_if_necessary, ForeachFreed on_free_block) noexcept {
         debug_assert(size <= const_::allocation_limit);
         debug_assert(size > 0);
         const uint32 nsize = size > const_::min_block_size ? static_cast<uint32>(size) : const_::min_block_size;
@@ -643,19 +695,19 @@ namespace cachelot {
             return block::checkout(found_blk);
         }
 
-        ////////////////////////////////
         // 2. Try to split the biggest available block
-        block * big_block = free_blocks->try_get_biggest_block(nsize);
-        if (big_block != nullptr) {
-            debug_assert(big_block->size() >= nsize);
+        block * huge_block = free_blocks->try_get_biggest_block(nsize);
+        if (huge_block != nullptr) {
+            debug_assert(huge_block->size() >= nsize);
             block * leftover;
-            tie(found_blk, leftover) = block::split(big_block, nsize);
+            tie(found_blk, leftover) = block::split(huge_block, nsize);
             if (leftover) {
                 free_blocks->put_block(leftover);
             }
             used_blocks->put_block(found_blk);
             return block::checkout(found_blk);
         }
+
         // 3. Try to evict existing block to free some space
         if (evict_if_necessary) {
             // 3.1. Lookup within same class size of used blocks
@@ -670,6 +722,27 @@ namespace cachelot {
                     size_class.push_front(used_blk);
                 }
                 return used_blk->memory();
+            }
+
+            // 3.2. Try to evict bigger available block
+            if (used_blocks->has_blocks_after(found_blk_pos)) {
+                while (found_blk_pos < group_by_size::position::max()) {
+                    found_blk_pos = found_blk_pos.next();
+                    if (not used_blocks->empty_at(found_blk_pos)) {
+                        block * used_bigger_block = used_blocks->get_block_at(found_blk_pos);
+                        debug_assert(used_bigger_block != nullptr);
+                        debug_assert(used_bigger_block->size() >= size);
+                        on_free_block(used_bigger_block->memory());
+                        block::unuse(used_bigger_block);
+                        block * leftover;
+                        tie(found_blk, leftover) = block::split(used_bigger_block, nsize);
+                        if (leftover) {
+                            free_blocks->put_block(leftover);
+                        }
+                        used_blocks->put_block(found_blk);
+                        return block::checkout(found_blk);
+                    }
+                }
             }
         }
         return nullptr;
