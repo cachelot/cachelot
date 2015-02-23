@@ -293,7 +293,7 @@ namespace cachelot {
                                     Response response = item_stored ? STORED : NOT_STORED;
                                     send_response(response);
                                 } else {
-                                    send_error(SERVER_ERROR, bytes(cache_error.message().c_str(), cache_error.message().size() - 1));
+                                    send_error(SERVER_ERROR, bytes(cache_error.message().c_str(), cache_error.message().size()));
                                 }
                         });
                     } else {
