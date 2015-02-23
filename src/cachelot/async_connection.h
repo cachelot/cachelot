@@ -102,9 +102,7 @@ namespace cachelot {
                             on_complete(error, receive_result);
                         } else {
                             // read more data
-                            delayed_call([=]() {
-                                this->async_receive_until(terminator, on_complete);
-                            });
+                            post([=]() { this->async_receive_until(terminator, on_complete); });
                         }
                     } else {
                         on_complete(error, bytes()); // completed with error

@@ -14,8 +14,8 @@ namespace cachelot {
 
     using namespace cachelot::net;
 
-    extern const bytes CRLF;
-    extern const char SPACE;
+    constexpr bytes CRLF = bytes::from_literal("\r\n");
+    constexpr char SPACE = ' ';
 
     template <class SocketType>
     class text_protocol_handler : public async_connection<SocketType, text_protocol_handler<SocketType>> {
@@ -28,7 +28,8 @@ namespace cachelot {
         /// constructor
         explicit text_protocol_handler(io_service & io_svc, cache::AsyncCacheAPI & the_cache)
             : super(io_svc)
-            , cache(the_cache) {
+            , cache(the_cache)
+            , calc_hash() {
         }
 
         /// destructor
@@ -292,7 +293,7 @@ namespace cachelot {
                                     Response response = item_stored ? STORED : NOT_STORED;
                                     send_response(response);
                                 } else {
-                                    send_error(SERVER_ERROR, cache_error.message().c_str());
+                                    send_error(SERVER_ERROR, bytes(cache_error.message().c_str(), cache_error.message().size() - 1));
                                 }
                         });
                     } else {
@@ -379,7 +380,7 @@ namespace cachelot {
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::flush() noexcept {
-        async_send_all([=](const error_code error) {
+        this->async_send_all([=](const error_code error) {
                             if (error) { this->on_error(error); }
                         });
     }

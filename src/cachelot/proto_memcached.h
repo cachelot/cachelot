@@ -19,6 +19,9 @@
 #ifndef CACHELOT_HASH_FNV1A_H_INCLUDED
 #  include <cachelot/hash_fnv1a.h>
 #endif
+#ifndef CACHELOT_SETTINGS_H_INCLUDED
+#  include <cachelot/settings.h>
+#endif
 
 /// @defgroup memcached Memcached protocols implementation
 /// @{
@@ -90,8 +93,6 @@ namespace cachelot {
     struct client_error : public memcached_error {
         explicit client_error(const char * msg) : memcached_error(msg) {}
     };
-
-    static constexpr size_t MaxSendbufSize = 256 * 1024 * 1024;
 
     typedef fnv1a<cache::hash_type>::hasher HashFunction;
 
