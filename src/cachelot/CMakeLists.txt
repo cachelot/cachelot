@@ -32,7 +32,6 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/unix_socket_server.h
                 ${CMAKE_CURRENT_LIST_DIR}/proto_memcached.h
                 ${CMAKE_CURRENT_LIST_DIR}/proto_memcached_text.h
-                ${CMAKE_CURRENT_LIST_DIR}/proto_memcached_text.cpp
                 ${CMAKE_CURRENT_LIST_DIR}/proto_memcached_servers.h
         )
 
