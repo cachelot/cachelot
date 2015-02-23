@@ -375,7 +375,7 @@ namespace cachelot {
         inline ItemPtr Cache::item_new(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) {
             void * memory;
             const size_t size_required = Item::CalcSizeRequired(key, value, cas_value);
-            auto on_delete = [=](void * ptr) -> void {
+            static const auto on_delete = [=](void * ptr) -> void {
                 auto i = reinterpret_cast<Item *>(ptr);
                 debug_only(bool deleted = ) this->m_dict.del(i->key(), i->hash());
                 debug_assert(deleted);
@@ -403,6 +403,7 @@ namespace cachelot {
                 item->reassign(new_value, new_flags, time_from(new_expires), new_cas_value);
             } else {
                 auto new_item = item_new(item->key(), item->hash(), new_value, new_flags, new_expires, new_cas_value);
+                // TODO: we may double delete same Item (previously during eviction)
                 m_dict.remove(at);
                 item_free(item);
                 m_dict.insert(at, new_item->key(), new_item->hash(), new_item);
