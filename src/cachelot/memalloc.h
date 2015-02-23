@@ -6,6 +6,9 @@
 /// @ingroup common
 /// @{
 
+// test case forward declaration to allow test access private memalloc members
+namespace { namespace test_memalloc { struct test_block_list; } }
+
 namespace cachelot {
 
     // constants
@@ -125,6 +128,10 @@ namespace cachelot {
             uint64 num_block_table_splits;
             uint64 num_block_table_merges;
         } stats;
+
+    private:
+        // unit tests
+        friend class test_memalloc::test_block_list;
     };
 
 
