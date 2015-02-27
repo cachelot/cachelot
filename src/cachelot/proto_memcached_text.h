@@ -265,6 +265,9 @@ namespace cachelot {
         auto expires_after = cache::seconds(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.length()));
         tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
         uint32 datalen = str_to_int<uint32>(parsed.begin(), parsed.length());
+        if (datalen > settings.cache.max_value_size) {
+            throw client_error("Maximum value length exceeded");
+        }
         cache::cas_value_type cas_unique = 0;
         if (req == cache::CAS) {
             tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
@@ -291,9 +294,14 @@ namespace cachelot {
                             [=](error_code cache_error, bool item_stored) noexcept {
                                 if (not cache_error) {
                                     Response response = item_stored ? STORED : NOT_STORED;
-                                    send_response(response);
+                                    this->post([=]() {
+                                        send_response(response);
+                                    } );
+
                                 } else {
-                                    send_error(SERVER_ERROR, bytes(cache_error.message().c_str(), cache_error.message().size()));
+                                    this->post([=]() {
+                                        send_error(SERVER_ERROR, bytes(cache_error.message().c_str(), cache_error.message().size()));
+                                    } );
                                 }
                         });
                     } else {
@@ -324,7 +332,9 @@ namespace cachelot {
             if (not error) {
                 static const bytes END = bytes::from_literal("END");
                 this->serialize() << END << CRLF;
-                this->flush();
+                this->post([=]() {
+                    this->flush();
+                } );
             } // TODO: ELSE??? (out of memory possible)
         });
     }
