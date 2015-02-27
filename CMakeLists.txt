@@ -2,22 +2,32 @@
 #       Cmake basic setup
 ###########################################################################
 if (NOT CMAKE_GENERATOR STREQUAL "Unix Makefiles")
-    set (CMAKE_CONFIGURATION_TYPES "debug;release;relwithdebuginfo;asan" CACHE TYPE INTERNAL FORCE)
+    set (CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebugInfo;AddressSanitizer" CACHE TYPE INTERNAL FORCE)
     mark_as_advanced (CMAKE_CONFIGURATION_TYPES)
 else ()
    # Unix Makefiles support only single build configuration - release by default
-   set (CMAKE_BUILD_TYPE release)
+   set (CMAKE_BUILD_TYPE Release)
 endif ()
 project (cachelot)
 cmake_minimum_required (VERSION 2.8.3)
-# Convert build type to lower case for case insensitive comparisson
-string (TOLOWER "${CMAKE_BUILD_TYPE}" CACHELOT_BUILD)
-# 32-bit OS forces to build x32 binaries
+
+###########################################################################
+#       Platform setup
+###########################################################################
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
-  set (FORCE_32_BITS TRUE)
+  set (CACHELOT_PLATFORM_BITS 32)
+  add_definitions ("-DCACHELOT_PLATFORM_BITS=32")
+elseif (CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set (CACHELOT_PLATFORM_BITS 64)
+  add_definitions ("-DCACHELOT_PLATFORM_BITS=64")
 else ()
-  set (FORCE_32_BITS FALSE)
+  message (FATAL_ERROR "CMake reports unsupported pointer size: \"${CMAKE_SIZEOF_VOID_P}\"")
 endif ()
+message (STATUS "Platform: ${CMAKE_SYSTEM_NAME} x${CACHELOT_PLATFORM_BITS}")
+if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    add_definition(-D_WIN32_WINNT=0x05010000) # set NTDDI_WINXP as a target win version
+endif ()
+
 
 ###########################################################################
 #       Compiler setup
@@ -38,10 +48,12 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
     set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES "Dbghelp.lib")
 elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang"))
 # - GCC / Clang common - - - - - - - - - - - - - - - - - - - - - - - - - -
-    if (NOT FORCE_32_BITS)
+    if (CACHELOT_PLATFORM_BITS EQUAL 64)
         set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64")
-    else ()
+    elseif (CACHELOT_PLATFORM_BITS EQUAL 32)
         set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m32")
+    else ()
+        message (FATAL_ERROR "CACHELOT_PLATFORM_BITS is set to unknown value: \"${CACHELOT_PLATFORM_BITS}\"")
     endif ()
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4 -std=c++11")
     set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -DDEBUG")
@@ -58,7 +70,7 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
             message (FATAL_ERROR "gcc minimum version 4.8 is required")
         endif ()
         message ("Address sanitizer build type was enabled for gcc")
-        set (CMAKE_CXX_FLAGS_ASAN "-fsanitize=address ${ADRESS_SANITIZER_FLAGS}")
+        set (CMAKE_CXX_FLAGS_ADDRESSSANITIZER "-fsanitize=address ${ADRESS_SANITIZER_FLAGS}")
        # - - Clang specific - - - - - - - - - - - - - - - - - - - - - - - -
     elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
         set (CLANG_VERSION ${CMAKE_CXX_COMPILER_VERSION})
@@ -68,7 +80,7 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
         set (CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -stdlib=libc++")
         if ((CLANG_VERSION VERSION_EQUAL 3.1) OR (CLANG_VERSION VERSION_GREATER 3.1))
             message ("Address sanitizer build type was enabled for Clang")
-            set (CMAKE_CXX_FLAGS_ASAN "-faddress-sanitizer ${ADRESS_SANITIZER_FLAGS}")
+            set (CMAKE_CXX_FLAGS_ADDRESSSANITIZER "-faddress-sanitizer ${ADRESS_SANITIZER_FLAGS}")
         endif ()
         # Clang on Linux requires additional flags to use proper ABI
         if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -76,21 +88,10 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
             set (CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -lc++abi")
         endif ()
     endif ()
-    if (CMAKE_CXX_FLAGS_ASAN)
-        mark_as_advanced(CMAKE_CXX_FLAGS_ASAN)
-        # Update the documentation string of CMAKE_BUILD_TYPE for GUIs
-        set (CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
-            "Choose the type of build, options are: debug release relwithdebuginfo  asan."
-            FORCE)
-    endif ()
 else ()
     message (FATAL_ERROR "unknown compiler")
 endif ()
 
-message (STATUS "Platform: " ${CMAKE_SYSTEM_NAME})
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    add_definition(-D_WIN32_WINNT=0x05010000) # set NTDDI_WINXP as a target win version
-endif ()
 
 ###########################################################################
 #       3rd party libraries
@@ -123,6 +124,8 @@ if (${NUM_PLATFORM_SPECIFIC_DEBUG_LIBRARIES})
   message(STATUS "Platform specific debug libraries: " ${PLATFORM_SPECIFIC_DEBUG_LIBRARIES})
 endif ()
 
+set (CACHELOT_BUILD "")
+string (TOLOWER "${CMAKE_BUILD_TYPE}" CACHELOT_BUILD)
 set_target_properties (cachelot PROPERTIES RUNTIME_OUTPUT_DIRECTORY bin/${CACHELOT_BUILD})
 
 # - - - Unit tests - - - - - - - - - -
