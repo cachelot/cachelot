@@ -8,7 +8,7 @@ namespace {
 using namespace cachelot;
 
 static constexpr size_t MEMSIZE = 1024 * 1024 * 4; // 4Mb
-static constexpr size_t NUM_ALLOC = 1000000;
+static constexpr size_t NUM_ALLOC = 100000;
 static constexpr size_t NUM_REPEAT = 5;
 static constexpr size_t MIN_ALLOC_SIZE = 4;
 static constexpr size_t MAX_ALLOC_SIZE = 1024 * 1024;
@@ -60,8 +60,6 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
     random_int<size_t> random_size(MIN_ALLOC_SIZE, MAX_ALLOC_SIZE);
     std::vector<void * > allocations;
     allocations.reserve(NUM_ALLOC);
-    uint64 num_allocation_errors = 0;
-
     for (size_t repeat_no = 0; repeat_no < NUM_REPEAT; ++repeat_no) {
         random_int<> probability(1, 100);
 
@@ -82,11 +80,10 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
                 });
             if (ptr != nullptr) {
                 allocations.push_back(ptr);
-            } else {
-                num_allocation_errors += 1;
             }
             // delete element with some probability
             if (not allocations.empty() && probability() > 60) { // ~40%
+                if (repeat_no == NUM_REPEAT - 1) continue;
                 random_int<> random_prev_allocation(0, allocations.size() - 1);
                 size_t prev_alloc_index = random_prev_allocation();
                 ptr = allocations.at(prev_alloc_index);
@@ -97,16 +94,26 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
                 allocations.resize(allocations.size() - 1);
             }
         }
+        if (repeat_no == NUM_REPEAT - 1) break;
         // free previously allocated memory
-        for (void * ptr : allocations) {
+        while (not allocations.empty()) {
+            void * ptr = allocations.back();
             allocator.free(ptr);
+            allocations.pop_back();
         }
-        allocations.clear();
         // start over again
     }
-    if (num_allocation_errors > 0) {
-        BOOST_TEST_MESSAGE("There are " << num_allocation_errors << " failures of " << NUM_ALLOC * NUM_REPEAT << " allocations");
-    }
+    std::cout << "num_malloc = " << allocator.stats.num_malloc << std::endl;
+    std::cout << "num_free = " << allocator.stats.num_free << std::endl;
+    std::cout << "num_realloc = " << allocator.stats.num_realloc << std::endl;
+    std::cout << "num_errors = " << allocator.stats.num_errors << std::endl;
+    std::cout << "total_requested_mem = " << allocator.stats.total_requested_mem << std::endl;
+    std::cout << "total_served_mem = " << allocator.stats.total_served_mem << std::endl;
+    std::cout << "served_mem = " << allocator.stats.served_mem << std::endl;
+    std::cout << "num_free_table_hits = " << allocator.stats.num_free_table_hits << std::endl;
+    std::cout << "num_used_table_hits = " << allocator.stats.num_used_table_hits << std::endl;
+    std::cout << "num_free_table_splits = " << allocator.stats.num_free_table_splits << std::endl;
+    std::cout << "num_used_table_merges = " << allocator.stats.num_used_table_splits << std::endl;
 }
 
 
