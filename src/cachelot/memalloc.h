@@ -1,8 +1,6 @@
 #ifndef CACHELOT_MEMALLOC_H_INCLUDED
 #define CACHELOT_MEMALLOC_H_INCLUDED
 
-#include <cachelot/bits.h> // pow2 utils
-
 /// @ingroup common
 /// @{
 
@@ -11,38 +9,14 @@ namespace { namespace test_memalloc { struct test_block_list; } }
 
 namespace cachelot {
 
-    // constants
-    namespace const_ {
-        debug_only(static constexpr uint64 DBG_MARKER = 1234567890987654321;)
-        debug_only(static constexpr char DBG_FILLER = 'X';)
-        // minimal block size is `2^min_power_of_2`
-        static constexpr uint32 min_power_of_2 = 6;  // limited to 2^min_power_of_2 >= sizeof(memblock)
-        // maximal block size is `2^max_power_of_2`
-        static constexpr uint32 max_power_of_2 = 30; // can not be changed (memblock::size is 31 bit)
-        static constexpr uint32 num_powers_of_2 = max_power_of_2 - min_power_of_2;
-        // number of second level cells per first level cell (first level cells are powers of 2 in range `[min_power_of_2..max_power_of_2]`)
-        static constexpr uint32 num_blocks_per_pow2 = 8; // bigger value means less memory overhead but increases table size
-
-        constexpr uint32 sub_block_size_of_pow2(uint32 power) {
-            // Formula: (2^(power + 1) - 2^power) / num_blocks_per_pow2)
-            // bit magic: x/(2^n) <=> x >> n
-            // TODO: check if compiler does this optimization by itself
-            return (pow2(power + 1) - pow2(power)) >> log2u(num_blocks_per_pow2);
-        }
-
-        // minimal size of block, blocks of `min_block_size` will be provided even on attempt to allocate less memory
-        static constexpr uint32 min_block_size = pow2(min_power_of_2);
-        // maximal size of block, attempt to allocate more memory than `max_block_size` will fail
-        static const uint32 max_block_size = pow2(max_power_of_2) - sub_block_size_of_pow2(max_power_of_2 - 1);
-        // Two-level block table is placed in memory as a continuous array of `block_table_size` elements
-        static constexpr uint32 block_table_size = num_powers_of_2 * num_blocks_per_pow2;
-        // Limit amount of memory that can be allocate in a single request to the memalloc
-        static const size_t allocation_limit = max_block_size;
-    }
-
    /**
-    * Allocator which is capable to work whithin fixed amount of memory
-    *  aims to provide fast allocation / deallocation
+    * Allocator which works whith fixed amount of pre-allocated memory
+    *
+    * Advantages:
+    *  - allocated blocks can be evicted in order to satisfy new allocations
+    *  - fast (malloc / free / realloc are amortized O(1) operations)
+    *  - efficiently utilizes CPU cache
+    *  - has small overhead (8 bytes of metadata per allocation + alignment bytes)
     *
     * Limitations:
     *  - memalloc is single threaded by design
@@ -50,20 +24,13 @@ namespace cachelot {
     *  - does not distinguish virtual and physical memory (treat whole given memory as commited) and
     *  - does not give unused memory back to OS (actually it doesn't call malloc / free or equivalents at all,
     *    initial contiguous memory volume 'arena' must be pre-allocated by user)
-    *  - contrary to standard malloc implementations allocated memory is aligned to 8 bytes boundary (not 16)
-    *
-    * Advantages:
-    *  - works within fixed amount of user-provided memory
-    *  - fast (malloc / free / realloc are O(1) operations)
-    *  - has small overhead (only 8 bytes of metadata per allocation)
+    *  - contrary to standard malloc implementations allocated memory is aligned to sizeof(void *) bytes boundary (not 16)
     */
     class memalloc {
         class block;
         class block_list;
         class group_by_size;
     public:
-        static const size_t allocation_limit = const_::allocation_limit;
-
         /// user must provide contiguous volume of memory to work with
         /// @p arena - pointer to memory to work with
         /// @p arena_size - size of `arena` in bytes
@@ -115,18 +82,21 @@ namespace cachelot {
         // all memory blocks are located in table, grouped by block size
         group_by_size * free_blocks; // free blocks are stored here
         group_by_size * used_blocks; // used for block eviction
+
+    public:
         // stats
         struct {
-            uint64 num_malloc;
-            uint64 num_free;
-            uint64 num_realloc;
-            uint64 requested_mem_total;
-            uint64 served_mem_total;
-            uint64 requested_mem;
-            uint64 served_mem;
-            uint64 num_block_table_hits;
-            uint64 num_block_table_splits;
-            uint64 num_block_table_merges;
+            uint64 num_malloc = 0;
+            uint64 num_free = 0;
+            uint64 num_realloc = 0;
+            uint64 num_errors = 0;
+            uint64 total_requested_mem = 0;
+            uint64 total_served_mem = 0;
+            uint64 served_mem = 0;
+            uint64 num_free_table_hits = 0;
+            uint64 num_used_table_hits = 0;
+            uint64 num_free_table_splits = 0;
+            uint64 num_used_table_splits = 0;
         } stats;
 
     private:
