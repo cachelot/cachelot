@@ -1,9 +1,18 @@
 #ifndef CACHELOT_CACHE_ITEM_H_INCLUDED
 #define CACHELOT_CACHE_ITEM_H_INCLUDED
 
-#include <cachelot/bytes.h> // key, value
-#include <cachelot/bits.h>  // unaligned_bytes
-#include <cachelot/expiration_clock.h> // expiration time
+#ifndef CACHELOT_BYTES_H_INCLUDED
+#  include <cachelot/bytes.h> // key, value
+#endif
+#ifndef CACHELOT_BITS_H_INCLUDED
+#  include <cachelot/bits.h>  // unaligned_bytes
+#endif
+#ifndef CACHELOT_EXPIRATION_CLOCK_H_INCLUDED
+#  include <cachelot/expiration_clock.h> // expiration time
+#endif
+#ifndef CACHELOT_SETTINGS_H_INCLUDED
+#  include <cachelot/settings.h>
+#endif
 
 /// @ingroup cache
 /// @{
@@ -42,13 +51,12 @@ namespace cachelot {
             typedef ExpirationClock clock;
             typedef clock::time_point expiration_time_point;
             typedef uint64 cas_value_type;
-            static constexpr size_t max_key_length = 250;
-            static constexpr size_t max_value_length = 128 * 1024 * 1024;
+            static constexpr size_t max_key_length = 250; // ! key size is limited to uint8
         private:
-            //!Important declaration order affects item size
-            expiration_time_point m_expiration_time; // when it expires
+            // Important! declaration order affects item size
             const hash_type m_hash; // hash value
             uint32 m_value_length; // length of value [0..MAX_VALUE_LENGTH]
+            expiration_time_point m_expiration_time; // when it expires
             opaque_flags_type m_opaque_flags; // user defined item flags
             const uint8 m_key_length; // length of key [1..MAX_KEY_LENGTH]
             bool m_ignore_cas; // does item have a CAS value
@@ -160,7 +168,7 @@ namespace cachelot {
 
         inline void Item::reassign(bytes new_value, opaque_flags_type new_flags, expiration_time_point new_expiration, cas_value_type new_cas_value) noexcept {
             debug_assert(key()); // must be already assigned
-            debug_assert(new_value.length() <= max_value_length);
+            debug_assert(new_value.length() <= settings.cache.max_value_size);
             bool ignore_cas = (new_cas_value == cas_value_type());
             m_expiration_time = new_expiration;
             m_value_length = new_value.length();
@@ -194,7 +202,7 @@ namespace cachelot {
         inline size_t Item::CalcSizeRequired(const bytes the_key, const bytes the_value, const cas_value_type cas_value) noexcept {
             debug_assert(the_key.length() > 0);
             debug_assert(the_key.length() <= max_key_length);
-            debug_assert(the_value.length() <= max_value_length);
+            debug_assert(the_value.length() <= settings.cache.max_value_size);
             size_t item_size = sizeof(Item);
             item_size += the_key.length();
             item_size += the_value.length();

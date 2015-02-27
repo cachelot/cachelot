@@ -39,8 +39,6 @@ namespace cachelot {
         typedef Item::cas_value_type cas_value_type;
         /// Maximum key length in bytes
         static constexpr auto max_key_length = Item::max_key_length;
-        /// Maximum value length in bytes
-        static constexpr auto max_value_length = Item::max_value_length;
 
         /// Single entry in the main cache dict
         class ItemDictEntry {
