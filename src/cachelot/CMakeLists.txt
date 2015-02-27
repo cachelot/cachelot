@@ -33,5 +33,9 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/proto_memcached.h
                 ${CMAKE_CURRENT_LIST_DIR}/proto_memcached_text.h
                 ${CMAKE_CURRENT_LIST_DIR}/proto_memcached_servers.h
+                ${CMAKE_CURRENT_LIST_DIR}/pool_allocator.h
+                ${CMAKE_CURRENT_LIST_DIR}/atom.h
+                ${CMAKE_CURRENT_LIST_DIR}/actor.cpp
+                ${CMAKE_CURRENT_LIST_DIR}/actor.h
         )
 
