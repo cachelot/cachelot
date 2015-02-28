@@ -128,8 +128,8 @@ namespace cachelot {
         };
         static constexpr size_t free_items_mask = Limit - 1;
         std::unique_ptr<free_node[]> free_items;
-        alignas(cpu_cache_line) std::atomic<size_t> add_pos;
-        alignas(cpu_cache_line) std::atomic<size_t> remove_pos;
+        alignas(cpu_l1d_cache_line) std::atomic<size_t> add_pos;
+        alignas(cpu_l1d_cache_line) std::atomic<size_t> remove_pos;
     };
 
 } // namespace cachelot

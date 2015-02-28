@@ -68,22 +68,22 @@ namespace cachelot {
         /// schedule function into IO loop. In multithreaded environment all
         /// function calls of the single connection will be executed one by the same thread
         template <typename Function>
-        void post(Function fun) noexcept { m_strand.post(fun); }
+        void post(Function fun) noexcept { m_ios.post(fun); }
 
     private:
         bytes receive_buffer() const noexcept;
 
     private:
+        io_service & m_ios;
         SocketType m_socket;
-        io_service::strand m_strand;
         io_buffer m_rcv_buf;
         io_buffer m_snd_buf;
     };
 
     template <class Sock, class Conn>
     inline async_connection<Sock, Conn>::async_connection(io_service & io_svc, const size_t rcvbuf_max, const size_t sndbuf_max)
-        : m_socket(io_svc)
-        , m_strand(io_svc)
+        : m_ios(io_svc)
+        , m_socket(io_svc)
         , m_rcv_buf(default_min_buffer_size, rcvbuf_max)
         , m_snd_buf(default_min_buffer_size, sndbuf_max) {
     }
