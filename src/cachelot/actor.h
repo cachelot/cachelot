@@ -3,45 +3,56 @@
 
 #include <cachelot/atom.h>
 #include <cachelot/bits.h>  // unaligned_bytes
-#include <cachelot/pool_allocator.h>
-#include <cachelot/mpsc_queue.h>
-#include <thread>
-#include <atomic>
+#include <cachelot/mpsc_queue.h> // mailbox
+
+/**
+ * @defgroup actor Lightweight Erlang actor model
+ * @par Example
+ * @snippet src/unit_test/test_actor.cpp Simple calculator actors
+ * @{
+ */
 
 namespace cachelot {
 
+    class ActorThread {
+        class ActorThreadImpl;
+    public:
+        typedef std::function<bool ()> MainFunction;
+
+        /// constructor
+        ActorThread(MainFunction func);
+
+        /// start to execute thread
+        void start() noexcept;
+
+        /// request thread to stop execution
+        void stop() noexcept;
+
+        /// wait for thread completion
+        void join() noexcept;
+
+    private:
+        std::unique_ptr<ActorThreadImpl> m_impl;
+        friend class Actor;
+    };
+
+
     /**
-     * Actor is an interface for implementing actors that are running in separate threads
-     * and communicate with each other via messages.
-     * (It's inspired by Erlang actor model although there's lack of major functionality, like failover handling)
+     * Actor is lightweight process executed cooperatively in thread
+     * Actors are able to communicate with each other via sending asynchronous messages
      *
-     * Specific actor implementation class must be inherited from Actor and provide 
+     * Specific actor implementation class must be inherited from `Actor` and provide two
      * callbacks: one for periodical executing in main loop and one for incoming messages
-     * @par Example
-     * @snippet src/unit_test/test_actor.cpp Simple calculator actors
-     * @see Message
+     * @see Actor::Message
      * @see on_message and on_idle
      * @note It is possible to implement state machine by changing `on_message` callback
      */
     class Actor {
         class MessageBase;
     public:
-        /**
-         * Reply is internally used to indicate whether message is replied or not
-         * @see reply_to() and noreply()
-         */
-        class Reply {
-            const bool flag = false;
-            explicit Reply(bool f) : flag(f) {}
-            explicit operator bool() { return flag; }
-            friend class Actor;
-        };
-
         class Message;
 
-        typedef std::function<Reply (Actor *, Message &) noexcept> message_callback_type;
-        typedef std::function<bool (Actor *) noexcept> idle_callback_type;
-
+        typedef std::function<bool (Actor *) noexcept> actor_body;
 
         ///@name constructors
         ///@{
@@ -61,81 +72,58 @@ namespace cachelot {
          * @endcode
          */
         template <class ActorType>
-        Actor(Actor::Reply (ActorType::*on_message_fun)(Actor::Message &) noexcept,
-                bool (ActorType::*on_idle_fun)() noexcept) noexcept
-            : on_message(reinterpret_cast<Actor::Reply (Actor::*)(Actor::Message &) noexcept>(on_message_fun))
-            , on_idle(reinterpret_cast<bool (Actor::*)() noexcept>(on_idle_fun)) {
+        Actor(ActorThread & execution_thread, bool (ActorType::*act_function)() noexcept) noexcept
+            : m_execution_thread(execution_thread)
+            , do_act(reinterpret_cast<bool (Actor::*)() noexcept>(act_function)) {
             static_assert(std::is_base_of<Actor, ActorType>::value, "implementation must be inherited from Actor class");
-            }
+            attach();
+        }
         ///@} // ^constructors
 
         /// virtual destructor
-        virtual ~Actor() {}
+        virtual ~Actor() {
+            detach();
+        }
 
         // disallow copying
         Actor(const Actor &) = delete;
         Actor & operator= (const Actor &) = delete;
+        // allow moving
+        Actor(Actor &&) = default;
+        Actor & operator=(Actor &&) = default;
 
-        /// start actor thread (can not be called for running actor)
-        void start();
-
-        /// request actor to interrupt (can be safely called from actor callbacks)
-        void stop() noexcept;
-
-        /** 
-         * blocks caller thread until this actor finishes execution
-         * @note calling this function from actor callbacks will cause deadlock
-         */
-        void wait_complete() noexcept;
+        bool act() noexcept { return do_act(this); }
 
     protected:
         /// Send message to the other actor
         template <typename ... Args>
-        void send_message(Actor & to, atom_type msg_type, Args&&... args);
+        void send_message(Actor & to, atom_type msg_type, Args&&... args) noexcept;
 
         /// Reply to the received message
         template <typename ... Args>
-        Reply reply_to(Message & msg, atom_type msg_type, Args ... args);
+        void reply_to(std::unique_ptr<Message> && msg, atom_type msg_type, Args ... args) noexcept;
 
-        /// indicate that message is left unreplied
-        Reply noreply() const noexcept { return Reply(false); }
+        /// Receive message
+        std::unique_ptr<Message> receive_message() noexcept;
 
-        /** 
-         * @name callbacks
-         * Every Actor implementations must assign two following callbacks:
-         *@{
-         */
+    private:
+        /// notify owner ActorThread to wake it up
+        void notify() noexcept;
 
-        /**
-         * callback to handle incoming messages from other actors
-         * @code
-         * Reply on_message(Actor * self, Message & msg) noexcept
-         * @endcode
-         * function must indicate whether message was replied or not
-         * by calling either Actor::reply_to() or Actor::noreply()
-         */
-        message_callback_type on_message;
-        /**
-         * main actor function that will be periodically executed in a loop
-         * @code
-         * bool on_idle(Actor * self) noexcept
-         * @endcode
-         * function must return `true` if it does something useful
-         * and `false` if it has nothing to do
-         */
-        idle_callback_type on_idle;
-        ///@} // ^callbacks
+        /// attach this actor to the thread
+        void attach() noexcept;
 
-    public:
-        bool do_nothing() noexcept { return false; }
+        /// detach this actor from the thread
+        void detach() noexcept;
 
     private:
         typedef mpsc_queue<Message> Mailbox;
-
-        std::thread m_thread;
         mpsc_queue<Message> m_mailbox;
-        std::atomic_bool m_is_interrupted;  // flag to stop thread execution
-        chrono::nanoseconds __time_to_sleep; // used by yield implementation
+        ActorThread & m_execution_thread;
+        actor_body do_act;
+
+    private:
+        friend class ActorThread;
     };
 
 
@@ -154,15 +142,11 @@ namespace cachelot {
         /// type of message
         const atom_type type;
 
-        /// opaque user data will not be modified when the message will be replied
-        void * const userdata;
-
     protected:
         /// constructor
-        explicit MessageBase(Actor & the_sender, const atom_type the_type, void * the_userdata) noexcept
+        explicit MessageBase(Actor & the_sender, const atom_type the_type) noexcept
             : sender(the_sender)
-            , type(the_type)
-            , userdata(the_userdata) {
+            , type(the_type) {
         }
 
     private:
@@ -195,8 +179,8 @@ namespace cachelot {
 
         /// private constructor
         template <typename ...  Args>
-        explicit Message(Actor & the_sender, const atom_type the_type, void * the_userdata, Args ... args) noexcept
-            : Actor::MessageBase(the_sender, the_type, the_userdata) {
+        explicit Message(Actor & the_sender, const atom_type the_type, Args ... args) noexcept
+            : Actor::MessageBase(the_sender, the_type) {
             static_assert(std::is_trivially_destructible<tuple<Args...>>::value, "Arguments must be trivially destructible");
             static_assert(sizeof(Message) == message_size, "Unexpected message size");
             static_assert(sizeof(tuple<Args...>) < payload_size, "Not enough space for the arguments");
@@ -210,19 +194,6 @@ namespace cachelot {
         ~Message() = default;
 
     public:
-        /// Create new message
-        template <typename ...Args>
-        static Message * Create(Actor & the_sender, const atom_type the_type, void * the_userdata, Args ... args) {
-            Message * msg = LazyPoolInit().create(the_sender, the_type, the_userdata, args ...);
-            debug_assert(msg != nullptr);
-            return msg;
-        }
-
-        /// Destroy the message
-        static void Dispose(Message * msg) noexcept {
-            debug_assert(msg != nullptr);
-            LazyPoolInit().destroy(msg);
-        }
 
         /**
          * unpack message arguments
@@ -234,36 +205,38 @@ namespace cachelot {
 
     private:
         static constexpr size_t payload_size = message_size - sizeof(Actor::MessageBase);
-        byte payload[payload_size];  // payload memory to hold arguments
+        uint8 payload[payload_size];  // payload memory to hold arguments
 
     private:
-        typedef pool_allocator<Message, message_pool_limit> message_pool_type;
-        friend message_pool_type;
         friend Actor;
-        static message_pool_type & LazyPoolInit() {
-            static message_pool_type instance;
-            return instance;
-        }
+        friend std::default_delete<Message>;
     };
 
 
 ///////////////// Actor implementation ///////////////////////////////////////////////////
 
     template <typename ... Args>
-    inline void Actor::send_message(Actor & to, atom_type msg_type, Args && ... args) {
-        to.m_mailbox.enqueue(Actor::Message::Create(*this, msg_type, std::forward<Args>(args) ...));
+    inline void Actor::send_message(Actor & to, atom_type msg_type, Args && ... args) noexcept {
+        to.m_mailbox.enqueue(new Actor::Message(*this, msg_type, std::move<Args>(args) ...));
+        to.notify();
     }
 
 
     template <typename ... Args>
-    inline Actor::Reply Actor::reply_to(Message & msg, atom_type msg_type, Args ... args) {
-        Actor & to = msg.sender;
-        auto userdata = msg.userdata;
-        Actor::Message * reply_msg = new (&msg) Actor::Message(*this, msg_type, userdata, args ...);
+    inline void Actor::reply_to(std::unique_ptr<Message> && msg, atom_type msg_type, Args ... args) noexcept {
+        debug_assert(msg);
+        Actor & to = msg->sender;
+        Actor::Message * reply_msg = new (msg.release()) Actor::Message(*this, msg_type, args ...);
         to.m_mailbox.enqueue(reply_msg);
-        return Actor::Reply(true);
+        to.notify();
+    }
+
+    inline std::unique_ptr<Actor::Message> Actor::receive_message() noexcept {
+        return std::unique_ptr<Actor::Message>(m_mailbox.dequeue());
     }
 
 } // namespace cachelot
+
+/// @}
 
 #endif // CACHELOT_ACTOR_H_INCLUDED

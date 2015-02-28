@@ -15,7 +15,7 @@ namespace cachelot {
             bool has_evictions = true;
         } cache;
         struct {
-            size_t number_of_threads = 2;
+            size_t number_of_threads = 4;
             bool has_TCP = true;
             string TCP_interface = "localhost";
             uint16 TCP_port = 11211;

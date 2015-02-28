@@ -1,7 +1,7 @@
 #ifndef CACHELOT_ATOM_H_INCLUDED
 #define CACHELOT_ATOM_H_INCLUDED
 
-/// @ingroup common
+/// @ingroup actor
 /// @{
 
 namespace cachelot {
@@ -26,11 +26,12 @@ namespace cachelot {
                           "abcdefghijklmnopqrstuvwxyz";
 
         constexpr uint64_t next_interim(uint64_t current, size_t char_code) {
-            static_assert(encoding_table[(char_code <= 0x7F) ? char_code : 0] != 0, "Invalid character in the atom");
+            // TODO: validation
+            //static_assert(encoding_table[(char_code <= 0x7F) ? char_code : 0], "Invalid character in the atom");
             return (current << 6) | encoding_table[(char_code <= 0x7F) ? char_code : 0];
         }
 
-        constexpr uint64_t atom_val(const char* cstr, uint64_t interim = 0) {
+        constexpr uint64_t atom_val(const char* cstr, uint64_t interim) {
             return (*cstr == '\0') ? interim : atom_val(cstr + 1, next_interim(interim, static_cast<size_t>(*cstr)));
         }
 
@@ -40,7 +41,7 @@ namespace cachelot {
      * Atom is an unique number created from character literal.
      *
      * Internaly atom is 6-bit encoded string placed in `uint64` bits
-     * Credits to: [C++ Actor Framewor](http://actor-framework.org)
+     * Credits: [C++ Actor Framewor](http://actor-framework.org)
      * @note maximal atom length is limited to 10 characters
      */
     typedef uint64 atom_type;

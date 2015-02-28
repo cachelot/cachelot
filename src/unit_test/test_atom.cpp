@@ -1,7 +1,7 @@
 #include "unit_test.h"
-#include <vault/atom.h>
+#include <cachelot/atom.h>
 
-using namespace vault;
+using namespace cachelot;
 
 BOOST_AUTO_TEST_SUITE(test_atom)
 

@@ -3,7 +3,7 @@
  * @brief  memalloc implementation
  *
  * memalloc splits all provided memory on blocks (aka slabs) of variable size;<br/>
-* All blocks are doubly-linked with adjacents:<br/>
+ * All blocks are doubly-linked with adjacents:<br/>
  *  `prev <- left_adjacent_offset [block] size -> next`<br/>
  * Linkage allows to coalesce smaller blocks into bigger<br/>
  *<br/>
