@@ -15,8 +15,9 @@ namespace cachelot {
     class ActorThread::ActorThreadImpl {
         static constexpr uint32 max_wait_spin_count = 10000;
     public:
-        ActorThreadImpl(MainFunction fun)
-            : m_func(fun) {
+        ActorThreadImpl(MainFunction fun, ActorThread & actor_interface)
+            : m_thread_interface(actor_interface)
+            , m_func(fun) {
         }
 
         ~ActorThreadImpl() {
@@ -26,11 +27,11 @@ namespace cachelot {
 
         void start() noexcept {
             debug_assert(not m_thread.joinable());
-            m_is_waiting = false;
-            m_is_interrupted = false;
+            m_is_waiting.store(false, std::memory_order_relaxed);
+            m_is_interrupted.store(false, std::memory_order_relaxed);
             m_thread = std::thread([this]() {
                 uint32 wait_spins;
-                while (not m_is_interrupted) {
+                while (not m_is_interrupted.load(std::memory_order_relaxed)) {
                     bool has_work = false;
                     for (auto actor: m_actors) {
                         has_work |= actor->act();
@@ -46,26 +47,27 @@ namespace cachelot {
                     if (wait_spins >= max_wait_spin_count) {
                         continue;
                     }
-                    // this check is important as termination could be requested from the one of actors
-                    if (not m_is_interrupted) {
+                    // important check as termination could be requested from the running actors
+                    if (not m_is_interrupted.load(std::memory_order_relaxed)) {
                         // wait in kernel lock
                         std::unique_lock<decltype(m_wait_mutex)> lck(m_wait_mutex);
-                        m_is_waiting = true;
+                        debug_assert(not m_is_waiting);
+                        m_is_waiting.store(true, std::memory_order_relaxed);
                         m_wait_condition.wait(lck);
                     }
                     wait_spins = 0;
-                    m_is_waiting = false;
+                    m_is_waiting.store(false, std::memory_order_relaxed);
                 }
             });
         }
 
         void stop() noexcept {
-            m_is_interrupted = true;
+            m_is_interrupted.store(true);
             notify();
         }
 
         void notify() noexcept {
-            if (/* likely */ not m_is_waiting) {
+            if (/* likely */ not m_is_waiting.load(std::memory_order_relaxed)) {
                 return;
             }
             m_wait_condition.notify_one();
@@ -102,7 +104,12 @@ namespace cachelot {
             debug_assert(false && "attempt to detach non-attached Actor");
         }
 
+        static ActorThread & this_thread() noexcept {
+            return *(ActorThread *)nullptr; // Eat this!
+        }
+
     private:
+        ActorThread & m_thread_interface;
         std::vector<Actor *> m_actors;
         std::thread m_thread;
         MainFunction m_func;
@@ -117,7 +124,7 @@ namespace cachelot {
 
 
     ActorThread::ActorThread(MainFunction func)
-        : m_impl(new ActorThreadImpl(func)) {
+        : m_impl(new ActorThreadImpl(func, *this)) {
     }
 
     ActorThread::~ActorThread() {}
@@ -129,6 +136,8 @@ namespace cachelot {
 
     /// wait for thread completion
     void ActorThread::join() noexcept { m_impl->join(); }
+
+    ActorThread & ActorThread::this_thread() noexcept { return ActorThreadImpl::this_thread();  }
 
 
 //////// Actor //////////////////////////////////////

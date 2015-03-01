@@ -1,117 +1,118 @@
 #include <cachelot/cachelot.h>
 #include <cachelot/cache_service.h>
+#include <cachelot/io_serialization.h>
 
 #include <emmintrin.h>  // _mm_pause
 
 namespace cachelot { namespace cache {
 
-    CacheService::CacheService(size_t memory_size, size_t initial_dict_size)
-        : m_cache(memory_size, initial_dict_size)
-        , m_requests()
-        , m_terminated(false)
-        , m_waiting(false)
-        // must be initialised last
-        , m_worker(&CacheService::background_process_requests, this)
-    {}
 
+    constexpr bytes CRLF = bytes::from_literal("\r\n");
 
-    CacheService::~CacheService() {
-        // interrupt worker thread
-        debug_assert(not m_terminated);
-        m_terminated = true;
-        m_waiting_cndvar.notify_one();
-        try { m_worker.join(); } catch (...) { /* DO NOTHING */ }
-        // delete unprocessed requests
-        AsyncRequest * req = m_requests.dequeue();
-        while (req != nullptr) {
-            delete req;
-            req = m_requests.dequeue();
-        }
+    CacheService::CacheService(ActorThread & cache_thread, size_t memory_size, size_t initial_dict_size)
+        : Actor(cache_thread, &CacheService::main)
+        , m_cache(memory_size, initial_dict_size) {
     }
 
 
-    void CacheService::background_process_requests() {
-        constexpr static uint64 max_spin = 2000;
-        uint64 spin_count = 0;
-        do {
-            std::unique_ptr<AsyncRequest> req(m_requests.dequeue());
-            if (req != nullptr) {
-                switch (req->type) {
-                case GET: {
-                    auto & args = req->get_args;
-                    m_cache.do_get(args.key, args.hash, args.callback);
-                    break;
-                }
-                case SET: {
-                    auto & args = req->store_args;
-                    m_cache.do_set(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
-                    break;
-                }
-                case ADD: {
-                    auto & args = req->store_args;
-                    m_cache.do_add(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
-                    break;
-                }
-                case REPLACE: {
-                    auto & args = req->store_args;
-                    m_cache.do_replace(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
-                    break;
-                }
-                case APPEND: {
-                    auto & args = req->store_args;
-                    m_cache.do_append(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
-                    break;
-                }
-                case PREPEND: {
-                    auto & args = req->store_args;
-                    m_cache.do_prepend(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
-                    break;
-                }
-                case CAS: {
-                    auto & args = req->store_args;
-                    m_cache.do_cas(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
-                    break;
-                }
-                case DELETE: {
-                    auto & args = req->del_args;
-                    m_cache.do_del(args.key, args.hash, args.callback);
-                    break;
-                }
-                case TOUCH: {
-                    auto & args = req->touch_args;
-                    m_cache.do_touch(args.key, args.hash, args.expires, args.callback);
-                    break;
-                }
-                case SYNC: {
-                    auto & args = req->sync_args;
-                    args.callback(error::success);
-                    break;
-                }
-                default:
-                    debug_assert(false && "Unknown request");
-                    break;
-                }
-            } else {
-                _mm_pause();
-                spin_count += 1;
-                if (spin_count < max_spin) {
-                    continue;
-                }
-                // we've waited long enough
-                m_waiting.store(true, std::memory_order_relaxed);
-                std::unique_lock<std::mutex> lck(m_wait_mutex);
-                m_waiting_cndvar.wait(lck);
-                spin_count = 0;
-                m_waiting.store(false, std::memory_order_relaxed);
+    CacheService::~CacheService() {}
+
+
+    bool CacheService::main() noexcept {
+        auto req = receive_message();
+        if (req != nullptr) {
+            switch (req->type) {
+            case atom("get"): {
+                bytes key; hash_type hash; atom_type serialization; io_buffer * iobuf;
+                req->unpack(key, hash, serialization, iobuf);
+                m_cache.do_get(key, hash, [&req, this, key, serialization, iobuf](error_code error, bool found, bytes value, opaque_flags_type flags, cas_value_type cas_value) -> void {
+                    if (not error) {
+                        if (found) {
+                            switch (serialization) {
+                            case atom("text"): {
+                                io_stream<text_serialization_tag> out(*iobuf);
+                                const auto value_length = static_cast<unsigned>(value.length());
+                                static const bytes VALUE = bytes::from_literal("VALUE ");
+                                out << VALUE << key << ' ' << flags << ' ' << value_length;
+                                if (cas_value != cache::cas_value_type()) {
+                                    out << ' ' << cas_value;
+                                }
+                                out << CRLF << value << CRLF;
+                                this->reply_to(std::move(req), atom("item"));
+                                break;
+                            }
+                            default:
+                                debug_assert(false && "Invalid serialization");
+                            }
+                        } else {
+                            this->reply_to(std::move(req), atom("notfound"));
+                        }
+                    } else {
+                        this->reply_to(std::move(req), atom("error"), error);
+                    }
+                });
+                break;
             }
-        } while (not m_terminated);
-    }
-
-
-    void CacheService::enqueue(AsyncRequest * req) noexcept {
-        m_requests.enqueue(req);
-        if (m_waiting.load(std::memory_order_relaxed)) {
-            m_waiting_cndvar.notify_one();
+            case atom("set"): {
+                bytes key; hash_type hash; bytes value; opaque_flags_type flags; seconds expires; cas_value_type cas_value;
+                req->unpack(key, hash, value, flags, expires, cas_value);
+                m_cache.do_set(key, hash, value, flags, expires, cas_value, [&req, this](error_code error, bool stored) {
+                    if (not error) {
+                        this->reply_to(std::move(req), stored ? atom("stored") : atom("stored"));
+                    } else {
+                        this->reply_to(std::move(req), atom("error"), error);
+                    }
+                });
+                break;
+            }
+            case atom("add"): {
+                //auto & args = req->store_args;
+                //m_cache.do_add(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                break;
+            }
+            case atom("replace"): {
+                //auto & args = req->store_args;
+                //m_cache.do_replace(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                break;
+            }
+            case atom("append"): {
+                //auto & args = req->store_args;
+                //m_cache.do_append(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                break;
+            }
+            case atom("prepend"): {
+//                    auto & args = req->store_args;
+//                    m_cache.do_prepend(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                break;
+            }
+            case atom("cas"): {
+//                    auto & args = req->store_args;
+//                    m_cache.do_cas(args.key, args.hash, args.value, args.flags, args.expires, args.cas_value, args.callback);
+                break;
+            }
+            case atom("delete"): {
+//                    auto & args = req->del_args;
+//                    m_cache.do_del(args.key, args.hash, args.callback);
+                break;
+            }
+            case atom("touch"): {
+//                    auto & args = req->touch_args;
+//                    m_cache.do_touch(args.key, args.hash, args.expires, args.callback);
+                break;
+            }
+            case atom("sync"): {
+                atom_type return_marker;
+                req->unpack(return_marker);
+                this->reply_to(std::move(req), return_marker);
+                break;
+            }
+            default:
+                debug_assert(false && "Unknown request");
+                break;
+            }
+            return true;
+        } else {
+            return false;
         }
     }
 

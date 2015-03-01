@@ -12,8 +12,12 @@ using namespace cachelot;
 
 // Global io_service to access it from the signal handler
 net::io_service reactor;
+std::vector<ActorThread> thread_pool;
 
 void on_signal_terminate(int) {
+    for (auto & th : thread_pool) {
+        th.stop();
+    }
     reactor.stop();
 }
 
@@ -24,10 +28,13 @@ void setup_signals() {
     signal(SIGQUIT, &on_signal_terminate);
 }
 
+
+
+
 int main() {
     try {
-        std::unique_ptr<cache::CacheService> cache(new cache::CacheService(settings.cache.memory_limit, settings.cache.initial_hash_table_size));
-        std::vector<std::thread> reactor_thread_pool;
+        ActorThread cache_thread([]() { return false; });
+        std::unique_ptr<cache::CacheService> cache(new cache::CacheService(cache_thread, settings.cache.memory_limit, settings.cache.initial_hash_table_size));
 
         // TCP
         std::unique_ptr<memcached::text_tcp_server> memcached_tcp_text;
@@ -39,14 +46,15 @@ int main() {
 
         // Threads
         for (unsigned thread_no = 0; thread_no < settings.net.number_of_threads; ++thread_no) {
-            reactor_thread_pool.emplace_back(std::move(std::thread( [=]() { reactor.run(); } )));
+            thread_pool.emplace_back(std::move(ActorThread( [=]() { error_code ignore; return reactor.run_one(ignore) > 0; } )));
         }
+        thread_pool.emplace_back(std::move(cache_thread));
 
         // Signal handlers
         setup_signals();
 
         // All done wait complete
-        for (auto & th : reactor_thread_pool) {
+        for (auto & th : thread_pool) {
             th.join();
         }
 
