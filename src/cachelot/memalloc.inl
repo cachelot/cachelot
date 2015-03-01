@@ -10,11 +10,11 @@
  * There is a table grouping blocks by their size (@ref group_by_size), to serve allocations. Each cell of this table is doubly-linked list of blocks of near size.<br/>
  * The easiest way to think about grouping near size blocks  as of the sizes are powers of 2, as follows:<br/>
  *  `[256, 512, 1024, 2048 ... 2^last_power_of_2]`<br/>
- * However, additionally each range [ 2^power .. 2^(power+1) ) split by `num_cells_per_pow2`, as follows `(num_cells_per_pow2 = 32)`:<br/>
+ * However, additionally each range [ 2^power .. 2^(power+1) ) split by `num_sub_cells_per_power`, as follows `(num_sub_cells_per_power = 32)`:<br/>
  *  `[256, 264, 272, 280, 288, 296 ... 512, 528, 544, ... allocation_limit]`<br/>
- * The first power of 2 and num_cells_per_pow2 defines alignment of each allocation:<br/>
- *  `alignment = (2^(first_power_of_2+1) - 2^(first_power_of_2)) / num_cells_per_pow2`<br/>
- * Moreover, blocks of size below 2^<sup>(first_power_of_2+1)</sup> are considered as a small. The range `[0..small_block_boundary)` also split on `num_cells_per_pow2` cells and stored in the `table[0]`.<br/>
+ * The first power of 2 and num_sub_cells_per_power defines alignment of each allocation:<br/>
+ *  `alignment = (2^(first_power_of_2_offset+1) - 2^(first_power_of_2_offset)) / num_sub_cells_per_power`<br/>
+ * Moreover, blocks of size below 2^<sup>(first_power_of_2_offset+1)</sup> are considered as a small. The range `[0..small_block_boundary)` also split on `num_sub_cells_per_power` cells and stored in the `table[0]`.<br/>
  * Finally, table looks as follows:<br/>
  *  `[0, 8, 16, 24 ... 248, 256, 264, ... 2^last_power_of_2, 2^last_power_of_2 + cell_difference ...]`<br/>
  *<br/>
@@ -35,29 +35,27 @@ namespace cachelot {
         // min / max allocation size and more.
         // Handle with care
 
-        // number of second level cells per first level cell (first level cells are powers of 2 in range `[first_power_of_2..last_power_of_2]`)
-        static constexpr uint32 num_cells_per_pow2 = 32; // bigger value means less memory overhead but increases table size
+        // number of second level cells per first level cell (first level cells are powers of 2 in range `[first_power_of_2_offset..last_power_of_2]`)
+        static constexpr uint32 num_sub_cells_per_power = 32; // bigger value means less memory overhead but increases table size
 
         // First (index 1) power of 2 in block table
 #if (CACHELOT_PLATFORM_BITS == 32)
-        static constexpr uint32 first_power_of_2 = 6;  // small block is 128 bytes
+        static constexpr uint32 first_power_of_2_offset = 6;  // small block is 128 bytes, aligmnet = 4
 #elif (CACHELOT_PLATFORM_BITS == 64)
-        static constexpr uint32 first_power_of_2 = 7;  // small block is 256 bytes
+        static constexpr uint32 first_power_of_2_offset = 7;  // small block is 256 bytes, aligmnet = 8
 #endif
         // memalloc maintains blocks of size below this boundary little bit differently
-        static constexpr uint32 small_block_boundary = pow2(first_power_of_2 + 1);
+        static constexpr uint32 small_block_boundary = pow2(first_power_of_2_offset + 1);
         // maximal block size is `2^last_power_of_2`
         static constexpr uint32 last_power_of_2 = 25; // ! can not be greater than 30 (memblock::size is 31 bit)
-        static constexpr uint32 num_powers_of_2 = last_power_of_2 - first_power_of_2;
+        static constexpr uint32 num_powers_of_2_plus_zero_cell = last_power_of_2 - first_power_of_2_offset + 1;
 
         constexpr uint32 sub_block_diff(uint32 power) {
             // TODO: check if compiler does this optimization by itself
-            // Formula: (2^(power + 1) - 2^power) / num_cells_per_pow2)
+            // Formula: (2^(power + 1) - 2^power) / num_sub_cells_per_power)
             // bit magic: x/(2^n) <=> x >> n
-            return (pow2(power + 1) - pow2(power)) >> log2u(num_cells_per_pow2);
+            return power > 0 ? (pow2(power + 1) - pow2(power)) >> log2u(num_sub_cells_per_power) : small_block_boundary  >> log2u(num_sub_cells_per_power);
         }
-        // Two-level block table is placed in memory as a continuous array of `block_table_size` elements
-        static constexpr uint32 block_table_size = num_powers_of_2 * num_cells_per_pow2;
     }
 
 
@@ -86,9 +84,9 @@ namespace cachelot {
 
     public:
         /// minimal allowed block size
-        constexpr static const uint32 min_size = const_::small_block_boundary / const_::num_cells_per_pow2;
+        constexpr static const uint32 min_size = const_::small_block_boundary / const_::num_sub_cells_per_power;
         /// maximal allowed block size
-        constexpr static const uint32 max_size = pow2(const_::last_power_of_2) - 1;
+        constexpr static const uint32 max_size = pow2(const_::last_power_of_2 + 1) - const_::sub_block_diff(const_::last_power_of_2);
         /// value of block alignment
         constexpr static const uint32 alignment = alignof(decltype(block::meta));
         /// size of block metadata
@@ -105,6 +103,8 @@ namespace cachelot {
             meta.size = 0;
             meta.left_adjacent_offset = 0;
             debug_only(meta.dbg_marker = DBG_MARKER);
+            debug_only(link.prev = nullptr);
+            debug_only(link.next = nullptr);
         }
 
         /// constructor used for normal blocks
@@ -124,6 +124,8 @@ namespace cachelot {
             meta.left_adjacent_offset = left_adjacent_block->size_with_meta();
             // check previous block for consistency
             debug_only(left_adjacent_block->test_check());
+            debug_only(link.prev = nullptr);
+            debug_only(link.next = nullptr);
         }
         ///@}
 
@@ -197,7 +199,7 @@ namespace cachelot {
             debug_assert(not blk->meta.used);
             blk->meta.used = true;
             // ensure that user memory is still filled with debug pattern
-            debug_only(uint32 half_size = blk->size() > 0 ? (blk->size() - sizeof(link)) / 2 : 0;)
+            debug_only(uint32 half_size = blk->size() > 0 ? (blk->size() - sizeof(link)) / 2 : 0);
             debug_assert(std::memcmp(blk->memory_ + sizeof(link), blk->memory_ + sizeof(link) + half_size, half_size) == 0);
             return blk->memory_;
         }
@@ -214,10 +216,9 @@ namespace cachelot {
         static tuple<block *, block *> split(block * blk, const uint32 new_size) noexcept {
             debug_only(blk->test_check());
             debug_assert(blk->is_free());
-            const uint32 new_round_size = new_size > min_size ? new_size + unaligned_bytes(new_size + meta_size, alignment) : min_size;
-            debug_assert(new_round_size < blk->size());
+            const uint32 new_round_size = new_size > min_size ? new_size + unaligned_bytes(blk->memory_ + new_size, alignment) : min_size;
             memalloc::block * leftover = nullptr;
-            if (blk->size() - new_round_size >= split_threshold) {
+            if (new_round_size <= blk->size() && blk->size() - new_round_size >= split_threshold) {
                 const uint32 old_size = blk->size();
                 memalloc::block * block_after_next = blk->right_adjacent();
                 blk->set_size(new_round_size);
@@ -263,15 +264,29 @@ namespace cachelot {
 
         /// add block `blk` to the list
         void push_front(block * blk) noexcept {
+            debug_assert(not islinked(blk));
             debug_assert(not has(blk));
-            block::link_type * link = &blk->link;
+            auto link = &blk->link;
             link->next = dummy_link.next;
+            debug_assert(link->next->prev == &dummy_link);
             link->next->prev = link;
             link->prev = &dummy_link;
             dummy_link.next = link;
         }
 
-        /// try to get block from the list, return `nullptr` if list is empty
+        /// add block `blk` to the back of the list
+        void push_back(block * blk) noexcept {
+            debug_assert(not islinked(blk));
+            debug_assert(not has(blk));
+            auto link = &blk->link;
+            link->prev = dummy_link.prev;
+            debug_assert(link->prev->next == &dummy_link);
+            link->prev->next = link;
+            link->next = &dummy_link;
+            dummy_link.prev = link;
+        }
+
+        /// remove head of the list
         block * pop_front() noexcept {
             debug_assert(not empty());
             block::link_type * link = dummy_link.next;
@@ -279,23 +294,16 @@ namespace cachelot {
             return block_from_link(link);
         }
 
-
-        /// return list head of `nullptr` if list is empty
+        /// return list head of the list
         block * front() noexcept {
-            if (not empty()) {
-                return block_from_link(dummy_link.next);
-            } else {
-                return nullptr;
-            }
+            debug_assert(not empty());
+            return block_from_link(dummy_link.next);
         }
 
-        /// return list tail of `nullptr` if list is empty
+        /// return tail of the list
         block * back() noexcept {
-            if (not empty()) {
-                return block_from_link(dummy_link.prev);
-            } else {
-                return nullptr;
-            }
+            debug_assert(not empty());
+            return block_from_link(dummy_link.prev);
         }
 
         /// check if block `blk` is list head
@@ -328,13 +336,18 @@ namespace cachelot {
             unlink(&blk->link);
         }
 
+        /// check whether `blk` is linked into some list
+        static bool islinked(block * blk) noexcept {
+            return blk->link.prev != blk->link.next;
+        }
+
     private:
         static void unlink(block::link_type * link) noexcept {
             debug_assert(link != nullptr);
             debug_assert(link->prev != link && link->next != link);
             link->prev->next = link->next;
             link->next->prev = link->prev;
-            debug_only(link->next = link->prev = link);
+            debug_only(link->next = link->prev = nullptr);
         }
 
         static block * block_from_link(block::link_type * link) noexcept {
@@ -359,15 +372,15 @@ namespace cachelot {
      * unset bit indicates that there is *definitely* no blocks of corresponding size
      *  - Each bit in first level index `pow_index` refers group of size classes of corresponding power of 2
      * @code
-     *  // depends on first_power_of_2
+     *  // depends on first_power_of_2_offset
      *  0000 0001 => [32..64)
      *  0000 0010 => [64..128)
      *  // ... and so on until last_power_of_2
      * @endcode
      *  - Each bit of second level index refers to the corresponding size class (sub-block in power of 2)
      * @code
-     *  [0000 0000][0000 0001] => [32..36) // zero sub-block of first_power_of_2
-     *  [0000 0000][0000 0010] => [36..40) // 1st sub-block of first_power_of_2
+     *  [0000 0000][0000 0001] => [32..36) // zero sub-block of first_power_of_2_offset
+     *  [0000 0000][0000 0010] => [36..40) // 1st sub-block of first_power_of_2_offset
      *  [0000 0000][0000 0100] => [40..44) // 2nd sub-block
      *  // ...
      *  [0000 0001][0000 0000] => [64..72) // zero sub-block of next power of 2
@@ -380,15 +393,17 @@ namespace cachelot {
          * position in table
          */
         class position {
+            /// private constructor used by group_by_size
             explicit constexpr position(const uint32 power_index, const uint32 sub_block_index)
                 : pow_index(power_index), sub_index(sub_block_index) {
                 debug_only(test_check());
             }
         public:
-            constexpr position() noexcept
-                : pow_index(const_::num_powers_of_2)
-                , sub_index(const_::num_cells_per_pow2) {
-                };
+            /// constructor
+            position() noexcept {
+                debug_only(pow_index = std::numeric_limits<uint32>::max());
+                debug_only(sub_index = std::numeric_limits<uint32>::max());
+            };
 
             constexpr position(const position &) noexcept = default;
             position & operator= (const position &) noexcept = default;
@@ -397,7 +412,7 @@ namespace cachelot {
             uint32 block_size() const noexcept {
                 debug_only(test_check());
                 if (pow_index > 0) {
-                    const uint32 power_of_2 = const_::first_power_of_2 + pow_index;
+                    const uint32 power_of_2 = const_::first_power_of_2_offset + pow_index;
                     uint32 size = pow2(power_of_2) + (sub_index * const_::sub_block_diff(power_of_2));
                     debug_assert(block::min_size <= size && size <= block::max_size);
                     return size;
@@ -408,33 +423,48 @@ namespace cachelot {
 
             /// return maximal available position
             static constexpr position max() noexcept {
-                return position(const_::num_powers_of_2 - 1, const_::num_cells_per_pow2 - 1);
+                return position(const_::last_power_of_2 - const_::first_power_of_2_offset, const_::num_sub_cells_per_power - 1);
             }
 
             void debug_print() {
-                std::cout << pow_index << ":" << sub_index << std::endl;
+                std::cout << "[" << pow_index << ":" << sub_index << "]";
             }
 
         //private:
             /// calculate index of target list in the linear table
             uint32 absolute() const noexcept {
-                const uint32 abs_index = pow_index * const_::num_cells_per_pow2 + sub_index;
-                debug_assert(abs_index < const_::block_table_size);
+                const uint32 abs_index = pow_index * const_::num_sub_cells_per_power + sub_index;
+                debug_assert(abs_index < block_table_size);
                 return abs_index;
             }
 
-            // debug only return next position
+            // next position
             position next() const noexcept {
                 uint32 next_pow_index, next_sub_index;
-                if (sub_index < const_::num_cells_per_pow2 - 1) {
+                if (sub_index < const_::num_sub_cells_per_power - 1) {
                     next_pow_index = pow_index;
                     next_sub_index = sub_index + 1;
                 } else {
-                    debug_assert(pow_index < const_::num_powers_of_2 - 1);
+                    debug_assert(pow_index < const_::last_power_of_2);
                     next_pow_index = pow_index + 1;
                     next_sub_index = 0;
                 }
                 return position(next_pow_index, next_sub_index);
+            }
+
+
+            // previous position
+            position prev() const noexcept {
+                uint32 prev_pow_index, prev_sub_index;
+                if (sub_index > 0) {
+                    prev_pow_index = pow_index;
+                    prev_sub_index = sub_index - 1;
+                } else {
+                    debug_assert(pow_index > 0);
+                    prev_pow_index = pow_index - 1;
+                    prev_sub_index = 0;
+                }
+                return position(prev_pow_index, prev_sub_index);
             }
 
             bool operator<(const position & other) const noexcept { return absolute() < other.absolute(); }
@@ -446,25 +476,31 @@ namespace cachelot {
 
             // debug only self-check
             void test_check() const noexcept {
-                debug_assert(pow_index < const_::num_powers_of_2);
-                debug_assert(sub_index < const_::num_cells_per_pow2);
-                debug_assert(absolute() < const_::block_table_size);
+                debug_assert(pow_index <= const_::last_power_of_2);
+                debug_assert(sub_index < const_::num_sub_cells_per_power);
+                debug_assert(absolute() < block_table_size);
             }
 
             // debug only check if size within this position size class
-            void test_size_check(const uint32 debug_only(size)) const noexcept {
-                debug_assert(size >= block_size());
-                const auto last_pos = position::max();
-                if ((pow_index < last_pos.pow_index) || (pow_index == last_pos.pow_index && sub_index < last_pos.sub_index)) {
+            void test_size_check(const uint32 size) const noexcept {
+                debug_assert(block_size() <= size);
+                if (*this < position::max()) {
                     debug_assert(size < next().block_size());
                 } else {
-                    debug_assert(pow_index == last_pos.pow_index && sub_index == last_pos.sub_index);
+                    debug_assert(*this == position::max());
                     debug_assert(size == block::max_size);
                     debug_assert(size == block_size());
                 }
+                if (pow_index > 0 || sub_index > 0) {
+                    debug_assert(size > prev().block_size());
+                } else {
+                    debug_assert(size == block::min_size);
+                    debug_assert(block_size() == block::min_size);
+                }
+                (void)size; // warning in Release build
             }
 
-        private:
+        //private:
             /// corresponding power of 2
             uint32 pow_index;
             /// index of sub-block within current [pow_index .. next_power_of_2) range
@@ -474,13 +510,31 @@ namespace cachelot {
         };
 
         /// calculate size class by `requested_size` while searching for block
-        position position_from_size(const uint32 requested_size) const noexcept {
+        position lookup_position_from_size(const uint32 requested_size) const noexcept {
+            debug_assert(block::min_size <= requested_size && requested_size <= block::max_size);
+            if (requested_size >= const_::small_block_boundary) {
+                const auto roundup_size = requested_size + (pow2(log2u(requested_size) - log2u(const_::num_sub_cells_per_power))) - 1;
+                uint32 power2_idx = log2u(roundup_size);
+                debug_assert(power2_idx > 0);
+                debug_assert(power2_idx <= const_::last_power_of_2);
+                uint32 sub_block_idx = (roundup_size >> (power2_idx - log2u(const_::num_sub_cells_per_power))) - const_::num_sub_cells_per_power;
+                power2_idx = power2_idx - const_::first_power_of_2_offset;
+                return position(power2_idx, sub_block_idx);
+            } else {
+                // small block
+                return position(0, requested_size >> log2u(block::min_size));
+            }
+        }
+
+        /// calculate size class by `requested_size` while inserting block
+        position insert_position_from_size(const uint32 requested_size) const noexcept {
             debug_assert(block::min_size <= requested_size && requested_size <= block::max_size);
             if (requested_size >= const_::small_block_boundary) {
                 uint32 power2_idx = log2u(requested_size);
-                debug_assert(power2_idx > log2u(const_::num_cells_per_pow2));
-                uint32 sub_block_idx = (requested_size >> (power2_idx - log2u(const_::num_cells_per_pow2))) - const_::num_cells_per_pow2;
-                power2_idx = power2_idx - const_::first_power_of_2;
+                debug_assert(power2_idx > 0);
+                debug_assert(power2_idx <= const_::last_power_of_2);
+                uint32 sub_block_idx = (requested_size >> (power2_idx - log2u(const_::num_sub_cells_per_power))) - const_::num_sub_cells_per_power;
+                power2_idx = power2_idx - const_::first_power_of_2_offset;
                 return position(power2_idx, sub_block_idx);
             } else {
                 // small block
@@ -517,14 +571,19 @@ namespace cachelot {
         /// @return block pointer or `nullptr` if fail
         tuple<block *, position> try_get_block(const uint32 requested_size) noexcept {
             debug_assert(requested_size <= block::max_size);
-            position pos = position_from_size(requested_size);
+            position pos = lookup_position_from_size(requested_size);
+            debug_only(pos.test_check());
             // access indexes first, unset bits clearly indicate that corresponding size_class is empty
             if (bit_index_probe(pos)) {
-                return tuple<block *, position>(get_block_at(pos), pos);
-            } else {
-                debug_assert(size_class_at(pos).empty());
-                return tuple<block *, position>(nullptr, pos);
+                block * blk = get_block_at(pos);
+                if (blk != nullptr) {
+                    debug_only(blk->test_check());
+                    debug_only(pos.test_size_check(blk->size()));
+                    return tuple<block *, position>(blk, pos);
+                }
             }
+            debug_assert(table[pos.absolute()].empty());
+            return tuple<block *, position>(nullptr, pos);
         }
 
         /// try to get the biggest available block, at least of `requested_size`
@@ -556,52 +615,54 @@ namespace cachelot {
 
         /// try to get block after given `pos`
         /// @return block pointer or `nullptr` if fail
-        block * try_get_block_after(position pos) noexcept {
-            const bool has_non_empty_after = (first_level_bit_index > pos.pow_index) || (second_level_bit_index[pos.pow_index] > pos.sub_index);
-            if (has_non_empty_after) {
-                auto lookup_pos = pos;
-                while (lookup_pos < group_by_size::position::max()) {
-                    uint32 next_non_empty_power, next_non_empty_sub_index;
-                    if (lookup_pos.sub_index < const_::num_cells_per_pow2) {
+        tuple<block *, position> try_get_block_after(position pos) noexcept {
+            const auto has_non_empty_after = [this](position p) -> bool {
+                return (bit::most_significant(first_level_bit_index) > p.pow_index) || (bit::most_significant(second_level_bit_index[p.pow_index]) > p.sub_index);
+            };
+            const auto find_next_set = [](uint32 bit_index, uint32 current) -> uint32 {
+                const auto MSB = bit::most_significant(bit_index);
+                debug_assert(current < 31);
+                for (uint32 bitno = current + 1; bitno <= MSB; ++bitno) {
+                    if (bit::isset(bit_index, bitno)) {
+                        return bitno;
                     }
-//                    found_blk_pos = found_blk_pos.next();
-//                    if (not used_blocks->empty_at(found_blk_pos)) {
-//                        block * used_bigger_block = used_blocks->get_block_at(found_blk_pos);
-//                        stats.num_used_table_splits += 1;
-//                        debug_assert(used_bigger_block != nullptr);
-//                        debug_assert(used_bigger_block->size() >= size);
-//                        on_free_block(used_bigger_block->memory());
-//                        block::unuse(used_bigger_block);
-//                        stats.served_mem -= used_bigger_block->size();
-//                        block * leftover;
-//                        tie(found_blk, leftover) = block::split(used_bigger_block, nsize);
-//                        if (leftover) {
-//                            free_blocks->put_block(leftover);
-//                        }
-//                        used_blocks->put_block(found_blk);
-//                        stats.served_mem += found_blk->size();
-//                        stats.total_served_mem += found_blk->size();
-//                        return block::checkout(found_blk);
-//                    }
+                }
+                return 0;
+            };
+            auto lookup_pos = pos;
+            while (has_non_empty_after(lookup_pos)) {
+                debug_assert(table[lookup_pos.absolute()].empty());
+                if (lookup_pos.sub_index < const_::num_sub_cells_per_power - 1) {
+                    uint32 next_non_empty_sub_index = find_next_set(second_level_bit_index[lookup_pos.pow_index], lookup_pos.sub_index);
+                    debug_assert(next_non_empty_sub_index > lookup_pos.sub_index || next_non_empty_sub_index == 0);
+                    if (next_non_empty_sub_index != 0) {
+                        lookup_pos = position(lookup_pos.pow_index, next_non_empty_sub_index);
+                        block * blk = get_block_at(lookup_pos);
+                        if (blk) {
+                            return tuple<block *, position>(blk, lookup_pos);
+                        }
+                    }
+                }
+                debug_assert(lookup_pos.pow_index < group_by_size::position::max().pow_index);
+                uint32 next_non_empty_power_index = find_next_set(first_level_bit_index, lookup_pos.pow_index);
+                debug_assert(next_non_empty_power_index > lookup_pos.pow_index || next_non_empty_power_index == 0);
+                if (next_non_empty_power_index != 0) {
+                    debug_assert(second_level_bit_index[next_non_empty_power_index] > 0);
+                    lookup_pos = position(next_non_empty_power_index, bit::least_significant(second_level_bit_index[next_non_empty_power_index]) - 1);
+                    block * blk = get_block_at(lookup_pos);
+                    if (blk) {
+                        return tuple<block *, position>(blk, lookup_pos);
+                    }
                 }
             }
-            return nullptr;
-        }
-
-        /// determine whether cell at `pos` is empty
-        bool empty_at(position pos) const noexcept {
-            debug_only(pos.test_check());
-            if (bit_index_probe(pos)) {
-                return table[pos.absolute()].empty();
-            }
-            return true;
+            return tuple<block *, position>(nullptr, lookup_pos);
         }
 
         /// store block `blk` at position corresponding to its size
         void put_block(block * blk) {
             debug_assert(not blk->is_technical());
             debug_only(blk->test_check());
-            position pos = position_from_size(blk->size());
+            position pos = insert_position_from_size(blk->size());
             put_block_at(blk, pos);
         }
 
@@ -612,21 +673,17 @@ namespace cachelot {
             put_block_at(blk, position::max());
         }
 
-        /// retrieve list of blocks within certain size class at position `pos`
-        block_list & size_class_at(const position pos) noexcept {
-            debug_only(pos.test_check());
-            return table[pos.absolute()];
-        }
-
         /// try to retrieve block at position `pos`, return `nullptr` if there are no blocks
         block * get_block_at(const position pos) noexcept {
             debug_only(pos.test_check());
             block * blk;
-            block_list & size_class = size_class_at(pos);
+            block_list & size_class = table[pos.absolute()];
             if (not size_class.empty()) {
                 blk = size_class.pop_front();
                 debug_only(blk->test_check());
                 debug_only(pos.test_size_check(blk->size()));
+                debug_only(pos.test_check());
+                debug_assert(blk->size() >= pos.block_size());
             } else {
                 blk = nullptr;
             }
@@ -642,7 +699,7 @@ namespace cachelot {
             debug_only(blk->test_check());
             debug_only(pos.test_size_check(blk->size()));
             debug_only(pos.test_check());
-            memalloc::block_list & size_class = size_class_at(pos);
+            memalloc::block_list & size_class = table[pos.absolute()];
             size_class.push_front(blk);
             // unconditionally update bit index
             bit_index_mark_non_empty(pos);
@@ -654,30 +711,31 @@ namespace cachelot {
         }
 
 
-        void test_bit_index_integrity_check() {
-            for (size_t pow = 0; pow < const_::num_powers_of_2; ++pow) {
+        void test_bit_index_integrity_check() const noexcept {
+            for (size_t pow = 0; pow < const_::num_powers_of_2_plus_zero_cell; ++pow) {
                 if (second_level_bit_index[pow] > 0) {
                     debug_assert(bit::isset(first_level_bit_index, pow));
                 } else {
                     debug_assert(bit::isunset(first_level_bit_index, pow));
                 }
-                for (unsigned bit_in_sli = 0; bit_in_sli < 8; ++bit_in_sli) {
-                    if (bit::isunset(second_level_bit_index[pow], bit_in_sli)) {
-                        debug_assert(size_class_at(position(pow, bit_in_sli)).empty());
+                for (unsigned bit_in_subidx = 0; bit_in_subidx < 8; ++bit_in_subidx) {
+                    if (bit::isunset(second_level_bit_index[pow], bit_in_subidx)) {
+                        debug_assert(table[position(pow, bit_in_subidx).absolute()].empty());
                     }
                 }
             }
         }
 
     private:
+        static constexpr uint32 block_table_size = const_::num_powers_of_2_plus_zero_cell * const_::num_sub_cells_per_power;
+
         // all memory blocks are located in table, segregated by block size
-        block_list table[const_::block_table_size];
-
-
-        uint32 second_level_bit_index[const_::num_powers_of_2] = {0};
+        block_list table[block_table_size];
+        // bit indexes
+        uint32 second_level_bit_index[const_::num_powers_of_2_plus_zero_cell] = {0};
         // Each power of 2 (with all sub-blocks) has corresponding bit in `first_level_bit_index`, so it masks `second_level_bit_index` too
         uint32 first_level_bit_index = 0;
-        static_assert(sizeof(second_level_bit_index[0]) * 8 >= const_::num_cells_per_pow2, "Not enough bits for sub-blocks");
+        static_assert(sizeof(second_level_bit_index[0]) * 8 >= const_::num_sub_cells_per_power, "Not enough bits for sub-blocks");
 
         friend class memalloc;
     };
@@ -759,6 +817,7 @@ namespace cachelot {
             if (blk->size() + blk->left_adjacent()->size_with_meta() <= block::max_size) {
                 block_list::unlink(blk->left_adjacent());
                 blk = block::merge(blk->left_adjacent(), blk);
+                stats.num_merges += 1;
             } else {
                 break;
             }
@@ -768,11 +827,36 @@ namespace cachelot {
             if (blk->size() + blk->right_adjacent()->size_with_meta() <= block::max_size) {
                 block_list::unlink(blk->right_adjacent());
                 blk = block::merge(blk, blk->right_adjacent());
+                stats.num_merges += 1;
             } else {
                 break;
             }
         }
         return blk;
+    }
+
+
+    inline void memalloc::unuse(memalloc::block * blk) noexcept {
+        block::unuse(blk);
+        blk = merge_unused(blk);
+        debug_assert(not block_list::islinked(blk));
+        free_blocks->put_block(blk);
+    }
+
+
+    inline void * memalloc::checkout(memalloc::block * blk, const size_t requested_size) noexcept {
+        debug_assert(blk->is_free());
+        block * leftover;
+        tie(blk, leftover) = block::split(blk, requested_size);
+        if (leftover) {
+            stats.num_splits += 1;
+            free_blocks->put_block(leftover);
+        }
+        debug_assert(not block_list::islinked(blk));
+        used_blocks->put_block(blk);
+        stats.total_requested_mem += requested_size;
+        stats.total_served_mem += blk->size();
+        return block::checkout(blk);
     }
 
 
@@ -782,6 +866,7 @@ namespace cachelot {
             debug_only(block::from_user_ptr(ptr)->test_check());
             return true;
         } else {
+            debug_assert(false);
             return false;
         }
     }
@@ -795,31 +880,22 @@ namespace cachelot {
         debug_assert(size > 0);
         const uint32 nsize = size > block::min_size ? static_cast<uint32>(size) : block::min_size;
         // 1. Try to get block of corresponding size from table
-        block * found_blk;
         group_by_size::position found_blk_pos;
-        tie(found_blk, found_blk_pos) = free_blocks->try_get_block(nsize);
-        if (found_blk != nullptr) {
-            stats.num_free_table_hits += 1;
-            used_blocks->put_block_at(found_blk, found_blk_pos);
-            stats.served_mem += found_blk->size();
-            stats.total_served_mem += found_blk->size();
-            return block::checkout(found_blk);
-        }
-
-        // 2. Try to split the biggest available block
-        block * huge_block = free_blocks->try_get_biggest_block(nsize);
-        if (huge_block != nullptr) {
-            stats.num_free_table_splits += 1;
-            debug_assert(huge_block->size() >= nsize);
-            block * leftover;
-            tie(found_blk, leftover) = block::split(huge_block, nsize);
-            if (leftover) {
-                free_blocks->put_block(leftover);
+        {
+            block * found_blk;
+            tie(found_blk, found_blk_pos) = free_blocks->try_get_block(nsize);
+            if (found_blk != nullptr) {
+                stats.num_free_table_hits += 1;
+                return checkout(found_blk, size);
             }
-            used_blocks->put_block(found_blk);
-            stats.served_mem += found_blk->size();
-            stats.total_served_mem += found_blk->size();
-            return block::checkout(found_blk);
+        }
+        {
+            // 2. Try to split the biggest available block
+            block * huge_block = free_blocks->try_get_biggest_block(nsize);
+            if (huge_block != nullptr) {
+                debug_assert(huge_block->size() >= nsize);
+                return checkout(huge_block, size);
+            }
         }
 
         // 3. Try to evict existing block to free some space
@@ -829,41 +905,19 @@ namespace cachelot {
             //block * used_blk = size_class.back();
             block * used_blk = used_blocks->get_block_at(found_blk_pos);
             if (used_blk != nullptr) {
-                debug_assert(used_blk->size() >= size);
                 on_free_block(used_blk->memory());
-                // increase block chances to survive eviction
-                //if (not size_class.is_head(used_blk)) {
-                //    block_list::unlink(used_blk);
-                //    size_class.push_front(used_blk);
-                //}
+                unuse(used_blk);
                 stats.num_used_table_hits += 1;
-                used_blocks->put_block_at(used_blk, found_blk_pos);
-                stats.total_served_mem += used_blk->size();
-                return used_blk->memory();
+                return checkout(used_blk, size);
             }
 
             // 3.2. Try to evict bigger available block
-            if (used_blocks->has_blocks_after(found_blk_pos)) {
-                while (found_blk_pos < group_by_size::position::max()) {
-                    found_blk_pos = found_blk_pos.next();
-                    if (not used_blocks->empty_at(found_blk_pos)) {
-                        block * used_bigger_block = used_blocks->get_block_at(found_blk_pos);
-                        stats.num_used_table_splits += 1;
-                        debug_assert(used_bigger_block != nullptr);
-                        debug_assert(used_bigger_block->size() >= size);
-                        on_free_block(used_bigger_block->memory());
-                        block::unuse(used_bigger_block);
-                        stats.served_mem -= used_bigger_block->size();
-                        block * leftover;
-                        tie(found_blk, leftover) = block::split(used_bigger_block, nsize);
-                        if (leftover) {
-                            free_blocks->put_block(leftover);
-                        }
-                        used_blocks->put_block(found_blk);
-                        stats.served_mem += found_blk->size();
-                        stats.total_served_mem += found_blk->size();
-                        return block::checkout(found_blk);
-                    }
+            for (unsigned attempt = 0; attempt < 5; ++attempt) {
+                tie(used_blk, found_blk_pos) = used_blocks->try_get_block_after(found_blk_pos);
+                if (used_blk != nullptr) {
+                    on_free_block(used_blk->memory());
+                    unuse(used_blk);
+                    return checkout(used_blk, size);
                 }
             }
         }
@@ -917,13 +971,12 @@ namespace cachelot {
         stats.num_free += 1;
         debug_assert(valid_addr(ptr));
         block * blk = block::from_user_ptr(ptr);
-        stats.served_mem -= blk->size();
+        debug_assert(block_list::islinked(blk));
         // remove from the used_block group_by_size table
         block_list::unlink(blk);
-        block::unuse(blk);
-        // try to merge it
-        blk = merge_unused(blk);
-        free_blocks->put_block(blk);
+        debug_assert(not block_list::islinked(blk));
+        // merge and put into free list
+        unuse(blk);
     }
 
 
