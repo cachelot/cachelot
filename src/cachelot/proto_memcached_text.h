@@ -31,7 +31,7 @@ namespace cachelot {
         static const size_t command_max_length = 7;
 
         /// constructor
-        explicit text_protocol_handler(io_service & io_svc, cache::AsyncCacheAPI & the_cache)
+        explicit text_protocol_handler(io_service & io_svc, cache::CacheService & the_cache)
             : super(io_svc)
             , cache(the_cache)
             , calc_hash() {
@@ -41,7 +41,7 @@ namespace cachelot {
         ~text_protocol_handler() {}
     public:
         /// create new connection
-        static this_type * create(io_service & io_svc, cache::AsyncCacheAPI & the_cache) {
+        static this_type * create(io_service & io_svc, cache::CacheService & the_cache) {
             return new this_type(io_svc, the_cache);
         }
 
@@ -106,7 +106,7 @@ namespace cachelot {
         }
  // */
     private:
-        cache::AsyncCacheAPI & cache;
+        cache::CacheService & cache;
         const HashFunction calc_hash;
         bool m_killed = false; // TODO: Move error handling to async_connection???
     };
@@ -251,7 +251,7 @@ namespace cachelot {
             case 'r': return is_("replace") ? cache::REPLACE : cache::UNDEFINED;
             default : return cache::UNDEFINED;
             }
-        default : 
+        default :
             return cache::UNDEFINED;
         }
     }

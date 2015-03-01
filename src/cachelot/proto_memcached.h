@@ -13,7 +13,7 @@
 #ifndef CACHELOT_IO_SERIALIZATION_H_INCLUDED
 #  include <cachelot/io_serialization.h>
 #endif
-#ifndef CACHELOT_CACHE_ASYNC_API_H_INCLUDED
+#ifndef CACHELOT_CACHE_CACHE_SERVICE_H_INCLUDED
 #  include <cachelot/cache_service.h>
 #endif
 #ifndef CACHELOT_HASH_FNV1A_H_INCLUDED

@@ -1,5 +1,5 @@
-#ifndef CACHELOT_CACHE_ASYNC_API_H_INCLUDED
-#define CACHELOT_CACHE_ASYNC_API_H_INCLUDED
+#ifndef CACHELOT_CACHE_CACHE_SERVICE_H_INCLUDED
+#define CACHELOT_CACHE_CACHE_SERVICE_H_INCLUDED
 
 #ifndef CACHELOT_CACHE_H_INCLUDED
 #  include <cachelot/cache.h>
@@ -75,10 +75,10 @@ namespace cachelot {
         }
 
         /**
-         * Thread safe asynchronous cache API
+         * Actor based cache service wrapper that works in separate thread
          * @see Cache
          */
-        class AsyncCacheAPI {
+        class CacheService {
             // Underlying dictionary
             typedef dict<bytes, ItemPtr, std::equal_to<bytes>, ItemDictEntry, DictOptions> dict_type;
             typedef dict_type::iterator iterator;
@@ -87,11 +87,11 @@ namespace cachelot {
             typedef dict_type::size_type size_type;
         public:
             /// @copydoc Cache::Cache()
-            explicit AsyncCacheAPI(size_t memory_size, size_t initial_dict_size);
+            explicit CacheService(size_t memory_size, size_t initial_dict_size);
 
             /// destructor
             /// stop down background thread and wait for its completion
-            ~AsyncCacheAPI();
+            ~CacheService();
 
             /// @copydoc Cache::do_get()
             template <typename Callback>
@@ -170,7 +170,7 @@ namespace cachelot {
             std::thread m_worker;
         };
 
-        struct AsyncCacheAPI::RequestArgs {
+        struct CacheService::RequestArgs {
             /// requested item key
             const bytes key;
             /// requested item hash
@@ -190,7 +190,7 @@ namespace cachelot {
             RequestArgs & operator=(RequestArgs &&) = default;
         };
 
-        struct AsyncCacheAPI::GetRequestArgs : public RequestArgs {
+        struct CacheService::GetRequestArgs : public RequestArgs {
             /// callback to notify operation completion
             std::function<void (error_code /*error*/, bool /*found*/, bytes /*value*/, opaque_flags_type /*flags*/, cas_value_type /*cas_value*/)> callback;
 
@@ -202,7 +202,7 @@ namespace cachelot {
             }
         };
 
-        struct AsyncCacheAPI::StoreRequestArgs : public RequestArgs {
+        struct CacheService::StoreRequestArgs : public RequestArgs {
             /// value of a stored item
             bytes value;
 
@@ -234,7 +234,7 @@ namespace cachelot {
         };
 
 
-        struct AsyncCacheAPI::DelRequestArgs : public RequestArgs {
+        struct CacheService::DelRequestArgs : public RequestArgs {
             /// callback to notify operation completion
             std::function<void (error_code /*error*/, bool /*deleted*/)> callback;
 
@@ -247,7 +247,7 @@ namespace cachelot {
         };
 
 
-        struct AsyncCacheAPI::TouchRequestArgs : public RequestArgs {
+        struct CacheService::TouchRequestArgs : public RequestArgs {
             /// expiration time point
             seconds expires;
 
@@ -264,7 +264,7 @@ namespace cachelot {
         };
 
 
-        struct AsyncCacheAPI::SyncRequestArgs {
+        struct CacheService::SyncRequestArgs {
             /// callback
             std::function<void (error_code /*error*/)> callback;
 
@@ -276,7 +276,7 @@ namespace cachelot {
         };
 
 
-        struct AsyncCacheAPI::AsyncRequest : public mpsc_queue<AsyncCacheAPI::AsyncRequest>::node {
+        struct CacheService::AsyncRequest : public mpsc_queue<CacheService::AsyncRequest>::node {
             /// type of request
             const Request type;
 
@@ -316,7 +316,7 @@ namespace cachelot {
                 , touch_args(std::move(args)){
             }
             /// @}
-            
+
             /// destructor
             ~AsyncRequest() {
                 switch (type) {
@@ -341,7 +341,7 @@ namespace cachelot {
         };
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_get(const bytes key, const hash_type hash, Callback on_get) noexcept {
+        inline void CacheService::do_get(const bytes key, const hash_type hash, Callback on_get) noexcept {
             debug_assert(not m_terminated);
             try {
                 auto * req = new AsyncRequest(GET, std::move(GetRequestArgs(key, hash, on_get)));
@@ -352,7 +352,7 @@ namespace cachelot {
         }
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_store(const Request rtype, const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_store) noexcept {
+        inline void CacheService::do_store(const Request rtype, const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_store) noexcept {
             debug_assert(not m_terminated);
             try {
                 auto * req = new AsyncRequest(rtype, std::move(StoreRequestArgs(key, hash, value, flags, expires, cas_value, on_store)));
@@ -363,43 +363,43 @@ namespace cachelot {
         }
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_set) noexcept {
+        inline void CacheService::do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_set) noexcept {
             do_store(SET, key, hash, value, flags, expires, cas_value, on_set);
         }
 
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_add) noexcept {
+        inline void CacheService::do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_add) noexcept {
             do_store(ADD, key, hash, value, flags, expires, cas_value, on_add);
         }
 
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_replace) noexcept {
+        inline void CacheService::do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_replace) noexcept {
             do_store(REPLACE, key, hash, value, flags, expires, cas_value, on_replace);
         }
 
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_cas) noexcept {
+        inline void CacheService::do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_cas) noexcept {
             do_store(CAS, key, hash, value, flags, expires, cas_value, on_cas);
         }
 
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_append) noexcept {
+        inline void CacheService::do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_append) noexcept {
             do_store(APPEND, key, hash, value, flags, expires, cas_value, on_append);
         }
 
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_prepend) noexcept {
+        inline void CacheService::do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_prepend) noexcept {
             do_store(PREPEND, key, hash, value, flags, expires, cas_value, on_prepend);
         }
 
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_del(const bytes key, const hash_type hash, Callback on_del) noexcept {
+        inline void CacheService::do_del(const bytes key, const hash_type hash, Callback on_del) noexcept {
             debug_assert(not m_terminated);
             try {
                 auto * req = new AsyncRequest(DELETE, std::move(DelRequestArgs(key, hash, on_del)));
@@ -411,7 +411,7 @@ namespace cachelot {
 
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_touch(const bytes key, const hash_type hash, seconds expires, Callback on_touch) noexcept {
+        inline void CacheService::do_touch(const bytes key, const hash_type hash, seconds expires, Callback on_touch) noexcept {
             debug_assert(not m_terminated);
             try {
                 auto * req = new AsyncRequest(TOUCH, std::move(TouchRequestArgs(key, hash, expires, on_touch)));
@@ -422,7 +422,7 @@ namespace cachelot {
         }
 
         template <typename Callback>
-        inline void AsyncCacheAPI::do_sync(Callback callback) noexcept {
+        inline void CacheService::do_sync(Callback callback) noexcept {
             debug_assert(not m_terminated);
             try {
                 auto * req = new AsyncRequest(SYNC, std::move(SyncRequestArgs(callback)));
@@ -437,4 +437,4 @@ namespace cachelot {
 
 /// @}
 
-#endif // CACHELOT_CACHE_ASYNC_API_H_INCLUDED
+#endif // CACHELOT_CACHE_CACHE_SERVICE_H_INCLUDED

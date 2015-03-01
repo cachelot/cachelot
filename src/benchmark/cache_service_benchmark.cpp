@@ -99,7 +99,7 @@ public:
                        });
     }
 private:
-    cache::AsyncCacheAPI m_cache;
+    cache::CacheService m_cache;
 };
 
 
@@ -131,7 +131,7 @@ static void warmup() {
 
 static void create_load() {
     auto chance = random_int<size_t>(1, 100);
-    
+
     for (int i=0; i<3; ++i) {
         for (iterator kv = data_array.begin(); kv < data_array.end(); ++kv) {
             csh.set(kv);
@@ -152,7 +152,7 @@ int main(int /*argc*/, char * /*argv*/[]) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     reset_stats();
-    
+
     std::vector<std::thread> load_workers;
     auto start_time = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < num_ld_threads; ++i) {

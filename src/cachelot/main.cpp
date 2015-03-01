@@ -26,7 +26,7 @@ void setup_signals() {
 
 int main() {
     try {
-        std::unique_ptr<cache::AsyncCacheAPI> cache(new cache::AsyncCacheAPI(settings.cache.memory_limit, settings.cache.initial_hash_table_size));
+        std::unique_ptr<cache::CacheService> cache(new cache::CacheService(settings.cache.memory_limit, settings.cache.initial_hash_table_size));
         std::vector<std::thread> reactor_thread_pool;
 
         // TCP
