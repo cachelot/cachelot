@@ -89,6 +89,8 @@ namespace cachelot {
         /**
          * Cache class to rule them all
          *
+         * Cache requires callback on each request.
+         * This is necessary to restrict Item usage outside of a single call. Item pointer may not be valid otherwise.
          * @note Cache is *not* thread safe
          */
         class Cache {

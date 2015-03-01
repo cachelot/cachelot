@@ -36,6 +36,9 @@ namespace cachelot {
         /// wait for thread completion
         void join() noexcept;
 
+        /// retrieve actor thread in which context we are running
+        static ActorThread & this_thread() noexcept;
+
     private:
         std::shared_ptr<ActorThreadImpl> m_impl;
         friend class Actor;
@@ -64,17 +67,13 @@ namespace cachelot {
         ///@name constructors
         ///@{
 
-        /// default constructor
-        Actor() noexcept;
-
         /**
          * @tparam ActorType class of specific actor implementation
          * @code
          * class MyActor : Actor {
-         *     Actor::Reply handle_message(Actor::Message & msg) noexcept { ... }
          *     bool main() noexcept { ... }
          * public:
-         *     MyActor() : Actor<MyActor>(&MyActor::handle_message, &MyActor::main) { ... }
+         *     MyActor() : Actor<MyActor>(&ActorThread, &MyActor::main) { ... }
          * };
          * @endcode
          */
