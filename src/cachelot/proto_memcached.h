@@ -14,7 +14,7 @@
 #  include <cachelot/io_serialization.h>
 #endif
 #ifndef CACHELOT_CACHE_ASYNC_API_H_INCLUDED
-#  include <cachelot/cache_async_api.h>
+#  include <cachelot/cache_service.h>
 #endif
 #ifndef CACHELOT_HASH_FNV1A_H_INCLUDED
 #  include <cachelot/hash_fnv1a.h>
