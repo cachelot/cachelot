@@ -5,17 +5,17 @@
 
 namespace cachelot { namespace cache {
 
-    AsyncCacheAPI::AsyncCacheAPI(size_t memory_size, size_t initial_dict_size)
+    CacheService::CacheService(size_t memory_size, size_t initial_dict_size)
         : m_cache(memory_size, initial_dict_size)
         , m_requests()
         , m_terminated(false)
         , m_waiting(false)
         // must be initialised last
-        , m_worker(&AsyncCacheAPI::background_process_requests, this)
+        , m_worker(&CacheService::background_process_requests, this)
     {}
 
 
-    AsyncCacheAPI::~AsyncCacheAPI() {
+    CacheService::~CacheService() {
         // interrupt worker thread
         debug_assert(not m_terminated);
         m_terminated = true;
@@ -30,7 +30,7 @@ namespace cachelot { namespace cache {
     }
 
 
-    void AsyncCacheAPI::background_process_requests() {
+    void CacheService::background_process_requests() {
         constexpr static uint64 max_spin = 2000;
         uint64 spin_count = 0;
         do {
@@ -108,7 +108,7 @@ namespace cachelot { namespace cache {
     }
 
 
-    void AsyncCacheAPI::enqueue(AsyncRequest * req) noexcept {
+    void CacheService::enqueue(AsyncRequest * req) noexcept {
         m_requests.enqueue(req);
         if (m_waiting.load(std::memory_order_relaxed)) {
             m_waiting_cndvar.notify_one();
