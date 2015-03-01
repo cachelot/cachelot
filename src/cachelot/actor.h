@@ -12,6 +12,8 @@
  * @{
  */
 
+namespace { namespace test_actor { struct test_message_arguments; } }
+
 namespace cachelot {
 
     class ActorThread {
@@ -21,6 +23,9 @@ namespace cachelot {
 
         /// constructor
         ActorThread(MainFunction func);
+
+        /// destructor
+        ~ActorThread();
 
         /// start to execute thread
         void start() noexcept;
@@ -32,7 +37,7 @@ namespace cachelot {
         void join() noexcept;
 
     private:
-        std::unique_ptr<ActorThreadImpl> m_impl;
+        std::shared_ptr<ActorThreadImpl> m_impl;
         friend class Actor;
     };
 
@@ -51,6 +56,8 @@ namespace cachelot {
         class MessageBase;
     public:
         class Message;
+
+        typedef std::weak_ptr<ActorThread> WeakThreadPtr;
 
         typedef std::function<bool (Actor *) noexcept> actor_body;
 
@@ -73,7 +80,7 @@ namespace cachelot {
          */
         template <class ActorType>
         Actor(ActorThread & execution_thread, bool (ActorType::*act_function)() noexcept) noexcept
-            : m_execution_thread(execution_thread)
+            : m_execution_thread(execution_thread.m_impl)
             , do_act(reinterpret_cast<bool (Actor::*)() noexcept>(act_function)) {
             static_assert(std::is_base_of<Actor, ActorType>::value, "implementation must be inherited from Actor class");
             attach();
@@ -119,7 +126,7 @@ namespace cachelot {
     private:
         typedef mpsc_queue<Message> Mailbox;
         mpsc_queue<Message> m_mailbox;
-        ActorThread & m_execution_thread;
+        std::weak_ptr<ActorThread::ActorThreadImpl> m_execution_thread;
         actor_body do_act;
 
     private:
@@ -210,6 +217,8 @@ namespace cachelot {
     private:
         friend Actor;
         friend std::default_delete<Message>;
+    private:
+        friend test_actor::test_message_arguments;
     };
 
 
@@ -217,7 +226,7 @@ namespace cachelot {
 
     template <typename ... Args>
     inline void Actor::send_message(Actor & to, atom_type msg_type, Args && ... args) noexcept {
-        to.m_mailbox.enqueue(new Actor::Message(*this, msg_type, std::move<Args>(args) ...));
+        to.m_mailbox.enqueue(new Actor::Message(*this, msg_type, std::forward<Args>(args) ...));
         to.notify();
     }
 
