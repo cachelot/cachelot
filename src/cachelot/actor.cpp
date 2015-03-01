@@ -46,11 +46,15 @@ namespace cachelot {
                     if (wait_spins >= max_wait_spin_count) {
                         continue;
                     }
-                    // wait in kernel lock
-                    std::unique_lock<decltype(m_wait_mutex)> lck;
-                    m_is_waiting = true;
-                    m_wait_condition.wait(lck);
+                    // this check is important as termination could be requested from the one of actors
+                    if (not m_is_interrupted) {
+                        // wait in kernel lock
+                        std::unique_lock<decltype(m_wait_mutex)> lck(m_wait_mutex);
+                        m_is_waiting = true;
+                        m_wait_condition.wait(lck);
+                    }
                     wait_spins = 0;
+                    m_is_waiting = false;
                 }
             });
         }
@@ -78,17 +82,22 @@ namespace cachelot {
         }
 
         void attach(Actor * actor) noexcept {
-            debug_assert(not m_thread.joinable() && "Can't attach actor after thread start");
+            // To attach new actor either thread must not be started or it's a call within the same thread;
+            debug_assert(std::this_thread::get_id() == m_thread.get_id() or not m_thread.joinable());
+            // Prevent double attach
             debug_only(for (auto a: m_actors) { debug_assert(a != actor); });
             m_actors.push_back(actor);
         }
 
         void detach(Actor * actor) {
-            for (auto a = m_actors.begin(); a != m_actors.end(); ++a) {
-                if (*a == actor) {
-                    *a = m_actors.back();
+            auto iter = m_actors.begin();
+            while (iter < m_actors.end()) {
+                if (*iter == actor) {
+                    *iter = m_actors.back();
                     m_actors.pop_back();
+                    return;
                 }
+                ++iter;
             }
             debug_assert(false && "attempt to detach non-attached Actor");
         }
@@ -111,6 +120,8 @@ namespace cachelot {
         : m_impl(new ActorThreadImpl(func)) {
     }
 
+    ActorThread::~ActorThread() {}
+
     void ActorThread::start() noexcept { m_impl->start(); }
 
     /// request thread to stop execution
@@ -125,17 +136,26 @@ namespace cachelot {
 
     /// notify owner ActorThread to wake it up
     void Actor::notify() noexcept {
-        m_execution_thread.m_impl->notify();
+        auto th_ptr = m_execution_thread.lock();
+        if (th_ptr) {
+            th_ptr->notify();
+        }
     }
 
     /// attach this actor to the thread
     void Actor::attach() noexcept {
-        m_execution_thread.m_impl->attach(this);
+        auto th_ptr = m_execution_thread.lock();
+        if (th_ptr) {
+            th_ptr->attach(this);
+        }
     }
 
     /// detach this actor from the thread
     void Actor::detach() noexcept {
-        m_execution_thread.m_impl->detach(this);
+        auto th_ptr = m_execution_thread.lock();
+        if (th_ptr) {
+            th_ptr->detach(this);
+        }
     }
 
 } // namespace cachelot
