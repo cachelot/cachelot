@@ -29,25 +29,33 @@ BOOST_AUTO_TEST_CASE(test_block_list) {
     BOOST_CHECK(the_list.is_tail(&b1));
     BOOST_CHECK_EQUAL(the_list.pop_front(), &b1);
     BOOST_CHECK(the_list.empty());
-    BOOST_CHECK(the_list.front() == nullptr);
-    BOOST_CHECK(the_list.back() == nullptr);
-    memalloc::block b2;
+    memalloc::block b2, b3;
     // multiple item operations
     the_list.push_front(&b1);
     the_list.push_front(&b2);
+    the_list.push_back(&b3);
     BOOST_CHECK(not the_list.empty());
     BOOST_CHECK_EQUAL(the_list.front(), &b2);
-    BOOST_CHECK_EQUAL(the_list.back(), &b1);
+    BOOST_CHECK_EQUAL(the_list.back(), &b3);
     BOOST_CHECK(the_list.is_head(&b2));
-    BOOST_CHECK(the_list.is_tail(&b1));
+    BOOST_CHECK(the_list.is_tail(&b3));
     // remove one item
     memalloc::block_list::unlink(&b1);
     BOOST_CHECK(not the_list.empty());
     BOOST_CHECK_EQUAL(the_list.front(), &b2);
-    BOOST_CHECK_EQUAL(the_list.back(), &b2);
+    BOOST_CHECK_EQUAL(the_list.back(), &b3);
     BOOST_CHECK(the_list.is_head(&b2));
-    BOOST_CHECK(the_list.is_tail(&b2));
+    BOOST_CHECK(the_list.is_tail(&b3));
+    // remove second element
     BOOST_CHECK_EQUAL(the_list.pop_front(), &b2);
+    BOOST_CHECK(not the_list.empty());
+    BOOST_CHECK_EQUAL(the_list.front(), &b3);
+    BOOST_CHECK_EQUAL(the_list.back(), &b3);
+    BOOST_CHECK(the_list.is_head(&b3));
+    BOOST_CHECK(the_list.is_tail(&b3));
+    // remove last element
+    memalloc::block_list::unlink(&b3);
+    BOOST_CHECK(the_list.empty());
 }
 
 
@@ -84,14 +92,13 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
             // delete element with some probability
             if (not allocations.empty() && probability() > 60) { // ~40%
                 if (repeat_no == NUM_REPEAT - 1) continue;
-                random_int<> random_prev_allocation(0, allocations.size() - 1);
-                size_t prev_alloc_index = random_prev_allocation();
-                ptr = allocations.at(prev_alloc_index);
-                BOOST_CHECK(ptr != nullptr);
+                random_int<> random_offset(0, allocations.size() - 1);
+                auto prev_alloc = allocations.begin() + random_offset();
+                BOOST_CHECK(*prev_alloc != nullptr);
                 allocator.free(ptr);
                 // remove pointer from the vector
-                allocations[prev_alloc_index] = allocations.back();
-                allocations.resize(allocations.size() - 1);
+                *prev_alloc = allocations.back();
+                allocations.pop_back();
             }
         }
         if (repeat_no == NUM_REPEAT - 1) break;

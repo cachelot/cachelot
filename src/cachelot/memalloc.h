@@ -70,6 +70,12 @@ namespace cachelot {
         /// coalesce adjacent unused blocks (up to `const_::max_block_size`) and return resulting block
         block * merge_unused(block * block) noexcept;
 
+        /// mark block as non-used and coalesce it with adjacent unused blocks
+        void unuse(block * blk) noexcept;
+
+        /// mark block as used and give requested memory to user
+        void * checkout(block * blk, const size_t requested_size) noexcept;
+
         // disallow copying
         memalloc(const memalloc &) = delete;
         memalloc & operator=(const memalloc &) = delete;
@@ -92,11 +98,14 @@ namespace cachelot {
             uint64 num_errors = 0;
             uint64 total_requested_mem = 0;
             uint64 total_served_mem = 0;
+            uint64 requested_mem = 0;
             uint64 served_mem = 0;
             uint64 num_free_table_hits = 0;
             uint64 num_used_table_hits = 0;
             uint64 num_free_table_splits = 0;
             uint64 num_used_table_splits = 0;
+            uint64 num_splits = 0;
+            uint64 num_merges = 0;
         } stats;
 
     private:
