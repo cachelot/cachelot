@@ -1,5 +1,5 @@
 #include <cachelot/cachelot.h>
-#include <cachelot/cache_async_api.h>
+#include <cachelot/cache_service.h>
 #include <cachelot/random.h>
 #include <cachelot/hash_fnv1a.h>
 

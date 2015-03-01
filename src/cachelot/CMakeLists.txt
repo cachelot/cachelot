@@ -23,8 +23,8 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/expiration_clock.h
                 ${CMAKE_CURRENT_LIST_DIR}/item.h
                 ${CMAKE_CURRENT_LIST_DIR}/cache.h
-                ${CMAKE_CURRENT_LIST_DIR}/cache_async_api.h
-                ${CMAKE_CURRENT_LIST_DIR}/cache_async_api.cpp
+                ${CMAKE_CURRENT_LIST_DIR}/cache_service.h
+                ${CMAKE_CURRENT_LIST_DIR}/cache_service.cpp
                 ${CMAKE_CURRENT_LIST_DIR}/mpsc_queue.h
                 ${CMAKE_CURRENT_LIST_DIR}/network.h
                 ${CMAKE_CURRENT_LIST_DIR}/async_connection.h

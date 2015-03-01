@@ -1,6 +1,6 @@
 #include <cachelot/cachelot.h>
 #include <cachelot/proto_memcached_servers.h>
-#include <cachelot/cache_async_api.h>
+#include <cachelot/cache_service.h>
 #include <cachelot/settings.h>
 
 #include <iostream>
