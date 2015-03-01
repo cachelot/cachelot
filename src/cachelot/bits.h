@@ -7,14 +7,13 @@
 namespace cachelot {
 
     namespace internal {
-        // count leading zeroes family for 32 / 64 bit integers
+        // count leading zeroes family as GCC / Clang intrinsic
         template <typename Int32_T> constexpr unsigned clz32(Int32_T i) noexcept { return __builtin_clz(i); }
         template <typename Int64_T> constexpr unsigned clz64(Int64_T i) noexcept { return __builtin_clzll(i); }
-
-        template <typename IntType,
-                  typename std::enable_if<std::is_integral<IntType>::value and sizeof(IntType) < 4>::type * = nullptr>
-        constexpr unsigned clz(IntType i) noexcept { return clz32<uint32>(static_cast<uint32>(i)) - (sizeof(uint32) - sizeof(IntType)) * 8; }
-
+        // find first set family as GCC / Clang intrinsic
+        template <typename Int32_T> constexpr unsigned ffs32(Int32_T i) noexcept { return __builtin_ffs(i); }
+        template <typename Int64_T> constexpr unsigned ffs64(Int64_T i) noexcept { return __builtin_ffsll(i); }
+        
         template <typename IntType,
                   typename std::enable_if<std::is_integral<IntType>::value and sizeof(IntType) == 4>::type * = nullptr>
         constexpr unsigned clz(IntType i) noexcept { return clz32<IntType>(i); }
@@ -22,6 +21,14 @@ namespace cachelot {
         template <typename IntType,
                   typename std::enable_if<std::is_integral<IntType>::value and sizeof(IntType) == 8>::type * = nullptr>
         constexpr unsigned clz(IntType i) noexcept { return clz64<IntType>(i); }
+
+        template <typename IntType,
+        typename std::enable_if<std::is_integral<IntType>::value and sizeof(IntType) == 4>::type * = nullptr>
+        constexpr unsigned ffs(IntType i) noexcept { return ffs32<IntType>(i); }
+
+        template <typename IntType,
+        typename std::enable_if<std::is_integral<IntType>::value and sizeof(IntType) == 8>::type * = nullptr>
+        constexpr unsigned ffs(IntType i) noexcept { return ffs64<IntType>(i); }
 
     }
 
@@ -61,10 +68,18 @@ namespace cachelot {
             return value ^ (IntType(1) << bitno);
         }
 
-        /// Retrieve no of the most significant bit (`value` must be non-zero)
+        /// Retrieve no of the most significant bit counting from zero
+        /// @note: result is undefined if `value` is zero
         template <typename IntType>
         constexpr unsigned most_significant(IntType value) noexcept {
             return (sizeof(IntType) * 8) - internal::clz<IntType>(value) - 1;
+        }
+
+        /// Retrieve no of the least significant bit + 1
+        /// @note: Bit counts from 1 in this function
+        template <typename IntType>
+        constexpr unsigned least_significant(IntType value) noexcept {
+            return internal::ffs<IntType>(value);
         }
 
     } // namespace bit
@@ -74,7 +89,7 @@ namespace cachelot {
     template <typename UIntT,
               class = typename std::enable_if<std::is_unsigned<UIntT>::value>::type>
     constexpr bool ispow2(const UIntT n) noexcept {
-        return (n > 0) && ((n & (n - 1u)) == 0);
+        return n==0 || ((n & (n - 1u)) == 0);
     }
 
 

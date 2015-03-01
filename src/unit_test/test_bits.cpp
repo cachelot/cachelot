@@ -9,7 +9,7 @@ BOOST_AUTO_TEST_SUITE(test_bits)
 
 BOOST_AUTO_TEST_CASE(test_pow2_utils) {
 
-    BOOST_CHECK(ispow2(0u) == false);
+    BOOST_CHECK(ispow2(0u) == true);
     BOOST_CHECK(ispow2(1u) == true);
     BOOST_CHECK(ispow2(2u) == true);
     BOOST_CHECK(ispow2(1024u) == true);
@@ -33,17 +33,25 @@ BOOST_AUTO_TEST_CASE(test_pow2_utils) {
 
 BOOST_AUTO_TEST_CASE(test_bit_basic) {
     uint32 i = 0;
-    BOOST_CHECK(bit::isset(i, 0) == false);
-    BOOST_CHECK(bit::isset(1, 0) == true);
+    BOOST_CHECK(bit::isunset(i, 0));
+    BOOST_CHECK(bit::isset(1, 0));
     i = bit::set(i, 0);
-    BOOST_CHECK(i == 1);
+    BOOST_CHECK_EQUAL(i, 1);
     i = bit::unset(i, 0);
     i = bit::set(i, 31);
-    BOOST_CHECK(i == 0x80000000);
-    BOOST_CHECK(bit::most_significant(i) == 31);
-    BOOST_CHECK(bit::isset(i, 31) == true);
+    BOOST_CHECK_EQUAL(i, 0x80000000);
+    BOOST_CHECK_EQUAL(bit::most_significant(i), 31);
+    BOOST_CHECK(bit::isset(i, 31));
     i = bit::flip(i, 31);
     BOOST_CHECK(i == 0);
+    BOOST_CHECK_EQUAL(bit::most_significant(0xFFFFFFFF), 31);
+    BOOST_CHECK_EQUAL(bit::most_significant(0xFFFFFFFE), 31);
+    BOOST_CHECK_EQUAL(bit::most_significant(0xFFFFFFFE), 31);
+    BOOST_CHECK_EQUAL(bit::least_significant(0xFFFFFFFF), 1);
+    BOOST_CHECK_EQUAL(bit::least_significant(0xFFFFFFFE), 2);
+    BOOST_CHECK_EQUAL(bit::least_significant(0x80000000), 32);
+    BOOST_CHECK_EQUAL(bit::least_significant(0x80000001), 1);
+    BOOST_CHECK_EQUAL(bit::least_significant(0), 0);
 }
 
 BOOST_AUTO_TEST_CASE(test_alignment) {
