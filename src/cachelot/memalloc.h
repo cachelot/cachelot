@@ -71,7 +71,7 @@ namespace cachelot {
         block * merge_unused(block * block) noexcept;
 
         /// mark block as non-used and coalesce it with adjacent unused blocks
-        void unuse(block * blk) noexcept;
+        void unuse(block * & blk) noexcept;
 
         /// mark block as used and give requested memory to user
         void * checkout(block * blk, const size_t requested_size) noexcept;

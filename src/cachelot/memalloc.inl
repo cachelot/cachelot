@@ -64,6 +64,9 @@ namespace cachelot {
 
     /// single allocation chunk with metadata
     class memalloc::block {
+        debug_only(static constexpr uint64 DBG_MARKER = 1234567890987654321;)
+        debug_only(static constexpr char DBG_FILLER = 'X';)
+
         struct {
             uint32 size : 31;   /// amount of memory available to user
             bool used : 1;      /// indicate whether block is used
@@ -76,11 +79,6 @@ namespace cachelot {
         } link;             /// link for circular list of blocks in group_by_size table
 
         uint8 memory_[1];   // pointer to actual memory given to user
-
-        debug_only(static constexpr uint64 DBG_MARKER = 1234567890987654321;)
-        debug_only(static constexpr char DBG_FILLER = 'X';)
-
-        friend class memalloc::block_list;
 
     public:
         /// minimal allowed block size
@@ -103,8 +101,8 @@ namespace cachelot {
             meta.size = 0;
             meta.left_adjacent_offset = 0;
             debug_only(meta.dbg_marker = DBG_MARKER);
-            debug_only(link.prev = nullptr);
-            debug_only(link.next = nullptr);
+            debug_only(link.prev = &link);
+            debug_only(link.next = &link);
         }
 
         /// constructor used for normal blocks
@@ -124,8 +122,8 @@ namespace cachelot {
             meta.left_adjacent_offset = left_adjacent_block->size_with_meta();
             // check previous block for consistency
             debug_only(left_adjacent_block->test_check());
-            debug_only(link.prev = nullptr);
-            debug_only(link.next = nullptr);
+            debug_only(link.prev = &link);
+            debug_only(link.next = &link);
         }
         ///@}
 
@@ -245,6 +243,9 @@ namespace cachelot {
             block_after_right->meta.left_adjacent_offset = left_block->size_with_meta();
             return left_block;
         }
+
+    private:
+        friend class memalloc::block_list;
     };
 
 
@@ -290,6 +291,7 @@ namespace cachelot {
         block * pop_front() noexcept {
             debug_assert(not empty());
             block::link_type * link = dummy_link.next;
+            debug_assert(link->prev == &dummy_link);
             unlink(link);
             return block_from_link(link);
         }
@@ -306,20 +308,48 @@ namespace cachelot {
             return block_from_link(dummy_link.prev);
         }
 
+        /// find first block that satisfies requested size
+        block * find_first_of(uint32 size) noexcept {
+            block::link_type * node = dummy_link.next;
+            while (node != &dummy_link) {
+                block * blk = block_from_link(node);
+                if (blk->size() >= size) {
+                    unlink(node);
+                    return blk;
+                }
+                node = node->next;
+            }
+            return nullptr;
+        }
+
         /// check if block `blk` is list head
         bool is_head(block * blk) const noexcept {
+            debug_assert(islinked(blk));
             debug_assert(has(blk));
             return &blk->link == dummy_link.next;
         }
 
         /// check if block `blk` is list tail
         bool is_tail(block * blk) const noexcept {
+            debug_assert(islinked(blk));
             debug_assert(has(blk));
             return &blk->link == dummy_link.prev;
         }
 
+        /// remove block `blk` from the any list in which it is linked
+        static void unlink(block * blk) noexcept {
+            debug_assert(islinked(blk));
+            unlink(&blk->link);
+        }
+
+        /// check whether `blk` is linked into some list
+        static bool islinked(block * blk) noexcept {
+            return blk->link.next != &blk->link && blk->link.prev != &blk->link;
+        }
+
         /// check whether list contains block `blk`
         bool has(block * blk) const noexcept {
+            debug_assert(blk != nullptr);
             const block::link_type * node = &dummy_link;
             while (node->next != &dummy_link) {
                 node = node->next;
@@ -331,23 +361,14 @@ namespace cachelot {
             return false;
         }
 
-        /// remove block `blk` from the any list in which it is linked
-        static void unlink(block * blk) noexcept {
-            unlink(&blk->link);
-        }
-
-        /// check whether `blk` is linked into some list
-        static bool islinked(block * blk) noexcept {
-            return blk->link.prev != blk->link.next;
-        }
-
     private:
         static void unlink(block::link_type * link) noexcept {
             debug_assert(link != nullptr);
-            debug_assert(link->prev != link && link->next != link);
+            debug_assert(link->prev->next == link);
             link->prev->next = link->next;
+            debug_assert(link->next->prev == link);
             link->next->prev = link->prev;
-            debug_only(link->next = link->prev = nullptr);
+            debug_only(link->next = link->prev = link);
         }
 
         static block * block_from_link(block::link_type * link) noexcept {
@@ -579,11 +600,19 @@ namespace cachelot {
                 if (blk != nullptr) {
                     debug_only(blk->test_check());
                     debug_only(pos.test_size_check(blk->size()));
-                    return tuple<block *, position>(blk, pos);
+                    return make_tuple(blk, pos);
+                }
+            }
+            if (pos.block_size() > requested_size && (pos > position(0, 0))) {
+                auto prev_pos = pos.prev();
+                if (bit_index_probe(prev_pos)) {
+                    block_list & size_class = table[prev_pos.absolute()];
+                    block * smaller_block = size_class.find_first_of(requested_size);
+                    return make_tuple(smaller_block, prev_pos);
                 }
             }
             debug_assert(table[pos.absolute()].empty());
-            return tuple<block *, position>(nullptr, pos);
+            return make_tuple(nullptr, pos);
         }
 
         /// try to get the biggest available block, at least of `requested_size`
@@ -836,23 +865,23 @@ namespace cachelot {
     }
 
 
-    inline void memalloc::unuse(memalloc::block * blk) noexcept {
+    inline void memalloc::unuse(memalloc::block * & blk) noexcept {
         block::unuse(blk);
-        blk = merge_unused(blk);
         debug_assert(not block_list::islinked(blk));
+        blk = merge_unused(blk);
         free_blocks->put_block(blk);
     }
 
 
     inline void * memalloc::checkout(memalloc::block * blk, const size_t requested_size) noexcept {
         debug_assert(blk->is_free());
+        debug_assert(not block_list::islinked(blk));
         block * leftover;
         tie(blk, leftover) = block::split(blk, requested_size);
         if (leftover) {
             stats.num_splits += 1;
             free_blocks->put_block(leftover);
         }
-        debug_assert(not block_list::islinked(blk));
         used_blocks->put_block(blk);
         stats.total_requested_mem += requested_size;
         stats.total_served_mem += blk->size();
@@ -879,9 +908,10 @@ namespace cachelot {
         debug_assert(size <= block::max_size);
         debug_assert(size > 0);
         const uint32 nsize = size > block::min_size ? static_cast<uint32>(size) : block::min_size;
-        // 1. Try to get block of corresponding size from table
+        // 1. Lookup for the unused block
         group_by_size::position found_blk_pos;
         {
+            // 1.1. Try to get block of corresponding size from table
             block * found_blk;
             tie(found_blk, found_blk_pos) = free_blocks->try_get_block(nsize);
             if (found_blk != nullptr) {
@@ -890,33 +920,44 @@ namespace cachelot {
             }
         }
         {
-            // 2. Try to split the biggest available block
+            // 1.2. Try to split the biggest available block
             block * huge_block = free_blocks->try_get_biggest_block(nsize);
             if (huge_block != nullptr) {
+                debug_assert(not block_list::islinked(huge_block));
                 debug_assert(huge_block->size() >= nsize);
                 return checkout(huge_block, size);
             }
         }
+        {
+            // 1.3. Try to satisfy allocation from the smaller blocks
+            if (found_blk_pos.block_size() > size && (found_blk_pos.pow_index > 0 || found_blk_pos.sub_index > 0)) {
+                for (unsigned attempt = 0; attempt < 10; ++attempt) {
 
-        // 3. Try to evict existing block to free some space
+                }
+            }
+        }
+
+        // 2. Try to evict existing block to free some space
         if (evict_if_necessary) {
-            // 3.1. Lookup within same class size of used blocks
+            // 2.1. Lookup within same class size of used blocks
             //block_list & size_class = used_blocks->size_class_at(found_blk_pos);
             //block * used_blk = size_class.back();
             block * used_blk = used_blocks->get_block_at(found_blk_pos);
             if (used_blk != nullptr) {
                 on_free_block(used_blk->memory());
                 unuse(used_blk);
+                block_list::unlink(used_blk);
                 stats.num_used_table_hits += 1;
                 return checkout(used_blk, size);
             }
 
-            // 3.2. Try to evict bigger available block
+            // 2.2. Try to evict bigger available block
             for (unsigned attempt = 0; attempt < 5; ++attempt) {
                 tie(used_blk, found_blk_pos) = used_blocks->try_get_block_after(found_blk_pos);
                 if (used_blk != nullptr) {
                     on_free_block(used_blk->memory());
                     unuse(used_blk);
+                    block_list::unlink(used_blk);
                     return checkout(used_blk, size);
                 }
             }
@@ -930,6 +971,7 @@ namespace cachelot {
 
 
     inline void * memalloc::try_realloc_inplace(void * ptr, const size_t new_size) noexcept {
+
         stats.num_realloc += 1;
         debug_assert(valid_addr(ptr));
         debug_assert(new_size <= block::max_size);
@@ -939,6 +981,9 @@ namespace cachelot {
         if (blk->size() >= new_size) {
             return ptr;
         }
+
+        return nullptr; // TODO: !!!!!!!!!!!!!!
+
         uint32 available_on_the_right = 0;
         uint32 neccassary = new_size - blk->size();
         while (available_on_the_right < neccassary && blk->right_adjacent()->is_free()) {
@@ -949,6 +994,7 @@ namespace cachelot {
             stats.served_mem -= blk->size();
             block_list::unlink(blk);
             while (blk->size() < new_size) {
+                block_list::unlink(blk->right_adjacent());
                 blk = block::merge(blk, blk->right_adjacent());
             }
             debug_assert(blk->size() >= new_size);

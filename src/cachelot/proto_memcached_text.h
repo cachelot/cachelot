@@ -1,7 +1,12 @@
 #ifndef CACHELOT_PROTO_MEMCACHED_TEXT
 #define CACHELOT_PROTO_MEMCACHED_TEXT
 
-#include <cachelot/proto_memcached.h>
+#ifndef CACHELOT_PROTO_MEMCACHED_H_INCLUDED
+#  include <cachelot/proto_memcached.h>
+#endif
+#ifndef CACHELOT_ACTOR_H_INCLUDED
+#  include <cachelot/actor.h>
+#endif
 
 /**
  * @ingroup memcached

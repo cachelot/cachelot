@@ -7,7 +7,9 @@
 #ifndef CACHELOT_MPSC_QUEUE_H_INCLUDED
 #  include <cachelot/mpsc_queue.h>
 #endif
-
+#ifndef CACHELOT_ACTOR_H_INCLUDED
+#  include <cachelot/actor.h>
+#endif
 #include <atomic>
 #include <thread>       // worker thread
 #include <mutex>        // wait mutex
