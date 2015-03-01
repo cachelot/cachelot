@@ -95,7 +95,7 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
                 random_int<> random_offset(0, allocations.size() - 1);
                 auto prev_alloc = allocations.begin() + random_offset();
                 BOOST_CHECK(*prev_alloc != nullptr);
-                allocator.free(ptr);
+                allocator.free(*prev_alloc);
                 // remove pointer from the vector
                 *prev_alloc = allocations.back();
                 allocations.pop_back();
@@ -121,6 +121,8 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
     std::cout << "num_used_table_hits = " << allocator.stats.num_used_table_hits << std::endl;
     std::cout << "num_free_table_splits = " << allocator.stats.num_free_table_splits << std::endl;
     std::cout << "num_used_table_merges = " << allocator.stats.num_used_table_splits << std::endl;
+    std::cout << "num_splits = " << allocator.stats.num_splits << std::endl;
+    std::cout << "num_merges = " << allocator.stats.num_merges << std::endl;
 }
 
 
