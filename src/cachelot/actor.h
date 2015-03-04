@@ -16,35 +16,6 @@ namespace { namespace test_actor { struct test_message_arguments; } }
 
 namespace cachelot {
 
-    class ActorThread {
-        class ActorThreadImpl;
-    public:
-        typedef std::function<bool ()> MainFunction;
-
-        /// constructor
-        ActorThread(MainFunction func);
-
-        /// destructor
-        ~ActorThread();
-
-        /// start to execute thread
-        void start() noexcept;
-
-        /// request thread to stop execution
-        void stop() noexcept;
-
-        /// wait for thread completion
-        void join() noexcept;
-
-        /// retrieve actor thread in which context we are running
-        static ActorThread & this_thread() noexcept;
-
-    private:
-        std::shared_ptr<ActorThreadImpl> m_impl;
-        friend class Actor;
-    };
-
-
     /**
      * Actor is lightweight process executed cooperatively in thread
      * Actors are able to communicate with each other via sending asynchronous messages
@@ -55,41 +26,39 @@ namespace cachelot {
      * @see on_message and on_idle
      * @note It is possible to implement state machine by changing `on_message` callback
      */
-    class Actor {
+    class Actor : public std::enable_shared_from_this<Actor> {
         class MessageBase;
+        /// private constructor
+        explicit Actor(bool (Actor::*act_function)() noexcept);
     public:
         class Message;
 
-        typedef std::weak_ptr<ActorThread> WeakThreadPtr;
+        typedef std::weak_ptr<Actor> WeakPtr;
 
-        typedef std::function<bool (Actor *) noexcept> actor_body;
+        typedef std::unique_ptr<Message> UniqueMessagePtr;
 
-        ///@name constructors
-        ///@{
+        typedef std::function<bool (Actor *) noexcept> ActFunction;
 
         /**
-         * @tparam ActorType class of specific actor implementation
+         * constructor
+         *
+         * @tparam ActorType - derived class implements
          * @code
          * class MyActor : Actor {
-         *     bool main() noexcept { ... }
+         *     bool do_act() noexcept { ... }
          * public:
-         *     MyActor() : Actor<MyActor>(&ActorThread, &MyActor::main) { ... }
+         *     MyActor() : Actor<MyActor>(&ActorThread, &MyActor::do_act) { ... }
          * };
          * @endcode
          */
         template <class ActorType>
-        Actor(ActorThread & execution_thread, bool (ActorType::*act_function)() noexcept) noexcept
-            : m_execution_thread(execution_thread.m_impl)
-            , do_act(reinterpret_cast<bool (Actor::*)() noexcept>(act_function)) {
+        Actor(bool (ActorType::*act_function)() noexcept) noexcept
+            : Actor(reinterpret_cast<bool (Actor::*)() noexcept>(act_function)) {
             static_assert(std::is_base_of<Actor, ActorType>::value, "implementation must be inherited from Actor class");
-            attach();
         }
-        ///@} // ^constructors
 
         /// virtual destructor
-        virtual ~Actor() {
-            detach();
-        }
+        virtual ~Actor();
 
         // disallow copying
         Actor(const Actor &) = delete;
@@ -98,38 +67,42 @@ namespace cachelot {
         Actor(Actor &&) = default;
         Actor & operator=(Actor &&) = default;
 
-        bool act() noexcept { return do_act(this); }
+        /// start to execute thread
+        void start() noexcept;
+
+        /// request thread to stop execution
+        void stop() noexcept;
+
+        /// wait for thread completion
+        void join() noexcept;
+
+        /// check whether actor was interrupted
+        /// @return value is undefined upon start
+        bool interrupted() noexcept;
 
     protected:
         /// Send message to the other actor
         template <typename ... Args>
-        void send_message(Actor & to, atom_type msg_type, Args&&... args) noexcept;
+        void send_to(std::shared_ptr<Actor> to, atom_type msg_type, Args&&... args) noexcept;
 
         /// Reply to the received message
+        /// @return `true` if message sent, `false` if recepient is dead
         template <typename ... Args>
-        void reply_to(std::unique_ptr<Message> && msg, atom_type msg_type, Args ... args) noexcept;
+        bool reply_to(UniqueMessagePtr && msg, atom_type msg_type, Args ... args) noexcept;
 
         /// Receive message
-        std::unique_ptr<Message> receive_message() noexcept;
+        UniqueMessagePtr receive_message() noexcept;
 
     private:
-        /// notify owner ActorThread to wake it up
+        /// notify Thread to wake it up
         void notify() noexcept;
-
-        /// attach this actor to the thread
-        void attach() noexcept;
-
-        /// detach this actor from the thread
-        void detach() noexcept;
 
     private:
         typedef mpsc_queue<Message> Mailbox;
-        mpsc_queue<Message> m_mailbox;
-        std::weak_ptr<ActorThread::ActorThreadImpl> m_execution_thread;
-        actor_body do_act;
-
-    private:
-        friend class ActorThread;
+        Mailbox m_mailbox;
+        class Thread; // separate thread implementation
+        std::unique_ptr<Thread> m_thread;
+        std::shared_ptr<Actor> __me; // satisfy precondition for a weak_ptr
     };
 
 
@@ -143,7 +116,7 @@ namespace cachelot {
     class Actor::MessageBase : private Actor::Mailbox::node {
     public:
         /// sender Actor of this message
-        Actor & sender;
+        std::weak_ptr<Actor> sender;
 
         /// type of message
         const atom_type type;
@@ -151,7 +124,7 @@ namespace cachelot {
     protected:
         /// constructor
         explicit MessageBase(Actor & the_sender, const atom_type the_type) noexcept
-            : sender(the_sender)
+            : sender(the_sender.shared_from_this())
             , type(the_type) {
         }
 
@@ -223,24 +196,33 @@ namespace cachelot {
 
 ///////////////// Actor implementation ///////////////////////////////////////////////////
 
+
     template <typename ... Args>
-    inline void Actor::send_message(Actor & to, atom_type msg_type, Args && ... args) noexcept {
-        to.m_mailbox.enqueue(new Actor::Message(*this, msg_type, std::forward<Args>(args) ...));
-        to.notify();
+    inline void Actor::send_to(std::shared_ptr<Actor> to, atom_type msg_type, Args && ... args) noexcept {
+        if (to) {
+            to->m_mailbox.enqueue(new Actor::Message(*this, msg_type, std::forward<Args>(args) ...));
+            to->notify();
+        }
     }
 
 
     template <typename ... Args>
-    inline void Actor::reply_to(std::unique_ptr<Message> && msg, atom_type msg_type, Args ... args) noexcept {
+    inline bool Actor::reply_to(UniqueMessagePtr && msg, atom_type msg_type, Args ... args) noexcept {
         debug_assert(msg);
-        Actor & to = msg->sender;
-        Actor::Message * reply_msg = new (msg.release()) Actor::Message(*this, msg_type, args ...);
-        to.m_mailbox.enqueue(reply_msg);
-        to.notify();
+        auto to = msg->sender.lock();
+        if (to) {
+            // re-create Message inplace unique_ptr::release call destructor
+            Actor::Message * reply_msg = new (msg.release()) Actor::Message(*this, msg_type, args ...);
+            to->m_mailbox.enqueue(reply_msg);
+            to->notify();
+            return true;
+        }
+        return false;
     }
 
-    inline std::unique_ptr<Actor::Message> Actor::receive_message() noexcept {
-        return std::unique_ptr<Actor::Message>(m_mailbox.dequeue());
+
+    inline Actor::UniqueMessagePtr Actor::receive_message() noexcept {
+        return std::move(UniqueMessagePtr(m_mailbox.dequeue()));
     }
 
 } // namespace cachelot

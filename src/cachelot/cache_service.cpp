@@ -9,8 +9,8 @@ namespace cachelot { namespace cache {
 
     constexpr bytes CRLF = bytes::from_literal("\r\n");
 
-    CacheService::CacheService(ActorThread & cache_thread, size_t memory_size, size_t initial_dict_size)
-        : Actor(cache_thread, &CacheService::main)
+    CacheService::CacheService(size_t memory_size, size_t initial_dict_size)
+        : Actor(&CacheService::main)
         , m_cache(memory_size, initial_dict_size) {
     }
 
@@ -54,11 +54,13 @@ namespace cachelot { namespace cache {
                 break;
             }
             case atom("set"): {
-                bytes key; hash_type hash; bytes value; opaque_flags_type flags; seconds expires; cas_value_type cas_value;
-                req->unpack(key, hash, value, flags, expires, cas_value);
-                m_cache.do_set(key, hash, value, flags, expires, cas_value, [&req, this](error_code error, bool stored) {
+                bytes key; hash_type hash; bytes value; opaque_flags_type flags; seconds expires; cas_value_type cas_value; bool noreply;
+                req->unpack(key, hash, value, flags, expires, cas_value, noreply);
+                m_cache.do_set(key, hash, value, flags, expires, cas_value, [&req, this, noreply](error_code error, bool stored) {
                     if (not error) {
-                        this->reply_to(std::move(req), stored ? atom("stored") : atom("stored"));
+                        if (not noreply) {
+                            this->reply_to(std::move(req), stored ? atom("stored") : atom("not_stored"));
+                        }
                     } else {
                         this->reply_to(std::move(req), atom("error"), error);
                     }

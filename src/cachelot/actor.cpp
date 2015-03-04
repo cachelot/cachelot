@@ -5,22 +5,23 @@
 #include <mutex>
 #include <condition_variable>
 #include <emmintrin.h> // _mm_pause
+#include <boost/thread/tss.hpp> // Xcode clang doesn't supoort thread_local
 
 namespace cachelot {
 
 
-//////// ActorThreadImpl ////////////////////////////
+//////// Actor::Thread //////////////////////////////
 
 
-    class ActorThread::ActorThreadImpl {
+    class Actor::Thread {
         static constexpr uint32 max_wait_spin_count = 10000;
     public:
-        ActorThreadImpl(MainFunction fun, ActorThread & actor_interface)
-            : m_thread_interface(actor_interface)
-            , m_func(fun) {
+        Thread(Actor::ActFunction act_function, Actor & self)
+            : m_self(self)
+            , m_function(act_function) {
         }
 
-        ~ActorThreadImpl() {
+        ~Thread() {
             stop();
             join();
         }
@@ -32,11 +33,7 @@ namespace cachelot {
             m_thread = std::thread([this]() {
                 uint32 wait_spins;
                 while (not m_is_interrupted.load(std::memory_order_relaxed)) {
-                    bool has_work = false;
-                    for (auto actor: m_actors) {
-                        has_work |= actor->act();
-                    }
-                    has_work |= m_func();
+                    bool has_work = m_function(&m_self);
                     if (has_work) {
                         wait_spins = 0;
                         continue;
@@ -50,10 +47,10 @@ namespace cachelot {
                     // important check as termination could be requested from the running actors
                     if (not m_is_interrupted.load(std::memory_order_relaxed)) {
                         // wait in kernel lock
-                        std::unique_lock<decltype(m_wait_mutex)> lck(m_wait_mutex);
+                        //std::unique_lock<decltype(m_wait_mutex)> lck(m_wait_mutex);
                         debug_assert(not m_is_waiting);
                         m_is_waiting.store(true, std::memory_order_relaxed);
-                        m_wait_condition.wait(lck);
+                        //m_wait_condition.wait(lck);
                     }
                     wait_spins = 0;
                     m_is_waiting.store(false, std::memory_order_relaxed);
@@ -83,36 +80,14 @@ namespace cachelot {
             }
         }
 
-        void attach(Actor * actor) noexcept {
-            // To attach new actor either thread must not be started or it's a call within the same thread;
-            debug_assert(std::this_thread::get_id() == m_thread.get_id() or not m_thread.joinable());
-            // Prevent double attach
-            debug_only(for (auto a: m_actors) { debug_assert(a != actor); });
-            m_actors.push_back(actor);
-        }
-
-        void detach(Actor * actor) {
-            auto iter = m_actors.begin();
-            while (iter < m_actors.end()) {
-                if (*iter == actor) {
-                    *iter = m_actors.back();
-                    m_actors.pop_back();
-                    return;
-                }
-                ++iter;
-            }
-            debug_assert(false && "attempt to detach non-attached Actor");
-        }
-
-        static ActorThread & this_thread() noexcept {
-            return *(ActorThread *)nullptr; // Eat this!
+        bool interrupted() noexcept {
+            return m_is_interrupted.load(std::memory_order_relaxed);
         }
 
     private:
-        ActorThread & m_thread_interface;
-        std::vector<Actor *> m_actors;
+        Actor & m_self;
         std::thread m_thread;
-        MainFunction m_func;
+        Actor::ActFunction m_function;
         std::mutex m_wait_mutex;
         std::condition_variable m_wait_condition;
         std::atomic_bool m_is_waiting;
@@ -120,52 +95,35 @@ namespace cachelot {
     };
 
 
-//////// ActorThread ////////////////////////////////
-
-
-    ActorThread::ActorThread(MainFunction func)
-        : m_impl(new ActorThreadImpl(func, *this)) {
-    }
-
-    ActorThread::~ActorThread() {}
-
-    void ActorThread::start() noexcept { m_impl->start(); }
-
-    /// request thread to stop execution
-    void ActorThread::stop() noexcept { m_impl->stop(); }
-
-    /// wait for thread completion
-    void ActorThread::join() noexcept { m_impl->join(); }
-
-    ActorThread & ActorThread::this_thread() noexcept { return ActorThreadImpl::this_thread();  }
-
-
 //////// Actor //////////////////////////////////////
 
+    Actor::Actor(bool (Actor::*act_function)() noexcept)
+        : std::enable_shared_from_this<Actor>()
+        , m_thread(new Thread(act_function, *this))
+        , __me(this) {
+    }
 
-    /// notify owner ActorThread to wake it up
-    void Actor::notify() noexcept {
-        auto th_ptr = m_execution_thread.lock();
-        if (th_ptr) {
-            th_ptr->notify();
+    Actor::~Actor() {
+        stop();
+        join();
+        // empty mailbox
+        Message * m = m_mailbox.dequeue();
+        while (m != nullptr) {
+            delete m;
+            m = m_mailbox.dequeue();
         }
     }
 
-    /// attach this actor to the thread
-    void Actor::attach() noexcept {
-        auto th_ptr = m_execution_thread.lock();
-        if (th_ptr) {
-            th_ptr->attach(this);
-        }
-    }
+    void Actor::notify() noexcept { m_thread->notify(); }
 
-    /// detach this actor from the thread
-    void Actor::detach() noexcept {
-        auto th_ptr = m_execution_thread.lock();
-        if (th_ptr) {
-            th_ptr->detach(this);
-        }
-    }
+    void Actor::start() noexcept { m_thread->start(); }
+
+    void Actor::stop() noexcept { m_thread->stop(); }
+
+    void Actor::join() noexcept { m_thread->join(); }
+
+    bool Actor::interrupted() noexcept { return m_thread->interrupted(); }
+
 
 } // namespace cachelot
 

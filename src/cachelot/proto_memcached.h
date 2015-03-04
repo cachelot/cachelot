@@ -96,7 +96,6 @@ namespace cachelot {
 
     typedef fnv1a<cache::hash_type>::hasher HashFunction;
 
-
 } } // namespace cachelot::memcached
 
 /// @}

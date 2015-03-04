@@ -32,6 +32,7 @@ namespace cachelot { namespace net {
         explicit tcp_server(io_service & ios)
             : m_ios(ios)
             , m_acceptor(ios) {
+            static_assert(std::is_base_of<this_type, Impl>::value, "TCP Server implementation must be derived from tcp_server");
         }
 
         tcp_server(const tcp_server &) = delete;
@@ -64,7 +65,6 @@ namespace cachelot { namespace net {
 
     template <class Impl, class ConnectionType>
     inline void tcp_server<Impl, ConnectionType>::start(const tcp::endpoint bind_addr) {
-        static_assert(std::is_base_of<this_type, Impl>::value, "TCP Server implementation must be derived from tcp_server");
         m_acceptor.open(tcp::v4());
         m_acceptor.bind(bind_addr);
         m_acceptor.listen();
@@ -78,14 +78,12 @@ namespace cachelot { namespace net {
             m_acceptor.async_accept(new_connection->socket(),
                 [=](const error_code error) {
                     net_debug_trace("[error: %s]", error.message().c_str());
-                    if (!error) {
-                        this->async_accept();
+                    if (not error) {
                         new_connection->run();
                     } else {
                         reinterpret_cast<Impl *>(this)->delete_connection(new_connection);
-                        this->stop();
                     }
-
+                    this->async_accept();
                 });
         } catch (const std::bad_alloc &) {
             // retry later TODO: will m_ios.post throw ???

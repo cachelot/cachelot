@@ -11,14 +11,14 @@ using std::endl;
 using namespace cachelot;
 
 // Global io_service to access it from the signal handler
+static bool killed = false;
 net::io_service reactor;
-std::vector<ActorThread> thread_pool;
+std::unique_ptr<cache::CacheService> cache_svc;
 
 void on_signal_terminate(int) {
-    for (auto & th : thread_pool) {
-        th.stop();
-    }
+    killed = true;
     reactor.stop();
+    if (cache_svc) { cache_svc->stop(); }
 }
 
 void setup_signals() {
@@ -33,30 +33,26 @@ void setup_signals() {
 
 int main() {
     try {
-        ActorThread cache_thread([]() { return false; });
-        std::unique_ptr<cache::CacheService> cache(new cache::CacheService(cache_thread, settings.cache.memory_limit, settings.cache.initial_hash_table_size));
-
-        // TCP
-        std::unique_ptr<memcached::text_tcp_server> memcached_tcp_text;
-        if (settings.net.has_TCP) {
-            memcached_tcp_text.reset(new memcached::text_tcp_server(reactor, *cache));
-            string host, service;
-            memcached_tcp_text->start(settings.net.TCP_port);
-        }
-
-        // Threads
-        for (unsigned thread_no = 0; thread_no < settings.net.number_of_threads; ++thread_no) {
-            thread_pool.emplace_back(std::move(ActorThread( [=]() { error_code ignore; return reactor.run_one(ignore) > 0; } )));
-        }
-        thread_pool.emplace_back(std::move(cache_thread));
+        // Cache Service
+        cache_svc.reset(new cache::CacheService(settings.cache.memory_limit, settings.cache.initial_hash_table_size));
+        cache_svc->start();
 
         // Signal handlers
         setup_signals();
 
-        // All done wait complete
-        for (auto & th : thread_pool) {
-            th.join();
+        // TCP
+        std::unique_ptr<memcached::text_tcp_server> memcached_tcp_text = nullptr;
+        if (settings.net.has_TCP) {
+            memcached_tcp_text.reset(new memcached::text_tcp_server(reactor, *cache_svc));
+            memcached_tcp_text->start(settings.net.TCP_port);
         }
+
+        while (not killed) {
+            reactor.run();
+        }
+
+        cache_svc->stop();
+        cache_svc->join();
 
         return EXIT_SUCCESS;
     } catch (const std::exception & e) {

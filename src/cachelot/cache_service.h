@@ -38,7 +38,7 @@ namespace cachelot {
             typedef dict_type::size_type size_type;
         public:
             /// @copydoc Cache::Cache()
-            explicit CacheService(ActorThread & cache_thread, size_t memory_size, size_t initial_dict_size);
+            explicit CacheService(size_t memory_size, size_t initial_dict_size);
 
             /// destructor
             ~CacheService();
