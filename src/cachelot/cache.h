@@ -81,7 +81,7 @@ namespace cachelot {
         /// Options of the underlying hash table
         struct DictOptions {
             typedef uint32 size_type;
-            typedef hash_type hash_type;
+            typedef ::cachelot::cache::hash_type hash_type;
             static constexpr size_type max_load_factor_percent = 93;
         };
 

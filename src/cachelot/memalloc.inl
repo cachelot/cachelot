@@ -23,6 +23,7 @@
 #ifndef CACHELOT_BITS_H_INCLUDED
 #  include <cachelot/bits.h> // pow2 utils
 #endif
+#include <cstddef> // offsetof
 
 namespace cachelot {
 

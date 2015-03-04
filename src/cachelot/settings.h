@@ -20,7 +20,7 @@ namespace cachelot {
             string TCP_interface = "localhost";
             uint16 TCP_port = 11211;
             bool hasUDP = true;
-            tuple<string, string> UDP_interface = tuple<string, string>("localhost", "11212");
+            //tuple<string, string> UDP_interface = tuple<string, string>("localhost", "11212");
             bool has_unix_socket = false;
             string unix_socket = "/var/run/cachelot/cachelot.socket";
             uint32 unix_socket_access = 0700;
