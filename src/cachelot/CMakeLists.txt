@@ -37,6 +37,5 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/atom.h
                 ${CMAKE_CURRENT_LIST_DIR}/actor.cpp
                 ${CMAKE_CURRENT_LIST_DIR}/actor.h
-                ${CMAKE_CURRENT_LIST_DIR}/process.h
         )
 
