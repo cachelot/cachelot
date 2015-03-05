@@ -206,6 +206,7 @@ namespace cachelot {
         /// mark block as free
         static void unuse(block * blk) noexcept {
             debug_only(blk->test_check());
+            debug_assert(not blk->is_technical());
             debug_assert(blk->is_used());
             blk->meta.used = false;
             debug_only(std::memset(blk->memory_, DBG_FILLER, blk->size()));
@@ -215,6 +216,7 @@ namespace cachelot {
         static tuple<block *, block *> split(block * blk, const uint32 new_size) noexcept {
             debug_only(blk->test_check());
             debug_assert(blk->is_free());
+            debug_assert(not blk->is_technical());
             const uint32 new_round_size = new_size > min_size ? new_size + unaligned_bytes(blk->memory_ + new_size, alignment) : min_size;
             memalloc::block * leftover = nullptr;
             if (new_round_size <= blk->size() && blk->size() - new_round_size >= split_threshold) {
@@ -234,6 +236,8 @@ namespace cachelot {
         static block * merge(block * left_block, block * right_block) noexcept {
             debug_only(left_block->test_check());
             debug_only(right_block->test_check());
+            debug_assert(not left_block->is_technical());
+            debug_assert(not right_block->is_technical());
             debug_assert(right_block->left_adjacent() == left_block);
             debug_assert(left_block->right_adjacent() == right_block);
             debug_assert(left_block->is_free()); debug_assert(right_block->is_free());
@@ -268,24 +272,26 @@ namespace cachelot {
         void push_front(block * blk) noexcept {
             debug_assert(not islinked(blk));
             debug_assert(not has(blk));
-            auto link = &blk->link;
+            block::link_type *  link = &blk->link;
+            debug_assert(dummy_link.next->prev == &dummy_link);
             link->next = dummy_link.next;
-            debug_assert(link->next->prev == &dummy_link);
             link->next->prev = link;
             link->prev = &dummy_link;
             dummy_link.next = link;
+            debug_assert(dummy_link.prev->next == &dummy_link);
         }
 
         /// add block `blk` to the back of the list
         void push_back(block * blk) noexcept {
             debug_assert(not islinked(blk));
             debug_assert(not has(blk));
-            auto link = &blk->link;
+            block::link_type * link = &blk->link;
             link->prev = dummy_link.prev;
             debug_assert(link->prev->next == &dummy_link);
             link->prev->next = link;
             link->next = &dummy_link;
             dummy_link.prev = link;
+            debug_assert(dummy_link.next->prev == &dummy_link);
         }
 
         /// remove head of the list
@@ -315,8 +321,21 @@ namespace cachelot {
             while (node != &dummy_link) {
                 block * blk = block_from_link(node);
                 if (blk->size() >= size) {
-                    unlink(node);
+                    unlink(blk);
                     return blk;
+                } else {
+                    auto left = blk->left_adjacent();
+                    if (left->is_free() && left->size() + blk->size() >= size) {
+                        unlink(blk);
+                        unlink(left);
+                        return block::merge(left, blk);
+                    }
+                    auto right = blk->right_adjacent();
+                    if (right->is_free() && blk->size() + right->size() >= size) {
+                        unlink(blk);
+                        unlink(right);
+                        return block::merge(blk, right);
+                    }
                 }
                 node = node->next;
             }
@@ -604,7 +623,7 @@ namespace cachelot {
                     return make_tuple(blk, pos);
                 }
             }
-            if (pos.block_size() > requested_size && (pos > position(0, 0))) {
+            if (/*pos.block_size() > requested_size && */(pos > position(0, 0))) {
                 auto prev_pos = pos.prev();
                 if (bit_index_probe(prev_pos)) {
                     block_list & size_class = table[prev_pos.absolute()];
@@ -616,10 +635,9 @@ namespace cachelot {
             return make_tuple(nullptr, pos);
         }
 
-        /// try to get the biggest available block, at least of `requested_size`
+        /// try to get the biggest available block
         /// @return block pointer or `nullptr` if fail
-        block * try_get_biggest_block(const uint32 requested_size) noexcept {
-            debug_assert(requested_size <= block::max_size);
+        block * get_biggest_block() noexcept {
             // accessing indexes first
             while (first_level_bit_index > 0) {
                 // 1. retrieve maximal non-empty size_classs group among powers of 2
@@ -628,17 +646,11 @@ namespace cachelot {
                 debug_assert(second_level_bit_index[pow_index] > 0);
                 const uint32 sub_index = bit::most_significant(second_level_bit_index[pow_index]);
                 const position biggest_block_pos = position(pow_index, sub_index);
-                // there is biggest block, but does it have sufficient size?
-                if (biggest_block_pos.block_size() >= requested_size) {
-                    // get_block_at will update bit indexes if there's no block
-                    block * big_block = get_block_at(biggest_block_pos);
-                    if (big_block) {
-                        return big_block;
-                    }
-                } else {
-                    return nullptr;
+                // get_block_at will update bit indexes if there's no block
+                block * big_block = get_block_at(biggest_block_pos);
+                if (big_block) {
+                    return big_block;
                 }
-                // TODO: DBG_loopBracker(100000000);
             }
             return nullptr;
         }
@@ -652,7 +664,7 @@ namespace cachelot {
             const auto find_next_set = [](uint32 bit_index, uint32 current) -> uint32 {
                 const auto MSB = bit::most_significant(bit_index);
                 debug_assert(current < 31);
-                for (uint32 bitno = current + 1; bitno <= MSB; ++bitno) {
+                for (uint32 bitno = current + 1; bitno <= MSB; ++bitno) { // TODO: Replace with CPU instruction
                     if (bit::isset(bit_index, bitno)) {
                         return bitno;
                     }
@@ -686,6 +698,12 @@ namespace cachelot {
                 }
             }
             return tuple<block *, position>(nullptr, lookup_pos);
+        }
+
+
+        ///
+        /// @return block pointer or `nullptr` if fail
+        block * try_evict_more(const uint32 requested_size) noexcept {
         }
 
         /// store block `blk` at position corresponding to its size
@@ -922,11 +940,19 @@ namespace cachelot {
         }
         {
             // 1.2. Try to split the biggest available block
-            block * huge_block = free_blocks->try_get_biggest_block(nsize);
+            block * huge_block = free_blocks->get_biggest_block();
             if (huge_block != nullptr) {
                 debug_assert(not block_list::islinked(huge_block));
-                debug_assert(huge_block->size() >= nsize);
-                return checkout(huge_block, size);
+                if (huge_block->size() >= nsize) {
+                    return checkout(huge_block, size);
+                } else {
+                    huge_block = merge_unused(huge_block);
+                    if (huge_block->size() >= nsize) {
+                        return checkout(huge_block, size);
+                    } else {
+                        free_blocks->put_block(huge_block);
+                    }
+                }
             }
         }
         {
@@ -953,13 +979,45 @@ namespace cachelot {
             }
 
             // 2.2. Try to evict bigger available block
-            for (unsigned attempt = 0; attempt < 5; ++attempt) {
-                tie(used_blk, found_blk_pos) = used_blocks->try_get_block_after(found_blk_pos);
-                if (used_blk != nullptr) {
-                    on_free_block(used_blk->memory());
-                    unuse(used_blk);
-                    block_list::unlink(used_blk);
+            tie(used_blk, found_blk_pos) = used_blocks->try_get_block_after(found_blk_pos);
+            if (used_blk != nullptr) {
+                on_free_block(used_blk->memory());
+                unuse(used_blk);
+                block_list::unlink(used_blk);
+                return checkout(used_blk, size);
+            }
+            // 2.3 Merge one of biggest used blocks
+            used_blk = used_blocks->get_biggest_block();
+            if (used_blk != nullptr) {
+                on_free_block(used_blk->memory());
+                block::unuse(used_blk);
+                unsigned attempt = 1;
+                while (used_blk->size() < nsize) {
+                    uint32 available_left = not used_blk->left_adjacent()->is_technical() ? used_blk->left_adjacent()->size() : 0;
+                    uint32 available_right = not used_blk->right_adjacent()->is_technical() ? used_blk->right_adjacent()->size() : 0;
+                    debug_assert(available_left != 0 || available_right != 0);
+                    if (available_right > available_left) {
+                        block * right = used_blk->right_adjacent();
+                        if (right->is_used()) {
+                            on_free_block(right->memory());
+                            block::unuse(right);
+                        }
+                        block_list::unlink(right);
+                        used_blk = block::merge(used_blk, right);
+                    } else {
+                        block * left = used_blk->left_adjacent();
+                        if (left->is_used()) {
+                            on_free_block(left->memory());
+                            block::unuse(left);
+                        }
+                        block_list::unlink(left);
+                        used_blk = block::merge(left, used_blk);
+                    }
+                }
+                if (used_blk->size() >= nsize) {
                     return checkout(used_blk, size);
+                } else {
+                    free_blocks->put_block(used_blk);
                 }
             }
         }
