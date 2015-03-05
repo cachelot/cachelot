@@ -93,6 +93,9 @@ namespace cachelot {
         /// Receive message
         UniqueMessagePtr receive_message() noexcept;
 
+        /// wait a few cycles
+        void pause() noexcept;
+
     private:
         /// notify Thread to wake it up
         void notify() noexcept;

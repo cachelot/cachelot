@@ -29,7 +29,7 @@ namespace cachelot {
         }
 
         tcp_text_protocol_handler * new_connection() {
-            return tcp_text_protocol_handler::create(*(new io_service()), cache.shared_from_this());
+            return tcp_text_protocol_handler::create(get_io_service(), cache.shared_from_this());
         }
 
         void delete_connection(tcp_text_protocol_handler * conn) noexcept {
@@ -54,7 +54,7 @@ namespace cachelot {
         }
 
         unix_text_protocol_handler * new_connection() {
-            return unix_text_protocol_handler::create(ios(), cache);
+            return unix_text_protocol_handler::create(get_io_service(), cache);
         }
 
         void delete_connection(unix_text_protocol_handler * conn) noexcept {

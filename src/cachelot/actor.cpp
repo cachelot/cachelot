@@ -39,21 +39,21 @@ namespace cachelot {
                         continue;
                     }
                     // wait in spinlock
-                    _mm_pause();
-                    wait_spins += 1;
-                    if (wait_spins >= max_wait_spin_count) {
-                        continue;
-                    }
-                    // important check as termination could be requested from the running actors
-                    if (not m_is_interrupted.load(std::memory_order_relaxed)) {
-                        // wait in kernel lock
-                        //std::unique_lock<decltype(m_wait_mutex)> lck(m_wait_mutex);
-                        debug_assert(not m_is_waiting);
-                        m_is_waiting.store(true, std::memory_order_relaxed);
-                        //m_wait_condition.wait(lck);
-                    }
-                    wait_spins = 0;
-                    m_is_waiting.store(false, std::memory_order_relaxed);
+                    pause();
+//                    wait_spins += 1;
+//                    if (wait_spins >= max_wait_spin_count) {
+//                        continue;
+//                    }
+//                    // important check as termination could be requested from the running actors
+//                    if (not m_is_interrupted.load(std::memory_order_relaxed)) {
+//                        // wait in kernel lock
+//                        std::unique_lock<decltype(m_wait_mutex)> lck(m_wait_mutex);
+//                        debug_assert(not m_is_waiting);
+//                        m_is_waiting.store(true, std::memory_order_relaxed);
+//                        m_wait_condition.wait(lck);
+//                    }
+//                    wait_spins = 0;
+//                    m_is_waiting.store(false, std::memory_order_relaxed);
                 }
             });
         }
@@ -80,6 +80,10 @@ namespace cachelot {
             }
         }
 
+        void pause() noexcept {
+            _mm_pause();
+        }
+
         bool interrupted() noexcept {
             return m_is_interrupted.load(std::memory_order_relaxed);
         }
@@ -104,8 +108,6 @@ namespace cachelot {
     }
 
     Actor::~Actor() {
-        stop();
-        join();
         // empty mailbox
         Message * m = m_mailbox.dequeue();
         while (m != nullptr) {
@@ -120,9 +122,11 @@ namespace cachelot {
 
     void Actor::stop() noexcept { m_thread->stop(); }
 
-    void Actor::join() noexcept { m_thread->join(); }
+    void Actor::join() noexcept { m_thread->join(); __me.reset(); }
 
     bool Actor::interrupted() noexcept { return m_thread->interrupted(); }
+
+    void Actor::pause() noexcept { m_thread->pause(); }
 
 
 } // namespace cachelot
