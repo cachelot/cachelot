@@ -13,7 +13,7 @@ using namespace cachelot;
 // Global io_service to access it from the signal handler
 static bool killed = false;
 net::io_service reactor;
-std::unique_ptr<cache::CacheService> cache_svc;
+cache::CacheService * cache_svc;
 
 void on_signal_terminate(int) {
     killed = true;
@@ -34,7 +34,7 @@ void setup_signals() {
 int main() {
     try {
         // Cache Service
-        cache_svc.reset(new cache::CacheService(settings.cache.memory_limit, settings.cache.initial_hash_table_size));
+        cache_svc = new cache::CacheService(settings.cache.memory_limit, settings.cache.initial_hash_table_size);
         cache_svc->start();
 
         // Signal handlers

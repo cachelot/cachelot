@@ -53,7 +53,7 @@ namespace cachelot { namespace net {
             m_acceptor.close(__);
         }
 
-        io_service & ios() noexcept { return m_ios; }
+        io_service & get_io_service() noexcept { return m_ios; }
 
     private:
         void async_accept();
