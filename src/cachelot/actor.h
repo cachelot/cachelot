@@ -27,15 +27,12 @@ namespace cachelot {
      * @note It is possible to implement state machine by changing `on_message` callback
      */
     class Actor : public std::enable_shared_from_this<Actor> {
+        class Impl; // pimpl
         class MessageBase;
         /// private constructor
         explicit Actor(bool (Actor::*act_function)() noexcept);
     public:
         class Message;
-
-        typedef std::weak_ptr<Actor> WeakPtr;
-
-        typedef std::unique_ptr<Message> UniqueMessagePtr;
 
         typedef std::function<bool (Actor *) noexcept> ActFunction;
 
@@ -83,15 +80,15 @@ namespace cachelot {
     protected:
         /// Send message to the other actor
         template <typename ... Args>
-        void send_to(std::shared_ptr<Actor> to, atom_type msg_type, Args&&... args) noexcept;
+        void send_to(Actor & to, atom_type msg_type, Args&&... args) noexcept;
 
         /// Reply to the received message
         /// @return `true` if message sent, `false` if recepient is dead
         template <typename ... Args>
-        bool reply_to(UniqueMessagePtr && msg, atom_type msg_type, Args ... args) noexcept;
+        bool reply_to(std::unique_ptr<Actor::Message> && msg, atom_type msg_type, Args ... args) noexcept;
 
         /// Receive message
-        UniqueMessagePtr receive_message() noexcept;
+        std::unique_ptr<Actor::Message> receive_message() noexcept;
 
         /// wait a few cycles
         void pause() noexcept;
@@ -100,12 +97,12 @@ namespace cachelot {
         /// notify Thread to wake it up
         void notify() noexcept;
 
+        /// @copydoc send_to()
+        void impl_send_to(std::shared_ptr<Actor::Impl> to, Message * msg) noexcept;
+
     private:
         typedef mpsc_queue<Message> Mailbox;
-        Mailbox m_mailbox;
-        class Thread; // separate thread implementation
-        std::unique_ptr<Thread> m_thread;
-        std::shared_ptr<Actor> __me; // satisfy precondition for a weak_ptr
+        std::shared_ptr<Impl> _impl;
     };
 
 
@@ -117,9 +114,11 @@ namespace cachelot {
      * MessageBase is internal class of Actor
      */
     class Actor::MessageBase : private Actor::Mailbox::node {
+        std::weak_ptr<Actor::Impl> _sender;
     public:
-        /// sender Actor of this message
-        std::weak_ptr<Actor> sender;
+        /// sender of this message
+        /// @return internal ID of the sender or `nullptr` if sender has terminated
+        std::shared_ptr<Actor::Impl> sender_id() noexcept { return _sender.lock(); }
 
         /// type of message
         const atom_type type;
@@ -127,7 +126,7 @@ namespace cachelot {
     protected:
         /// constructor
         explicit MessageBase(Actor & the_sender, const atom_type the_type) noexcept
-            : sender(the_sender.shared_from_this())
+            : _sender(the_sender._impl)
             , type(the_type) {
         }
 
@@ -201,32 +200,24 @@ namespace cachelot {
 
 
     template <typename ... Args>
-    inline void Actor::send_to(std::shared_ptr<Actor> to, atom_type msg_type, Args && ... args) noexcept {
-        if (to) {
-            to->m_mailbox.enqueue(new Actor::Message(*this, msg_type, std::forward<Args>(args) ...));
-            to->notify();
-        }
+    inline void Actor::send_to(Actor & to, atom_type msg_type, Args && ... args) noexcept {
+        impl_send_to(to._impl, new Actor::Message(*this, msg_type, std::forward<Args>(args) ...));
     }
 
 
     template <typename ... Args>
-    inline bool Actor::reply_to(UniqueMessagePtr && msg, atom_type msg_type, Args ... args) noexcept {
+    inline bool Actor::reply_to(std::unique_ptr<Actor::Message> && msg, atom_type msg_type, Args ... args) noexcept {
         debug_assert(msg);
-        auto to = msg->sender.lock();
+        auto to = msg->sender_id();
         if (to) {
             // re-create Message inplace unique_ptr::release call destructor
             Actor::Message * reply_msg = new (msg.release()) Actor::Message(*this, msg_type, args ...);
-            to->m_mailbox.enqueue(reply_msg);
-            to->notify();
+            impl_send_to(to, reply_msg);
             return true;
         }
         return false;
     }
 
-
-    inline Actor::UniqueMessagePtr Actor::receive_message() noexcept {
-        return std::move(UniqueMessagePtr(m_mailbox.dequeue()));
-    }
 
 } // namespace cachelot
 

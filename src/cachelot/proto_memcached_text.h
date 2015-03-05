@@ -31,10 +31,10 @@ namespace cachelot {
         static const size_t command_max_length = 7;
 
         /// constructor
-        explicit text_protocol_handler(io_service & io_svc, std::shared_ptr<Actor> the_cache)
-            : parent_connection(io_svc)
+        explicit text_protocol_handler(std::unique_ptr<io_service> && io_svc, Actor & the_cache)
+            : parent_connection(*io_svc)
             , Actor(&this_type::main)
-            , m_ios(io_svc)
+            , m_ios(std::move(io_svc))
             , cache(the_cache)
             , calc_hash() {
         }
@@ -44,8 +44,9 @@ namespace cachelot {
 
     public:
         /// create new connection
-        static this_type * create(io_service & io_svc, std::shared_ptr<Actor> the_cache) {
-            return new this_type(io_svc, the_cache);
+        static this_type * create(Actor & the_cache) {
+            auto personal_io_svc = std::unique_ptr<io_service>(new io_service());
+            return new this_type(std::move(personal_io_svc), the_cache);
         }
 
         static void destroy(this_type * this_) noexcept {
@@ -63,7 +64,7 @@ namespace cachelot {
         bool main() noexcept;
 
         /// handle reply message from the cache service
-        void on_cache_reply(Actor::UniqueMessagePtr && msg) noexcept;
+        void on_cache_reply(std::unique_ptr<Actor::Message> && msg) noexcept;
 
         /// wait until cache handle request
         void wait_for_cache_reply() noexcept;
@@ -108,8 +109,8 @@ namespace cachelot {
         bool maybe_noreply(const bytes buffer);
 
     private:
-        io_service & m_ios;
-        std::shared_ptr<Actor> cache;
+        std::unique_ptr<io_service> m_ios;
+        Actor & cache;
         const HashFunction calc_hash;
         bool m_killed = false; // TODO: Move error handling to async_connection???
     };
@@ -118,28 +119,29 @@ namespace cachelot {
     template <class Sock>
     inline bool text_protocol_handler<Sock>::main() noexcept {
         error_code error;
-        bool has_work = m_ios.poll(error) > 0;
-        if (error) {
+        m_ios->poll(error);
+        if (not error) {
+            auto msg = receive_message();
+            while (msg) {
+                on_cache_reply(std::move(msg));
+                msg = receive_message();
+            }
+        } else {
             on_error(error);
         }
-        auto msg = receive_message();
-        if (msg) {
-            has_work = true;
-            on_cache_reply(std::move(msg));
-        }
-        return has_work;
+        return true;
     }
 
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::on_cache_reply(Actor::UniqueMessagePtr && msg) noexcept {
+    inline void text_protocol_handler<Sock>::on_cache_reply(std::unique_ptr<Actor::Message> && msg) noexcept {
         switch (msg->type) {
             case atom("stored"):
-                send_response(memcached::STORED);
+                send_response(STORED);
                 break;
             case atom("not_stored"): {
-                send_response(memcached::NOT_STORED);
+                send_response(NOT_STORED);
                 break;
             }
             case atom("flush"): {
@@ -152,12 +154,11 @@ namespace cachelot {
                 send_error(memcached::SERVER_ERROR, bytes(err.message().c_str(), err.message().size()));
             }
             case atom("die"): {
-                this->close();
-                io_service().post([=](){
-                    this->stop();
-                    this->join();
-                });
+                suicide();
             }
+            case atom("item"):
+            case atom("notfound"):
+                break;
             default:
                 debug_assert(false && "Error - unknown message");
                 break;
@@ -167,9 +168,10 @@ namespace cachelot {
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::wait_for_cache_reply() noexcept {
-        Actor::UniqueMessagePtr msg;
-        while (not msg) {
+        std::unique_ptr<Actor::Message> msg; uint32 attempt = 100;
+        while (not msg && attempt > 0) {
             msg = receive_message();
+            attempt -= 1;
             if (msg) {
                 on_cache_reply(std::move(msg));
             } else {
@@ -305,6 +307,7 @@ namespace cachelot {
                     } else {
                         send_error(CLIENT_ERROR, bytes::from_literal("invalid value: \\r\\n expected"));
                         suicide();
+                        return;
                     }
                     send_to(cache, req, key, calc_hash(key), value, flags, expires_after, cas_unique, noreply);
                     net_receive();
@@ -362,7 +365,8 @@ namespace cachelot {
     template <class Sock>
     inline void text_protocol_handler<Sock>::on_error(const error_code error) noexcept {
         debug_assert(error);
-        suicide();
+        this->close();
+        send_to(cache, atom("sync"), atom("die"));
     }
 
 
@@ -373,7 +377,12 @@ namespace cachelot {
         Actor::stop();
         if (! m_killed) {
             m_killed = true;
-            send_to(cache, atom("sync"), atom("die"));
+            this->close();
+            io_service().post([=](){
+                this->stop();
+                this->join();
+                delete this;
+            });
         }
     }
 

@@ -10,20 +10,27 @@
 namespace cachelot {
 
 
-//////// Actor::Thread //////////////////////////////
+//////// Actor::Impl //////////////////////////////
 
 
-    class Actor::Thread {
+    class Actor::Impl {
         static constexpr uint32 max_wait_spin_count = 10000;
     public:
-        Thread(Actor::ActFunction act_function, Actor & self)
+        Impl(Actor::ActFunction act_function, Actor & self)
             : m_self(self)
-            , m_function(act_function) {
+            , m_function(act_function)
+            , m_thread() {
         }
 
-        ~Thread() {
+        ~Impl() {
             stop();
             join();
+            // empty mailbox
+            auto * m = m_mailbox.dequeue();
+            while (m != nullptr) {
+                delete m;
+                m = m_mailbox.dequeue();
+            }
         }
 
         void start() noexcept {
@@ -88,10 +95,21 @@ namespace cachelot {
             return m_is_interrupted.load(std::memory_order_relaxed);
         }
 
+        Message * receive_message() noexcept {
+            return m_mailbox.dequeue();
+        }
+
+        void send_to(std::shared_ptr<Impl> to, Message * msg) {
+            debug_assert(to);
+            debug_assert(msg);
+            to->m_mailbox.enqueue(msg);
+        }
+
     private:
         Actor & m_self;
-        std::thread m_thread;
         Actor::ActFunction m_function;
+        std::thread m_thread;
+        Mailbox m_mailbox;
         std::mutex m_wait_mutex;
         std::condition_variable m_wait_condition;
         std::atomic_bool m_is_waiting;
@@ -102,31 +120,49 @@ namespace cachelot {
 //////// Actor //////////////////////////////////////
 
     Actor::Actor(bool (Actor::*act_function)() noexcept)
-        : std::enable_shared_from_this<Actor>()
-        , m_thread(new Thread(act_function, *this))
-        , __me(this) {
+        : _impl(new Impl(act_function, *this)) {
     }
 
-    Actor::~Actor() {
-        // empty mailbox
-        Message * m = m_mailbox.dequeue();
-        while (m != nullptr) {
-            delete m;
-            m = m_mailbox.dequeue();
+    Actor::~Actor() {}
+
+    void Actor::notify() noexcept {
+        if(_impl) _impl->notify();
+    }
+
+    void Actor::start() noexcept {
+        debug_assert(_impl);
+        _impl->start();
+    }
+
+    void Actor::stop() noexcept {
+        if(_impl) _impl->stop();
+    }
+
+    void Actor::join() noexcept {
+        if(_impl) _impl->join();
+    }
+
+    bool Actor::interrupted() noexcept {
+        return _impl ? _impl->interrupted() : true;
+    }
+
+    void Actor::pause() noexcept {
+        debug_assert(_impl);
+        _impl->pause();
+    }
+
+    std::unique_ptr<Actor::Message> Actor::receive_message() noexcept {
+        if (_impl) {
+            std::unique_ptr<Actor::Message> msg(_impl->receive_message());
+            return std::move(msg);
         }
+        return nullptr;
     }
 
-    void Actor::notify() noexcept { m_thread->notify(); }
+    void Actor::impl_send_to(std::shared_ptr<Actor::Impl> to, Actor::Message * msg) noexcept {
+        _impl->send_to(to, msg);
+    }
 
-    void Actor::start() noexcept { m_thread->start(); }
-
-    void Actor::stop() noexcept { m_thread->stop(); }
-
-    void Actor::join() noexcept { m_thread->join(); __me.reset(); }
-
-    bool Actor::interrupted() noexcept { return m_thread->interrupted(); }
-
-    void Actor::pause() noexcept { m_thread->pause(); }
 
 
 } // namespace cachelot
