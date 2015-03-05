@@ -623,7 +623,7 @@ namespace cachelot {
                     return make_tuple(blk, pos);
                 }
             }
-            if (/*pos.block_size() > requested_size && */(pos > position(0, 0))) {
+            if (pos.block_size() > requested_size && (pos > position(0, 0))) {
                 auto prev_pos = pos.prev();
                 if (bit_index_probe(prev_pos)) {
                     block_list & size_class = table[prev_pos.absolute()];
@@ -700,11 +700,6 @@ namespace cachelot {
             return tuple<block *, position>(nullptr, lookup_pos);
         }
 
-
-        ///
-        /// @return block pointer or `nullptr` if fail
-        block * try_evict_more(const uint32 requested_size) noexcept {
-        }
 
         /// store block `blk` at position corresponding to its size
         void put_block(block * blk) {
@@ -927,7 +922,7 @@ namespace cachelot {
         debug_assert(size <= block::max_size);
         debug_assert(size > 0);
         const uint32 nsize = size > block::min_size ? static_cast<uint32>(size) : block::min_size;
-        // 1. Lookup for the unused block
+        // 1. Lookup for the free block
         group_by_size::position found_blk_pos;
         {
             // 1.1. Try to get block of corresponding size from table
