@@ -13,8 +13,8 @@
 #ifndef CACHELOT_IO_SERIALIZATION_H_INCLUDED
 #  include <cachelot/io_serialization.h>
 #endif
-#ifndef CACHELOT_CACHE_CACHE_SERVICE_H_INCLUDED
-#  include <cachelot/cache_service.h>
+#ifndef CACHELOT_THREAD_SAFE_CACHE_H_INCLUDED
+#  include <cachelot/thread_safe_cache.h>
 #endif
 #ifndef CACHELOT_HASH_FNV1A_H_INCLUDED
 #  include <cachelot/hash_fnv1a.h>
@@ -95,6 +95,7 @@ namespace cachelot {
     };
 
     typedef fnv1a<cache::hash_type>::hasher HashFunction;
+
 
 } } // namespace cachelot::memcached
 

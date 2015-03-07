@@ -11,11 +11,6 @@
 #  include <cachelot/io_buffer.h>
 #endif
 
-#if 1
-#   define net_debug_trace(...) ((void)0)
-#   define net_debug_mtrace(...) ((void)0)
-#endif
-
 // Disable warnings in boost::asio
 #if defined __GNUC__
 #  pragma GCC system_header
@@ -23,6 +18,9 @@
 #  pragma warning(push, 1)
 #endif
 #ifndef BOOST_ASIO_HPP
+// TODO: Build system options
+//#define BOOST_ASIO_DISABLE_THREADS
+//#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
 #  include <boost/asio.hpp>
 #endif
 #if defined _MSC_VER

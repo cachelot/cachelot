@@ -89,8 +89,6 @@ namespace cachelot {
         /**
          * Cache class to rule them all
          *
-         * Cache requires callback on each request.
-         * This is necessary to restrict Item usage outside of a single call. Item pointer may not be valid otherwise.
          * @note Cache is *not* thread safe
          */
         class Cache {
@@ -114,10 +112,12 @@ namespace cachelot {
              * `get` -  retrieve item
              *
              * @tparam Callback - callback will be called when request is completed
+             *
              * Callback must have following signature:
              * @code
              *    void on_get(error_code error, bool found, bytes value, opaque_flags_type flags, cas_value_type cas_value)
              * @endcode
+             * @note Key/value pointers may not be valid outside of this call.
              */
             template <typename Callback>
             void do_get(const bytes key, const hash_type hash, Callback on_get) noexcept;

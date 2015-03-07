@@ -33,6 +33,7 @@
 #include <tuple>    // std::tuple
 #include <thread>   // std::thread std::this_thread
 #include <cstring>  // std::memmove
+#include <emmintrin.h> // _mm_pause
 
 #define __CACHELOT_PP_STR1(X) #X
 #define CACHELOT_PP_STR(X) __CACHELOT_PP_STR1(X)
@@ -85,6 +86,10 @@ namespace cachelot {
     template <class SmartPointer>
     auto raw_pointer(const SmartPointer & ptr) -> decltype(ptr.get()) {
         return ptr.get();
+    }
+
+    inline void pause_cpu() noexcept {
+        _mm_pause();
     }
 
     constexpr size_t cpu_l1d_cache_line = 64;
