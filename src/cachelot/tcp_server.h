@@ -77,7 +77,6 @@ namespace cachelot { namespace net {
             ConnectionType * new_connection = reinterpret_cast<Impl *>(this)->new_connection();
             m_acceptor.async_accept(new_connection->socket(),
                 [=](const error_code error) {
-                    net_debug_trace("[error: %s]", error.message().c_str());
                     if (not error) {
                         new_connection->run();
                     } else {

@@ -65,8 +65,7 @@ namespace cachelot {
         /// immediately cancel all pending operations and close the connection
         void close() noexcept;
 
-        /// schedule function into IO loop. In multithreaded environment all
-        /// function calls of the single connection will be executed one by the same thread
+        /// schedule function into IO loop
         template <typename Function>
         void post(Function fun) noexcept { m_ios.post(fun); }
 
@@ -96,7 +95,6 @@ namespace cachelot {
                     bytes receive_result;
                     if (not error) {
                         m_rcv_buf.confirm(bytes_received);
-                        net_debug_mtrace("async_receive_until -> received %u bytes (buffer: %u bytes)", bytes_received, m_rcv_buf.size());
                         receive_result = m_rcv_buf.try_read_until(terminator);
                         if (receive_result) {
                             on_complete(error, receive_result);
@@ -119,12 +117,11 @@ namespace cachelot {
         } else {
             size_t bytes_to_receive = n - m_rcv_buf.unread();
             asio::async_read(m_socket, asio::buffer(m_rcv_buf.begin_write(bytes_to_receive), bytes_to_receive), transfer_exactly(bytes_to_receive),
-                [=](const error_code error, const size_t bytes_received) {
+                [=](const error_code error, const size_t bytes_received) noexcept {
                     bytes receive_result;
                     if (!error) {
                         debug_assert(bytes_received == bytes_to_receive);
                         m_rcv_buf.confirm(bytes_received);
-                        net_debug_mtrace("async_receive_n -> received %u bytes (buffer: %u bytes)", bytes_received, bytes_received, m_rcv_buf.size());
                         receive_result = m_rcv_buf.read(n);
                     }
                     on_complete(error, receive_result);
@@ -145,7 +142,7 @@ namespace cachelot {
 
     template <class Sock, class Conn>
     inline void async_connection<Sock, Conn>::close() noexcept {
-        if (m_socket.is_open()) {
+        if (is_open()) {
             error_code __;
             // try to shutdown the connection gracefully
             m_socket.shutdown(Sock::shutdown_both, __);
