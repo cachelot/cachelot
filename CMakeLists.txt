@@ -5,8 +5,10 @@ if (NOT CMAKE_GENERATOR STREQUAL "Unix Makefiles")
     set (CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebugInfo;AddressSanitizer" CACHE TYPE INTERNAL FORCE)
     mark_as_advanced (CMAKE_CONFIGURATION_TYPES)
 else ()
-   # Unix Makefiles support only single build configuration - release by default
-   set (CMAKE_BUILD_TYPE Release)
+    # Unix Makefiles support only single build configuration - release by default
+    if (NOT "$CMAKE_BUILD_TYPE")
+        set (CMAKE_BUILD_TYPE RelWithDebugInfo)
+    endif()
 endif ()
 project (cachelot)
 cmake_minimum_required (VERSION 2.8.3)
@@ -71,6 +73,7 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
         endif ()
         message ("Address sanitizer build type was enabled for gcc")
         set (CMAKE_CXX_FLAGS_ADDRESSSANITIZER "-fsanitize=address ${ADRESS_SANITIZER_FLAGS}")
+        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
        # - - Clang specific - - - - - - - - - - - - - - - - - - - - - - - -
     elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
         set (CLANG_VERSION ${CMAKE_CXX_COMPILER_VERSION})

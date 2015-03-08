@@ -437,7 +437,7 @@ namespace cachelot {
             /// private constructor used by group_by_size
             explicit constexpr position(const uint32 power_index, const uint32 sub_block_index)
                 : pow_index(power_index), sub_index(sub_block_index) {
-                debug_only(test_check());
+                /* debug_only(test_check()); */
             }
         public:
             /// constructor
