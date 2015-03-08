@@ -47,7 +47,7 @@ int main() {
         }
 
         std::thread t1([=]() { reactor.run(); });
-        std::thread t2([=]() { reactor.run(); });
+        //std::thread t2([=]() { reactor.run(); });
 
 
         do {
@@ -59,7 +59,7 @@ int main() {
         reactor.stop();
 
         t1.join();
-        t2.join();
+        //t2.join();
 
         return EXIT_SUCCESS;
     } catch (const std::exception & e) {

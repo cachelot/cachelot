@@ -24,8 +24,8 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/expiration_clock.h
                 ${CMAKE_CURRENT_LIST_DIR}/item.h
                 ${CMAKE_CURRENT_LIST_DIR}/cache.h
-                ${CMAKE_CURRENT_LIST_DIR}/cache_service.h
-                ${CMAKE_CURRENT_LIST_DIR}/cache_service.cpp
+                ${CMAKE_CURRENT_LIST_DIR}/thread_safe_cache.h
+                ${CMAKE_CURRENT_LIST_DIR}/thread_safe_cache.cpp
                 ${CMAKE_CURRENT_LIST_DIR}/mpsc_queue.h
                 ${CMAKE_CURRENT_LIST_DIR}/network.h
                 ${CMAKE_CURRENT_LIST_DIR}/async_connection.h
@@ -36,7 +36,5 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/proto_memcached_servers.h
                 ${CMAKE_CURRENT_LIST_DIR}/pool_allocator.h
                 ${CMAKE_CURRENT_LIST_DIR}/atom.h
-                ${CMAKE_CURRENT_LIST_DIR}/thread_safe_cache.h
-                ${CMAKE_CURRENT_LIST_DIR}/thread_safe_cache.cpp
-        )
+       )
 
