@@ -5,8 +5,10 @@ if (NOT CMAKE_GENERATOR STREQUAL "Unix Makefiles")
     set (CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebugInfo;AddressSanitizer" CACHE TYPE INTERNAL FORCE)
     mark_as_advanced (CMAKE_CONFIGURATION_TYPES)
 else ()
-   # Unix Makefiles support only single build configuration - release by default
-   set (CMAKE_BUILD_TYPE Release)
+    # Unix Makefiles support only single build configuration - release by default
+    if (NOT "$CMAKE_BUILD_TYPE")
+        set (CMAKE_BUILD_TYPE RelWithDebugInfo)
+    endif()
 endif ()
 project (cachelot)
 cmake_minimum_required (VERSION 2.8.3)
@@ -55,13 +57,15 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
     else ()
         message (FATAL_ERROR "CACHELOT_PLATFORM_BITS is set to unknown value: \"${CACHELOT_PLATFORM_BITS}\"")
     endif ()
+    # TODO: Intel specific
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse -msse2")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4 -std=c++11")
     set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -DDEBUG")
     set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
     set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO "${CMAKE_CXX_FLAGS_RELEASE} -O2 -DNDEBUG -g")
-    set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES)
+    set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES "")
     # Flags for address sanitizer build type
-    set (ADRESS_SANITIZER_FLAGS "-O1 -g -DDEBUG -DADDRESS_SANITIZER -fno-optimize-sibling-calls")
+    set (ADRESS_SANITIZER_FLAGS "-O1 -g -DNDEBUG -DADDRESS_SANITIZER -fno-optimize-sibling-calls")
     # - - GCC specific - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
         set (GCC_VERSION ${CMAKE_CXX_COMPILER_VERSION})
@@ -71,6 +75,7 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
         endif ()
         message ("Address sanitizer build type was enabled for gcc")
         set (CMAKE_CXX_FLAGS_ADDRESSSANITIZER "-fsanitize=address ${ADRESS_SANITIZER_FLAGS}")
+        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
        # - - Clang specific - - - - - - - - - - - - - - - - - - - - - - - -
     elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
         set (CLANG_VERSION ${CMAKE_CXX_COMPILER_VERSION})

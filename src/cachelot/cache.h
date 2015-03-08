@@ -126,16 +126,20 @@ namespace cachelot {
             /**
              * @class doxygen_store_command
              *
-             * @return `tuple(error, stored)`
-             *  - `error` indicates that Item had not stored because of an error (the most probably out of memory)
-             *  - `stored` bool flag shows whether conditions of `add` / `replace` have met
+             * @tparam Callback - callback will be called when request is completed
+             * Callback must have following signature:
+             * @code
+             *    void on_complete(error_code error, bool stored)
+             * @endcode
              */
 
             /**
              * `set` - store item unconditionally
-             * @return error_code indicates that Item had not stored because of an error (the most probably out of memory)
+             *
+             * @copydoc doxygen_store_command
              */
-            error_code do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+            template <typename Callback>
+            void do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_set) noexcept;
 
             /**
              * `add` - store non-existing item
@@ -277,7 +281,8 @@ namespace cachelot {
         }
 
 
-        inline error_code Cache::do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
+        template <typename Callback>
+        inline void Cache::do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_set) noexcept {
             bool found; iterator at;
             try {
                 tie(found, at) = retrieve_item(key, hash);
@@ -287,9 +292,9 @@ namespace cachelot {
                 } else {
                     item_reassign_at(at, value, flags, expires, cas_value);
                 }
-                return error::success;
+                on_set(error::success, true);
             } catch (const std::bad_alloc &) {
-                return error::out_of_memory;
+                on_set(error::out_of_memory, false);
             }
         }
 
