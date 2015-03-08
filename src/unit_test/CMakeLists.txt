@@ -16,8 +16,6 @@ set (CACHELOT_UNIT_TEST_SOURCES
                 test_io_buffer.cpp
                 test_mpsc_queue.cpp
                 test_atom.cpp
-                test_actor.cpp
-                test_pool_allocator.cpp
                 ${CACHELOT_SOURCES}
         )
 
