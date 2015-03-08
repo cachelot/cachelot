@@ -19,7 +19,6 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/settings.cpp
                 ${CMAKE_CURRENT_LIST_DIR}/memalloc.h
                 ${CMAKE_CURRENT_LIST_DIR}/memalloc.inl
-                ${CMAKE_CURRENT_LIST_DIR}/spinlock.h
                 ${CMAKE_CURRENT_LIST_DIR}/xrange.h
                 ${CMAKE_CURRENT_LIST_DIR}/expiration_clock.h
                 ${CMAKE_CURRENT_LIST_DIR}/item.h
@@ -34,7 +33,6 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/proto_memcached.h
                 ${CMAKE_CURRENT_LIST_DIR}/proto_memcached_text.h
                 ${CMAKE_CURRENT_LIST_DIR}/proto_memcached_servers.h
-                ${CMAKE_CURRENT_LIST_DIR}/pool_allocator.h
                 ${CMAKE_CURRENT_LIST_DIR}/atom.h
-       )
+        )
 
