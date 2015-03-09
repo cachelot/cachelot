@@ -1,6 +1,6 @@
 #include <cachelot/cachelot.h>
 #include <cachelot/proto_memcached_servers.h>
-#include <cachelot/thread_safe_cache.h>
+#include <cachelot/cache.h>
 #include <cachelot/settings.h>
 
 #include <iostream>
@@ -34,7 +34,7 @@ namespace  {
 int main() {
     try {
         // Cache Service
-        std::unique_ptr<cache::ThreadSafeCache> the_cache(new cache::ThreadSafeCache(settings.cache.memory_limit,
+        std::unique_ptr<cache::Cache> the_cache(new cache::Cache(settings.cache.memory_limit,
                                                                                      settings.cache.initial_hash_table_size));
         // Signal handlers
         setup_signals();
@@ -46,20 +46,14 @@ int main() {
             memcached_tcp_text->start(settings.net.TCP_port);
         }
 
-        std::thread t1([=]() { reactor.run(); });
-        //std::thread t2([=]() { reactor.run(); });
-
-
+        error_code error;
         do {
-            error_code ignore;
-            reactor.run(ignore);
-        } while(not killed);
+            reactor.run(error);
+        } while(not killed && not error);
 
-        // stop everything
-        reactor.stop();
-
-        t1.join();
-        //t2.join();
+        if (memcached_tcp_text) {
+            memcached_tcp_text->stop();
+        }
 
         return EXIT_SUCCESS;
     } catch (const std::exception & e) {

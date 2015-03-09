@@ -52,13 +52,11 @@ public:
     void set(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
-        m_cache.do_set(k, calc_hash(k), v, 0, forever, 0,
-                       [=](error_code error, bool /*stored*/) {
-                           stats.num_set += 1;
-                           if (error) {
-                               stats.num_error += 1;
-                           }
-                       });
+        error_code error = m_cache.do_set(k, calc_hash(k), v, /*flags*/0, forever, /*CAS*/0);
+        stats.num_set += 1;
+        if (error) {
+            stats.num_error += 1;
+        }
     }
 
     void get(iterator it) {

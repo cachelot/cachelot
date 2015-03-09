@@ -19,7 +19,7 @@
 #endif
 #ifndef BOOST_ASIO_HPP
 // TODO: Build system options
-//#define BOOST_ASIO_DISABLE_THREADS
+#define BOOST_ASIO_DISABLE_THREADS
 //#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
 #  include <boost/asio.hpp>
 #endif

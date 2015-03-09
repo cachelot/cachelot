@@ -26,7 +26,7 @@ namespace cachelot {
         static const size_t command_max_length = 7;
 
         /// constructor
-        explicit text_protocol_handler(io_service & io_svc, cache::ThreadSafeCache & the_cache)
+        explicit text_protocol_handler(io_service & io_svc, cache::Cache & the_cache)
             : super(io_svc)
             , cache(the_cache)
             , calc_hash()
@@ -37,7 +37,7 @@ namespace cachelot {
         ~text_protocol_handler() {}
     public:
         /// create new connection
-        static this_type * create(io_service & io_svc, cache::ThreadSafeCache & the_cache) {
+        static this_type * create(io_service & io_svc, cache::Cache & the_cache) {
             return new this_type(io_svc, the_cache);
         }
 
@@ -46,7 +46,7 @@ namespace cachelot {
             delete this_;
         }
 
-        void run() noexcept { receive_request(); }
+        void run() noexcept { receive_command(); }
 
     private:
         /// close this connection and move it to the pool
@@ -55,11 +55,11 @@ namespace cachelot {
         /// try to send all unsent data in buffer
         void flush() noexcept;
 
-        /// start to receive new request
-        void receive_request() noexcept;
+        /// start to receive new command
+        void receive_command() noexcept;
 
-        /// request received handler
-        void on_request(const bytes buffer) noexcept;
+        /// command received handler
+        void on_command(const bytes buffer) noexcept;
 
         /// error handler
         void on_error(const error_code error) noexcept;
@@ -78,32 +78,32 @@ namespace cachelot {
 
         ostream_type serialize() noexcept { return ostream_type(this->send_buffer()); }
 
-        cache::Request determine_request(const bytes command);
-        void handle_storage_request_header(cache::Request req, bytes args_buf);
-        void handle_storage_request_data(cache::Request req, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply);
-        void handle_delete_request(cache::Request req, bytes args_buf);
-        void handle_arithmetic_request(cache::Request req, bytes args_buf);
-        void handle_touch_request(cache::Request req, bytes args_buf);
-        void handle_retrieval_request(cache::Request req, bytes args_buf);
-        void handle_service_request(cache::Request req, bytes args_buf);
+        Command parse_command_name(const bytes command);
+        void handle_storage_command_header(Command cmd, bytes args_buf);
+        void handle_storage_command_data(Command cmd, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply);
+        void handle_delete_command(Command cmd, bytes args_buf);
+        void handle_arithmetic_command(Command cmd, bytes args_buf);
+        void handle_touch_command(Command cmd, bytes args_buf);
+        void handle_retrieval_command(Command cmd, bytes args_buf);
+        void handle_service_command(Command cmd, bytes args_buf);
 
         void validate_key(const bytes key);
         bool maybe_noreply(const bytes buffer);
 
     private:
-        cache::ThreadSafeCache & cache;
+        cache::Cache & cache;
         const HashFunction calc_hash;
         std::atomic_bool m_killed;
     };
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::receive_request() noexcept {
+    inline void text_protocol_handler<Sock>::receive_command() noexcept {
         super::async_receive_until(CRLF,
             [=](const error_code error, const bytes data) {
                 if (!error) {
                     debug_assert(data.endswith(CRLF));
-                    this->on_request(data);
+                    this->on_command(data);
                 } else {
                     this->on_error(error);
                 }
@@ -146,7 +146,7 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::on_request(const bytes buffer) noexcept {
+    inline void text_protocol_handler<Sock>::on_command(const bytes buffer) noexcept {
         try {
             bytes command_name, command_args, __;
             tie(command_name, command_args) = buffer.split(SPACE);
@@ -155,33 +155,32 @@ namespace cachelot {
             } else {
                 command_name = command_name.rtrim_n(CRLF.length());
             }
-            cache::Request req = determine_request(command_name);
-            cache::RequestClass req_class = cache::ClassOfRequest(req);
-            switch (req_class) {
-                case cache::STORAGE_REQUEST:
-                    handle_storage_request_header(req, command_args);
+            Command cmd = parse_command_name(command_name);
+            switch (ClassOfCommand(cmd)) {
+                case STORAGE_COMMAND:
+                    handle_storage_command_header(cmd, command_args);
                     return;
-                case cache::DELETE_REQUEST:
+                case DELETE_COMMAND:
                     break;
-                case cache::ARITHMETIC_REQUEST:
-                    //handle_arithmetic_request(command_args);
+                case ARITHMETIC_COMMAND:
+                    //handle_arithmetic_command(command_args);
                     break;
-                case cache::TOUCH_REQUEST:
-                    //handle_touch_request(command_args);
+                case TOUCH_COMMAND:
+                    //handle_touch_command(command_args);
                     break;
-                case cache::RETRIEVAL_REQUEST:
-                    handle_retrieval_request(req, command_args);
+                case RETRIEVAL_COMMAND:
+                    handle_retrieval_command(cmd, command_args);
                     break;
-                case cache::SERVICE_REQUEST:
-                    handle_service_request(req, command_args);
-                case cache::QUIT_REQUEST:
+                case SERVICE_COMMAND:
+                    handle_service_command(cmd, command_args);
+                case QUIT_COMMAND:
                     super::close();
                     suicide();
                     return;
                 default:
-                    throw non_existing_request_error();
+                    throw non_existing_command_error();
             }
-            receive_request();
+            receive_command();
             return;
         } catch(const memcached_error & err) {
             //this->flush(););
@@ -198,53 +197,53 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline cache::Request text_protocol_handler<Sock>::determine_request(const bytes command) {
+    inline Command text_protocol_handler<Sock>::parse_command_name(const bytes command) {
         if (not command) {
-            return cache::UNDEFINED;
+            return UNDEFINED;
         }
-        auto is_ = [=](const char * literal) -> bool {
+        const auto is_ = [=](const char * literal) -> bool {
             return std::strncmp(command.begin(), literal, command.length()) == 0;
         };
         const char first_char = command[0];
         switch (command.length()) {
         case 3:
             switch (first_char) {
-            case 'a': return is_("add") ? cache::ADD : cache::UNDEFINED;
-            case 'c': return is_("cas") ? cache::CAS : cache::UNDEFINED;
-            case 'g': return is_("get") ? cache::GET : cache::UNDEFINED;
-            case 's': return is_("set") ? cache::SET : cache::UNDEFINED;
-            default : return cache::UNDEFINED;
+            case 'a': return is_("add") ? ADD : UNDEFINED;
+            case 'c': return is_("cas") ? CAS : UNDEFINED;
+            case 'g': return is_("get") ? GET : UNDEFINED;
+            case 's': return is_("set") ? SET : UNDEFINED;
+            default : return UNDEFINED;
             }
         case 4:
             switch (first_char) {
-            case 'd': return is_("decr") ? cache::DECR : cache::UNDEFINED;
-            case 'g': return is_("gets") ? cache::GETS : cache::UNDEFINED;
-            case 'i': return is_("incr") ? cache::INCR : cache::UNDEFINED;
-            case 'q': return is_("quit") ? cache::QUIT : cache::UNDEFINED;
-            default : return cache::UNDEFINED;
+            case 'd': return is_("decr") ? DECR : UNDEFINED;
+            case 'g': return is_("gets") ? GETS : UNDEFINED;
+            case 'i': return is_("incr") ? INCR : UNDEFINED;
+            case 'q': return is_("quit") ? QUIT : UNDEFINED;
+            default : return UNDEFINED;
             }
         case 5:
-            return is_("touch") ? cache::TOUCH : cache::UNDEFINED;
+            return is_("touch") ? TOUCH : UNDEFINED;
         case 6:
             switch (first_char) {
-            case 'a': return is_("append") ? cache::APPEND : cache::UNDEFINED;
-            case 'd': return is_("delete") ? cache::DELETE : cache::UNDEFINED;
-            default : return cache::UNDEFINED;
+            case 'a': return is_("append") ? APPEND : UNDEFINED;
+            case 'd': return is_("delete") ? DELETE : UNDEFINED;
+            default : return UNDEFINED;
             }
         case 7:
             switch (first_char) {
-            case 'p': return is_("prepend") ? cache::PREPEND : cache::UNDEFINED;
-            case 'r': return is_("replace") ? cache::REPLACE : cache::UNDEFINED;
-            default : return cache::UNDEFINED;
+            case 'p': return is_("prepend") ? PREPEND : UNDEFINED;
+            case 'r': return is_("replace") ? REPLACE : UNDEFINED;
+            default : return UNDEFINED;
             }
         default : 
-            return cache::UNDEFINED;
+            return UNDEFINED;
         }
     }
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_storage_request_header(cache::Request req, bytes arguments_buf) {
+    inline void text_protocol_handler<Sock>::handle_storage_command_header(Command cmd, bytes arguments_buf) {
         // command arguments
         bytes key;
         tie(key, arguments_buf) = arguments_buf.split(SPACE);
@@ -260,7 +259,7 @@ namespace cachelot {
             throw client_error("Maximum value length exceeded");
         }
         cache::cas_value_type cas_unique = 0;
-        if (req == cache::CAS) {
+        if (cmd == CAS) {
             tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
             cas_unique = str_to_int<cache::cas_value_type>(parsed.begin(), parsed.length());
         }
@@ -279,7 +278,7 @@ namespace cachelot {
                         send_error(CLIENT_ERROR, bytes::from_literal("invalid value: \\r\\n expected"));
                         suicide();
                     }
-                    handle_storage_request_data(req, key, value, flags, expires_after, cas_unique, noreply);
+                    handle_storage_command_data(cmd, key, value, flags, expires_after, cas_unique, noreply);
                 } else {
                     on_error(net_error);
                 }
@@ -288,37 +287,32 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_storage_request_data(cache::Request req, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply) {
-        if (not noreply) {
-            std::atomic_flag is_waiting = ATOMIC_FLAG_INIT;
-            error_code cache_error; bool item_stored;
-            is_waiting.test_and_set(std::memory_order_acquire);
-            cache.do_store(req, key, calc_hash(key), value, flags, expires_after, cas_unique,
-                           [&is_waiting, &cache_error, &item_stored](error_code err, bool stored) noexcept {
-                               cache_error = err;
-                               item_stored = stored;
-                               is_waiting.clear(std::memory_order_release);
-                           } );
-            do {
-                //std::this_thread::sleep_for(std::chrono::nanoseconds(100));
-                pause_cpu();
-            } while (is_waiting.test_and_set(std::memory_order_acquire) == true);
-            if (not cache_error) {
-                send_response(item_stored ? STORED : NOT_STORED);
-            } else {
-                send_server_error(cache_error);
+    inline void text_protocol_handler<Sock>::handle_storage_command_data(Command cmd, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply) {
+        error_code cache_error; Response response;
+        const auto hash = calc_hash(key);
+        switch(cmd) {
+        case SET:
+            cache_error = cache.do_set(key, hash, value, flags, expires_after, cas_unique);
+            response = STORED;
+            break;
+        default:
+            debug_assert(false);
+        }
+
+
+        if (not cache_error) {
+            if (not noreply) {
+                send_response(response);
             }
         } else {
-            // don't wait until complete
-            static const auto ignore_response = [=](error_code, bool) noexcept {};
-            cache.do_store(req, key, calc_hash(key), value, flags, expires_after, cas_unique, ignore_response);
+            send_server_error(cache_error);
         }
-        receive_request();
+        receive_command();
     }
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_retrieval_request(cache::Request req, bytes args_buf) {
-        const bool send_cas = req == cache::GETS ? true : false;
+    inline void text_protocol_handler<Sock>::handle_retrieval_command(Command cmd, bytes args_buf) {
+        const bool send_cas = cmd == GETS ? true : false;
         do {
             bytes key;
             tie(key, args_buf) = args_buf.split(SPACE);
@@ -331,28 +325,13 @@ namespace cachelot {
                     if (not cache_error && found) { push_item(key, value, flags, cas_value, send_cas); }
                 });
         } while (args_buf);
-        std::atomic_flag is_waiting(true);
-        error_code cache_error;
-        cache.delayed_call([&is_waiting,&cache_error](error_code error) {
-            cache_error = error;
-            is_waiting.clear(std::memory_order_relaxed);
-        });
-        do {
-            //std::this_thread::sleep_for(std::chrono::nanoseconds(100));
-            pause_cpu();
-        } while (is_waiting.test_and_set(std::memory_order_acquire) == true);
-        if (not cache_error) {
-            static const bytes END = bytes::from_literal("END");
-            serialize() << END << CRLF;
-            this->flush();
-        } else {
-            send_server_error(cache_error);
-            on_error(cache_error);
-        }
+        static const bytes END = bytes::from_literal("END");
+        serialize() << END << CRLF;
+        this->flush();
     }
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_service_request(cache::Request req, bytes args_buf) {
+    inline void text_protocol_handler<Sock>::handle_service_command(Command cmd, bytes args_buf) {
         (void)args_buf;
     }
 
