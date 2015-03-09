@@ -74,7 +74,7 @@ namespace cachelot {
         void send_response(const Response res) noexcept;
 
         /// add single item to the send buffer
-        void push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value) noexcept;
+        void push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value, bool send_cas) noexcept;
 
         ostream_type serialize() noexcept { return ostream_type(this->send_buffer()); }
 
@@ -133,11 +133,11 @@ namespace cachelot {
 
 
     template <class Sock>
-    void text_protocol_handler<Sock>::push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value) noexcept {
+    void text_protocol_handler<Sock>::push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value, bool send_cas) noexcept {
         const auto value_length = static_cast<unsigned>(value.length());
         static const bytes VALUE = bytes::from_literal("VALUE ");
         serialize() << VALUE << key << ' ' << flags << ' ' << value_length;
-        if (cas_value != cache::cas_value_type()) {
+        if (send_cas) {
             serialize() << ' ' << cas_value;
         }
         serialize() << CRLF << value << CRLF;
@@ -323,10 +323,12 @@ namespace cachelot {
             bytes key;
             tie(key, args_buf) = args_buf.split(SPACE);
             validate_key(key);
+            std::atomic_flag is_waiting = ATOMIC_FLAG_INIT;
+            is_waiting.test_and_set(std::memory_order_acquire);
             cache.do_get(key, calc_hash(key),
                 [=](error_code cache_error, bool found, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value) {
                     // TODO: What if error?
-                    if (not cache_error && found) { push_item(key, value, flags, cas_value); }
+                    if (not cache_error && found) { push_item(key, value, flags, cas_value, send_cas); }
                 });
         } while (args_buf);
         std::atomic_flag is_waiting(true);
@@ -334,8 +336,11 @@ namespace cachelot {
         cache.delayed_call([&is_waiting,&cache_error](error_code error) {
             cache_error = error;
             is_waiting.clear(std::memory_order_relaxed);
-
         });
+        do {
+            //std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+            pause_cpu();
+        } while (is_waiting.test_and_set(std::memory_order_acquire) == true);
         if (not cache_error) {
             static const bytes END = bytes::from_literal("END");
             serialize() << END << CRLF;
