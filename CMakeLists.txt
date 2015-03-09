@@ -103,7 +103,7 @@ endif ()
 ###########################################################################
 # - boost libraries - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 set (BOOST_MIN_VERSION, "1.53.0")
-set (USED_COMPONENTS unit_test_framework system)
+set (USED_COMPONENTS unit_test_framework system program_options)
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)
 add_definitions (-DBOOST_ALL_NO_LIB) # disable boost auto-linking feature as it does not work with all compilers
@@ -120,7 +120,7 @@ add_subdirectory (src/cachelot)
 get_directory_property(CACHELOT_SOURCES DIRECTORY src/cachelot DEFINITION CACHELOT_SOURCES)
 list (APPEND CACHELOT_SOURCES src/cachelot/main.cpp) # add main.cpp containig main() function
 add_executable (cachelot ${CACHELOT_SOURCES})
-set (CACHELOT_LINK_LIBRARIES ${Boost_SYSTEM_LIBRARY})
+set (CACHELOT_LINK_LIBRARIES ${Boost_SYSTEM_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY})
 # - target link libraries setup
 target_link_libraries (cachelot ${CACHELOT_LINK_LIBRARIES})
 list (LENGTH PLATFORM_SPECIFIC_DEBUG_LIBRARIES NUM_PLATFORM_SPECIFIC_DEBUG_LIBRARIES)

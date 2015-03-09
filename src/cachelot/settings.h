@@ -17,10 +17,10 @@ namespace cachelot {
         struct {
             size_t number_of_threads = 4;
             bool has_TCP = true;
-            string TCP_interface = "localhost";
+            string listen_interface = "localhost";
             uint16 TCP_port = 11211;
             bool hasUDP = true;
-            //tuple<string, string> UDP_interface = tuple<string, string>("localhost", "11212");
+            uint16 UDP_port = 11211;
             bool has_unix_socket = false;
             string unix_socket = "/var/run/cachelot/cachelot.socket";
             uint32 unix_socket_access = 0700;
