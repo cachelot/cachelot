@@ -13,8 +13,8 @@
 namespace cachelot {
 
     // constants
-    constexpr size_t default_min_buffer_size = 2048; // 2Kb
-    constexpr size_t default_max_buffer_size = 1024 * 1024 * 32; // 32Mb
+    constexpr size_t default_min_buffer_size = 1024; // 1Kb
+    constexpr size_t default_max_buffer_size = 1024 * 1024 * 8; // 8Mb
 
 
     /**
