@@ -93,7 +93,7 @@ namespace cachelot {
     private:
         cache::Cache & cache;
         const HashFunction calc_hash;
-        std::atomic_bool m_killed;
+        bool m_killed;
     };
 
 
@@ -317,8 +317,6 @@ namespace cachelot {
             bytes key;
             tie(key, args_buf) = args_buf.split(SPACE);
             validate_key(key);
-            std::atomic_flag is_waiting = ATOMIC_FLAG_INIT;
-            is_waiting.test_and_set(std::memory_order_acquire);
             cache.do_get(key, calc_hash(key),
                 [=](error_code cache_error, bool found, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value) {
                     // TODO: What if error?
