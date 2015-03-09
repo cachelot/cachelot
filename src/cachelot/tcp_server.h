@@ -43,7 +43,7 @@ namespace cachelot { namespace net {
 
         /// start accept connections
         void start(uint16 port) {
-            tcp::endpoint bind_addr(tcp::v4(), port);
+            tcp::endpoint bind_addr(ip::address_v4::any(), port);
             start(bind_addr);
         }
 
