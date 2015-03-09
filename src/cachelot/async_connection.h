@@ -135,6 +135,7 @@ namespace cachelot {
         asio::async_write(m_socket, asio::buffer(m_snd_buf.begin_read(), m_snd_buf.unread()), transfer_all(),
             [=](error_code error, size_t bytes_sent) {
                 if (not error) {
+                    debug_assert(m_snd_buf.unread() == bytes_sent);
                     m_snd_buf.read(bytes_sent);
                 }
                 on_complete(error);
