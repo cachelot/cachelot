@@ -138,8 +138,7 @@ namespace cachelot {
              *
              * @copydoc doxygen_store_command
              */
-            template <typename Callback>
-            void do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_set) noexcept;
+            error_code do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
 
             /**
              * `add` - store non-existing item
@@ -281,8 +280,7 @@ namespace cachelot {
         }
 
 
-        template <typename Callback>
-        inline void Cache::do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_set) noexcept {
+        inline error_code Cache::do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
             bool found; iterator at;
             try {
                 tie(found, at) = retrieve_item(key, hash);
@@ -292,9 +290,9 @@ namespace cachelot {
                 } else {
                     item_reassign_at(at, value, flags, expires, cas_value);
                 }
-                on_set(error::success, true);
+                return error::success;
             } catch (const std::bad_alloc &) {
-                on_set(error::out_of_memory, false);
+                return error::out_of_memory;
             }
         }
 

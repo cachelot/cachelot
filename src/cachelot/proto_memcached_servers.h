@@ -23,7 +23,7 @@ namespace cachelot {
     class text_tcp_server : public tcp_server<text_tcp_server, tcp_text_protocol_handler> {
         typedef tcp_server<text_tcp_server, tcp_text_protocol_handler> super;
     public:
-        text_tcp_server(io_service & ios, cache::ThreadSafeCache & the_cache)
+        text_tcp_server(io_service & ios, cache::Cache & the_cache)
             : super(ios)
             , cache(the_cache) {
         }
@@ -37,7 +37,7 @@ namespace cachelot {
         }
 
     private:
-        cache::ThreadSafeCache & cache;
+        cache::Cache & cache;
     };
 
 
@@ -48,7 +48,7 @@ namespace cachelot {
     class text_unix_server : public unix_stream_server<text_unix_server, unix_text_protocol_handler> {
         typedef unix_stream_server<text_unix_server, unix_text_protocol_handler> super;
     public:
-        explicit text_unix_server(asio::io_service & ios, cache::ThreadSafeCache & the_cache)
+        explicit text_unix_server(asio::io_service & ios, cache::Cache & the_cache)
             : super(ios)
             , cache(the_cache) {
         }
@@ -63,7 +63,7 @@ namespace cachelot {
         }
 
     private:
-        cache::ThreadSafeCache & cache;
+        cache::Cache & cache;
     };
 
 } } // namespace cachelot::memcached
