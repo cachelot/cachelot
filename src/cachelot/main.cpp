@@ -11,6 +11,7 @@
 using std::cerr;
 using std::endl;
 using namespace cachelot;
+using std::string;
 namespace po = boost::program_options;
 
 namespace  {
@@ -31,16 +32,30 @@ namespace  {
         signal(SIGQUIT, &on_signal_terminate);
     }
 
+    /// Command line arguments parser
     int parse_cmdline(int argc, const char * const argv[]) {
         po::options_description desc("Allowed options");
         desc.add_options()
             ("help,h", "produce help message")
-            ("tcp-port,p", po::value<uint16>(), "TCP port number to listen on (default: 11211)")
-            ("udp-port,U", po::value<uint16>(), "UDP port number to listen on (default: 11211, 0 is off)")
+            ("tcp-port,p", po::value<uint16>()->default_value(11211),   "TCP port number to listen on")
+            ("udp-port,U", po::value<uint16>()->default_value(11211),   "UDP port number to listen on (0 is off)")
+            ("socket,s",   po::value<string>(),                         "UNIX socket path to listen on")
+            ("socket_access,a", po::value<unsigned>(),                  "access mask for UNIX socket, in octal (default: 0700)")
+            ("listen,l",   po::value<std::vector<string>>(),
+                                                                        "interface to listen on (default: INADDR_ANY, all addresses)\n"
+                                                                        "<arg> may be specified as host:port. If you don't specify a port number,"
+                                                                        "the value you specified with -p or -U is used."
+                                                                        "You may specify multiple addresses separated by comma or by using -l multiple times")
+            ("daemon,d",   po::bool_switch()->default_value(false),     "run as a daemon")
+            ("OUM-error,M", po::bool_switch()->default_value(false),    "return error on memory exhausted (rather than removing items)")
+            ("no-cas,C",   po::bool_switch()->default_value(false),     "disable use of CAS (memory economy)")
+            ("memory,m",   po::value<unsigned>(),                       "max memory to use for items in megabytes (default: 64 MB)")
+
         ;
 
         po::variables_map varmap;
         po::store(po::parse_command_line(argc, argv, desc), varmap);
+        // TODO: May throw
         po::notify(varmap);
 
         if (varmap.count("help")) {
@@ -52,7 +67,19 @@ namespace  {
         }
         if (varmap.count("udp-port") == 1) {
             settings.net.UDP_port = varmap["udp-port"].as<uint16>();
+            if (settings.net.UDP_port != 0) {
+                settings.net.has_UDP = true;
+            } else {
+                settings.net.has_UDP = false;
+            }
         }
+        if (varmap.count("socket") == 1) {
+            settings.net.unix_socket = varmap["socket"].as<string>();
+            settings.net.has_unix_socket = true;
+        }
+        settings.cache.has_evictions = not varmap["OUM-error"].as<bool>();
+        settings.cache.has_CAS = not varmap["no-cas"].as<bool>();
+
         return 0;
     }
 }
