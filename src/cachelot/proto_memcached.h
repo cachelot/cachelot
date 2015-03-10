@@ -31,7 +31,7 @@ namespace cachelot {
     namespace memcached {
 
 // Primary table of all supported commands and their classes
-#define MEMCACHED_COMMANDS_ENUM(x)              \
+#define MEMCACHED_COMMANDS_ENUM(x)          \
         x(ADD, STORAGE_COMMAND)             \
         x(APPEND, STORAGE_COMMAND)          \
         x(CAS, STORAGE_COMMAND)             \
@@ -45,7 +45,6 @@ namespace cachelot {
         x(SET, STORAGE_COMMAND)             \
         x(TOUCH, TOUCH_COMMAND)             \
         x(QUIT, QUIT_COMMAND)               \
-        x(SYNC, SYNC_COMMAND)               \
         x(UNDEFINED, UNDEFINED_COMMAND)
 
 

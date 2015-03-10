@@ -1,4 +1,4 @@
-#include <cachelot/cachelot.h>
+#include <cachelot/common.h>
 #include <cachelot/error.h>
 
 namespace cachelot { namespace error {

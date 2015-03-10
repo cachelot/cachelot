@@ -1,4 +1,4 @@
-#include <cachelot/cachelot.h>
+#include <cachelot/common.h>
 #include <cachelot/proto_memcached_servers.h>
 #include <cachelot/cache.h>
 #include <cachelot/settings.h>

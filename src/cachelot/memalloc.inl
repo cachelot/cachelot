@@ -986,7 +986,7 @@ namespace cachelot {
             if (used_blk != nullptr) {
                 on_free_block(used_blk->memory());
                 block::unuse(used_blk);
-                unsigned attempt = 1;
+                // TODO: This particular merge breaks O(1) complexity
                 while (used_blk->size() < nsize) {
                     uint32 available_left = not used_blk->left_adjacent()->is_technical() ? used_blk->left_adjacent()->size() : 0;
                     uint32 available_right = not used_blk->right_adjacent()->is_technical() ? used_blk->right_adjacent()->size() : 0;

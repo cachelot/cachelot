@@ -87,7 +87,7 @@ namespace cachelot {
 
 
         /**
-         * Cache class to rule them all
+         * One cache class to rule them all
          *
          * @note Cache is *not* thread safe
          */
@@ -136,7 +136,7 @@ namespace cachelot {
             /**
              * `set` - store item unconditionally
              *
-             * @copydoc doxygen_store_command
+             * @return error indicates whether Item has stored because of an error (the most likely out of memory)
              */
             error_code do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
 
