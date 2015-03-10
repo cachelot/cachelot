@@ -105,7 +105,7 @@ namespace cachelot {
              * @param memory_size - amount of memory available for storage use
              * @param initial_dict_size - number of reserved items in dictionary
              */
-            explicit Cache(size_t memory_size, size_t initial_dict_size);
+            explicit Cache();
 
 
             /**
@@ -244,10 +244,10 @@ namespace cachelot {
         };
 
 
-        inline Cache::Cache(size_t memory_size, size_t initial_dict_size)
-            : memory_arena(new uint8[memory_size])
-            , m_allocator(raw_pointer(memory_arena), memory_size)
-            , m_dict(initial_dict_size) {
+        inline Cache::Cache()
+            : memory_arena(new uint8[settings.cache.memory_limit])
+            , m_allocator(raw_pointer(memory_arena), settings.cache.memory_limit)
+            , m_dict(settings.cache.initial_hash_table_size) {
         }
 
 

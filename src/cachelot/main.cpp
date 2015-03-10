@@ -64,8 +64,7 @@ int main(int argc, char * argv[]) {
             return EXIT_FAILURE;
         }
         // Cache Service
-        std::unique_ptr<cache::Cache> the_cache(new cache::Cache(settings.cache.memory_limit,
-                                                                                     settings.cache.initial_hash_table_size));
+        std::unique_ptr<cache::Cache> the_cache(new cache::Cache());
         // Signal handlers
         setup_signals();
 
