@@ -2,6 +2,7 @@
 #include <cachelot/cache.h>
 #include <cachelot/random.h>
 #include <cachelot/hash_fnv1a.h>
+#include <cachelot/settings.h>
 
 #include <iostream>
 #include <iomanip>
@@ -22,7 +23,7 @@ constexpr uint8 max_key_len = 40;
 constexpr uint32 min_value_len = 14;
 constexpr uint32 max_value_len = 40;
 
-/// Hash function
+// Hash function
 static auto calc_hash = fnv1a<cache::Cache::hash_type>::hasher();
 
 
@@ -47,7 +48,7 @@ constexpr cache::seconds forever = cache::seconds(0);
 
 class CacheWrapper {
 public:
-    CacheWrapper() : m_cache(cache_memory, hash_initial) {}
+    CacheWrapper() : m_cache() {}
 
     void set(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
@@ -121,6 +122,10 @@ static void warmup() {
 auto chance = random_int<size_t>(1, 100);
 
 int main(int /*argc*/, char * /*argv*/[]) {
+    // setup cache
+    settings.cache.memory_limit = cache_memory;
+    settings.cache.initial_hash_table_size = hash_initial;
+
     generate_test_data();
     warmup();
     reset_stats();
