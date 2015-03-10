@@ -1,5 +1,4 @@
 #include "unit_test.h"
-#include <cachelot/xrange.h>
 #include <cachelot/hash_table.h>
 
 namespace {
@@ -27,7 +26,7 @@ BOOST_AUTO_TEST_CASE(test_hash_table_operations) {
     BOOST_CHECK(the_dict.empty());
     BOOST_CHECK(the_dict.capacity() == DefaultCapacity);
     BOOST_CHECK(the_dict.size() == 0);
-    for (auto i : xrange<size_t>(DefaultCapacity)) {
+    for (size_t i = 0; i < DefaultCapacity; ++i) {
         BOOST_CHECK(the_dict.empty_at(i));
     }
     // store value
