@@ -1,5 +1,5 @@
-#ifndef CACHELOT_H_INCLUDED
-#define CACHELOT_H_INCLUDED
+#ifndef CACHELOT_COMMON_H_INCLUDED
+#define CACHELOT_COMMON_H_INCLUDED
 
 /// @defgroup common Generic code
 /// @{
@@ -33,7 +33,6 @@
 #include <tuple>    // std::tuple
 #include <thread>   // std::thread std::this_thread
 #include <cstring>  // std::memmove
-#include <emmintrin.h> // _mm_pause
 
 #define __CACHELOT_PP_STR1(X) #X
 #define CACHELOT_PP_STR(X) __CACHELOT_PP_STR1(X)
@@ -88,10 +87,6 @@ namespace cachelot {
         return ptr.get();
     }
 
-    inline void pause_cpu() noexcept {
-        _mm_pause();
-    }
-
     constexpr size_t cpu_l1d_cache_line = 64;
     constexpr int the_answer_to_life_the_universe_and_everything = 42;
 
@@ -99,5 +94,5 @@ namespace cachelot {
 
 /// @}
 
-#endif // CACHELOT_H_INCLUDED
+#endif // CACHELOT_COMMON_H_INCLUDED
 

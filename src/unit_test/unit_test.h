@@ -1,7 +1,7 @@
 #ifndef CACHELOT_UNIT_TEST_H_INCLUDED
 #define CACHELOT_UNIT_TEST_H_INCLUDED
 
-#include <cachelot/cachelot.h>
+#include <cachelot/common.h>
 #include <cachelot/random.h>
 
 #if defined(__GNUC__)

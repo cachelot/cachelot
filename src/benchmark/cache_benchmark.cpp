@@ -1,4 +1,4 @@
-#include <cachelot/cachelot.h>
+#include <cachelot/common.h>
 #include <cachelot/cache.h>
 #include <cachelot/random.h>
 #include <cachelot/hash_fnv1a.h>
@@ -96,6 +96,7 @@ array_type data_array;
 CacheWrapper csh;
 
 inline iterator random_pick() {
+    debug_assert(data_array.size() > 0);
     static random_int<array_type::size_type> rndelem(0, data_array.size() - 1);
     auto at = rndelem();
     return data_array.begin() + at;

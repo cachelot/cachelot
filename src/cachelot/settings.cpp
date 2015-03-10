@@ -1,4 +1,4 @@
-#include <cachelot/cachelot.h>
+#include <cachelot/common.h>
 #include <cachelot/settings.h>
 
 namespace cachelot {

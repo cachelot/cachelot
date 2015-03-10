@@ -2,8 +2,8 @@
 # For instance it is included in unit tests to simplify linking
 
 set (CACHELOT_SOURCES
-                ${CMAKE_CURRENT_LIST_DIR}/cachelot.h
-                ${CMAKE_CURRENT_LIST_DIR}/cachelot.cpp
+                ${CMAKE_CURRENT_LIST_DIR}/common.h
+                ${CMAKE_CURRENT_LIST_DIR}/common.cpp
                 ${CMAKE_CURRENT_LIST_DIR}/bits.h
                 ${CMAKE_CURRENT_LIST_DIR}/string_conv.h
                 ${CMAKE_CURRENT_LIST_DIR}/hash_table.h
