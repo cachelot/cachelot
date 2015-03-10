@@ -1,6 +1,5 @@
 #include "unit_test.h"
 #include <cachelot/memalloc.h>
-#include <cachelot/xrange.h>
 
 
 namespace {
