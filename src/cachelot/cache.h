@@ -381,11 +381,13 @@ namespace cachelot {
 
         inline tuple<error_code, Response> Cache::do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
             (void)key; (void)hash; (void)value; (void)flags; (void)expires; (void)cas_value;
+            return make_tuple(error::not_implemented, NOT_A_RESPONSE);
         }
 
 
         inline tuple<error_code, Response> Cache::do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
             (void)key; (void)hash; (void)value; (void)flags; (void)expires; (void)cas_value;
+            return make_tuple(error::not_implemented, NOT_A_RESPONSE);
         }
 
 

@@ -79,12 +79,12 @@ namespace cachelot {
         ostream_type serialize() noexcept { return ostream_type(this->send_buffer()); }
 
         cache::Command parse_command_name(const bytes command);
+        void handle_retrieval_command(cache::Command cmd, bytes args_buf);
         void handle_storage_command_header(cache::Command cmd, bytes args_buf);
         void handle_storage_command_data(cache::Command cmd, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply);
         void handle_delete_command(cache::Command cmd, bytes args_buf);
         void handle_arithmetic_command(cache::Command cmd, bytes args_buf);
         void handle_touch_command(cache::Command cmd, bytes args_buf);
-        void handle_retrieval_command(cache::Command cmd, bytes args_buf);
         void handle_service_command(cache::Command cmd, bytes args_buf);
 
         void validate_key(const bytes key);
@@ -163,10 +163,10 @@ namespace cachelot {
                 case cache::DELETE_COMMAND:
                     break;
                 case cache::ARITHMETIC_COMMAND:
-                    //handle_arithmetic_command(command_args);
+                    handle_arithmetic_command(cmd, command_args);
                     break;
                 case cache::TOUCH_COMMAND:
-                    //handle_touch_command(command_args);
+                    handle_touch_command(cmd, command_args);
                     break;
                 case cache::RETRIEVAL_COMMAND:
                     handle_retrieval_command(cmd, command_args);
@@ -182,7 +182,7 @@ namespace cachelot {
             }
             receive_command();
             return;
-        } catch(const cache_error & err) {
+        } catch(const memcached_error & err) {
             //this->flush(););
             // TODO: !!!!
         } catch(const std::exception & err) {
@@ -246,6 +246,25 @@ namespace cachelot {
 
 
     template <class Sock>
+    inline void text_protocol_handler<Sock>::handle_retrieval_command(cache::Command cmd, bytes args_buf) {
+        const bool send_cas = cmd == cache::GETS ? true : false;
+        do {
+            bytes key;
+            tie(key, args_buf) = args_buf.split(SPACE);
+            validate_key(key);
+            cache.do_get(key, calc_hash(key),
+                         [=](error_code cache_error, bool found, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value) {
+                             // TODO: What if error?
+                             if (not cache_error && found) { push_item(key, value, flags, cas_value, send_cas); }
+                         });
+        } while (args_buf);
+        static const bytes END = bytes::from_literal("END");
+        serialize() << END << CRLF;
+        flush();
+    }
+
+
+    template <class Sock>
     inline void text_protocol_handler<Sock>::handle_storage_command_header(cache::Command cmd, bytes arguments_buf) {
         // command arguments
         bytes key;
@@ -304,23 +323,24 @@ namespace cachelot {
         receive_command();
     }
 
+
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_retrieval_command(cache::Command cmd, bytes args_buf) {
-        const bool send_cas = cmd == cache::GETS ? true : false;
-        do {
-            bytes key;
-            tie(key, args_buf) = args_buf.split(SPACE);
-            validate_key(key);
-            cache.do_get(key, calc_hash(key),
-                [=](error_code cache_error, bool found, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value) {
-                    // TODO: What if error?
-                    if (not cache_error && found) { push_item(key, value, flags, cas_value, send_cas); }
-                });
-        } while (args_buf);
-        static const bytes END = bytes::from_literal("END");
-        serialize() << END << CRLF;
+    inline void text_protocol_handler<Sock>::handle_arithmetic_command(cache::Command cmd, bytes args_buf) {
+        (void) cmd; (void) args_buf;
+        // TODO: Implementation
+        send_server_error(error::not_implemented);
         flush();
     }
+
+
+    template <class Sock>
+    inline void text_protocol_handler<Sock>::handle_touch_command(cache::Command cmd, bytes args_buf) {
+        (void) cmd; (void) args_buf;
+        // TODO: Implementation
+        send_server_error(error::not_implemented);
+        flush();
+    }
+
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_service_command(cache::Command cmd, bytes args_buf) {
