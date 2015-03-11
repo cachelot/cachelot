@@ -7,7 +7,7 @@ CACHELOT="/home/rider/workspace/cachelot/bin/release/cachelot"
 MEMCACHED="/usr/bin/memcached"
 NUM_ITEMS=100000
 NUM_WARMUP_ITERATIONS=2
-NUM_REPEATS=1
+NUM_REPEATS=16
 
 function ssh_command() {
     ssh "$REMOTE_SSH" "$*"
