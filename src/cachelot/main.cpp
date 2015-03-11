@@ -3,10 +3,18 @@
 #include <cachelot/cache.h>
 #include <cachelot/settings.h>
 
+#if defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wall"
+#endif
+
 #include <iostream>
 #include <boost/program_options.hpp>
-
 #include <signal.h>
+
+#if defined(__GNUC__)
+#  pragma GCC diagnostic pop
+#endif
 
 using std::cerr;
 using std::endl;
