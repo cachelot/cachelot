@@ -198,47 +198,50 @@ namespace cachelot {
 
     template <class Sock>
     inline cache::Command text_protocol_handler<Sock>::parse_command_name(const bytes command) {
-        if (not command) {
-            return cache::UNDEFINED;
+        const auto is_3 = [=](const char literal[4]) -> bool { return *command.nth(1) == literal[1] && *command.nth(2) == literal[2]; };
+        const auto is_4 = [=](const char literal[5]) -> bool { return is_3(literal) && *command.nth(3) == literal[3]; };
+        const auto is_5 = [=](const char literal[6]) -> bool { return is_4(literal) && *command.nth(4) == literal[4]; };
+        const auto is_6 = [=](const char literal[7]) -> bool { return is_5(literal) && *command.nth(5) == literal[5]; };
+        const auto is_7 = [=](const char literal[8]) -> bool { return is_6(literal) && *command.nth(6) == literal[6]; };
+
+        if (command) {
+            const char first_char = command[0];
+            switch (command.length()) {
+            case 3:
+                switch (first_char) {
+                case 'a': return is_3("add") ? cache::ADD : cache::UNDEFINED;
+                case 'c': return is_3("cas") ? cache::CAS : cache::UNDEFINED;
+                case 'g': return is_3("get") ? cache::GET : cache::UNDEFINED;
+                case 's': return is_3("set") ? cache::SET : cache::UNDEFINED;
+                default : return cache::UNDEFINED;
+                }
+            case 4:
+                switch (first_char) {
+                case 'd': return is_4("decr") ? cache::DECR : cache::UNDEFINED;
+                case 'g': return is_4("gets") ? cache::GETS : cache::UNDEFINED;
+                case 'i': return is_4("incr") ? cache::INCR : cache::UNDEFINED;
+                case 'q': return is_4("quit") ? cache::QUIT : cache::UNDEFINED;
+                default : return cache::UNDEFINED;
+                }
+            case 5:
+                return is_5("touch") ? cache::TOUCH : cache::UNDEFINED;
+            case 6:
+                switch (first_char) {
+                case 'a': return is_6("append") ? cache::APPEND : cache::UNDEFINED;
+                case 'd': return is_6("delete") ? cache::DELETE : cache::UNDEFINED;
+                default : return cache::UNDEFINED;
+                }
+            case 7:
+                switch (first_char) {
+                case 'p': return is_7("prepend") ? cache::PREPEND : cache::UNDEFINED;
+                case 'r': return is_7("replace") ? cache::REPLACE : cache::UNDEFINED;
+                default : return cache::UNDEFINED;
+                }
+            default : 
+                return cache::UNDEFINED;
+            }
         }
-        const auto is_ = [=](const char * literal) -> bool {
-            return std::strncmp(command.begin(), literal, command.length()) == 0;
-        };
-        const char first_char = command[0];
-        switch (command.length()) {
-        case 3:
-            switch (first_char) {
-            case 'a': return is_("add") ? cache::ADD : cache::UNDEFINED;
-            case 'c': return is_("cas") ? cache::CAS : cache::UNDEFINED;
-            case 'g': return is_("get") ? cache::GET : cache::UNDEFINED;
-            case 's': return is_("set") ? cache::SET : cache::UNDEFINED;
-            default : return cache::UNDEFINED;
-            }
-        case 4:
-            switch (first_char) {
-            case 'd': return is_("decr") ? cache::DECR : cache::UNDEFINED;
-            case 'g': return is_("gets") ? cache::GETS : cache::UNDEFINED;
-            case 'i': return is_("incr") ? cache::INCR : cache::UNDEFINED;
-            case 'q': return is_("quit") ? cache::QUIT : cache::UNDEFINED;
-            default : return cache::UNDEFINED;
-            }
-        case 5:
-            return is_("touch") ? cache::TOUCH : cache::UNDEFINED;
-        case 6:
-            switch (first_char) {
-            case 'a': return is_("append") ? cache::APPEND : cache::UNDEFINED;
-            case 'd': return is_("delete") ? cache::DELETE : cache::UNDEFINED;
-            default : return cache::UNDEFINED;
-            }
-        case 7:
-            switch (first_char) {
-            case 'p': return is_("prepend") ? cache::PREPEND : cache::UNDEFINED;
-            case 'r': return is_("replace") ? cache::REPLACE : cache::UNDEFINED;
-            default : return cache::UNDEFINED;
-            }
-        default : 
-            return cache::UNDEFINED;
-        }
+        return cache::UNDEFINED;
     }
 
 
@@ -316,12 +319,14 @@ namespace cachelot {
         } while (args_buf);
         static const bytes END = bytes::from_literal("END");
         serialize() << END << CRLF;
-        this->flush();
+        flush();
     }
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_service_command(cache::Command cmd, bytes args_buf) {
-        (void)args_buf;
+        (void) cmd; (void) args_buf;
+        send_server_error(error::not_implemented);
+        flush();
     }
 
 
@@ -353,6 +358,7 @@ namespace cachelot {
     template <class Sock>
     inline void text_protocol_handler<Sock>::on_error(const error_code error) noexcept {
         debug_assert(error);
+        (void) error;
         suicide();
     }
 
@@ -362,8 +368,8 @@ namespace cachelot {
         // 'suicide' can be called several times from background operation handlers
         // we must ensure that it'll be only one attempt to delete this object
         if (! m_killed) {
+            super::close();
             m_killed = true;
-            // TODO: Race! Unprocessed AsyncRequests in Cache would get invalid `this` pointer in their callbacks
             super::post([=](){ delete this; });
         }
     }

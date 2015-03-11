@@ -15,7 +15,8 @@ namespace cachelot {
     // Note: all error codes declared in `error` namespace, so use as `error::unknown_error`
     #define APPLICATION_ERROR_ENUM(apply) \
         apply(unknown_error, "Unknown error") \
-        apply(out_of_memory, "Out of memory")
+        apply(out_of_memory, "Out of memory") \
+        apply(not_implemented, "Not implemented")
 
     /// system error handling
     using boost::system::error_code;      // boost::error is used rather than std's because it is used by boost::asio
