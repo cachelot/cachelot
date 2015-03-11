@@ -71,28 +71,28 @@ namespace cachelot {
         void send_server_error(const error_code error) noexcept;
 
         /// send standard response to the client
-        void send_response(const Response res) noexcept;
+        void send_response(const cache::Response res) noexcept;
 
         /// add single item to the send buffer
         void push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value, bool send_cas) noexcept;
 
         ostream_type serialize() noexcept { return ostream_type(this->send_buffer()); }
 
-        Command parse_command_name(const bytes command);
-        void handle_storage_command_header(Command cmd, bytes args_buf);
-        void handle_storage_command_data(Command cmd, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply);
-        void handle_delete_command(Command cmd, bytes args_buf);
-        void handle_arithmetic_command(Command cmd, bytes args_buf);
-        void handle_touch_command(Command cmd, bytes args_buf);
-        void handle_retrieval_command(Command cmd, bytes args_buf);
-        void handle_service_command(Command cmd, bytes args_buf);
+        cache::Command parse_command_name(const bytes command);
+        void handle_storage_command_header(cache::Command cmd, bytes args_buf);
+        void handle_storage_command_data(cache::Command cmd, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply);
+        void handle_delete_command(cache::Command cmd, bytes args_buf);
+        void handle_arithmetic_command(cache::Command cmd, bytes args_buf);
+        void handle_touch_command(cache::Command cmd, bytes args_buf);
+        void handle_retrieval_command(cache::Command cmd, bytes args_buf);
+        void handle_service_command(cache::Command cmd, bytes args_buf);
 
         void validate_key(const bytes key);
         bool maybe_noreply(const bytes buffer);
 
     private:
         cache::Cache & cache;
-        const HashFunction calc_hash;
+        const cache::HashFunction calc_hash;
         bool m_killed;
     };
 
@@ -126,7 +126,7 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::send_response(const Response res) noexcept {
+    inline void text_protocol_handler<Sock>::send_response(const cache::Response res) noexcept {
         serialize() << AsciiResponse(res) << CRLF;
         flush();
     }
@@ -155,25 +155,25 @@ namespace cachelot {
             } else {
                 command_name = command_name.rtrim_n(CRLF.length());
             }
-            Command cmd = parse_command_name(command_name);
+            cache::Command cmd = parse_command_name(command_name);
             switch (ClassOfCommand(cmd)) {
-                case STORAGE_COMMAND:
+                case cache::STORAGE_COMMAND:
                     handle_storage_command_header(cmd, command_args);
                     return;
-                case DELETE_COMMAND:
+                case cache::DELETE_COMMAND:
                     break;
-                case ARITHMETIC_COMMAND:
+                case cache::ARITHMETIC_COMMAND:
                     //handle_arithmetic_command(command_args);
                     break;
-                case TOUCH_COMMAND:
+                case cache::TOUCH_COMMAND:
                     //handle_touch_command(command_args);
                     break;
-                case RETRIEVAL_COMMAND:
+                case cache::RETRIEVAL_COMMAND:
                     handle_retrieval_command(cmd, command_args);
                     break;
-                case SERVICE_COMMAND:
+                case cache::SERVICE_COMMAND:
                     handle_service_command(cmd, command_args);
-                case QUIT_COMMAND:
+                case cache::QUIT_COMMAND:
                     super::close();
                     suicide();
                     return;
@@ -182,7 +182,7 @@ namespace cachelot {
             }
             receive_command();
             return;
-        } catch(const memcached_error & err) {
+        } catch(const cache_error & err) {
             //this->flush(););
             // TODO: !!!!
         } catch(const std::exception & err) {
@@ -197,9 +197,9 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline Command text_protocol_handler<Sock>::parse_command_name(const bytes command) {
+    inline cache::Command text_protocol_handler<Sock>::parse_command_name(const bytes command) {
         if (not command) {
-            return UNDEFINED;
+            return cache::UNDEFINED;
         }
         const auto is_ = [=](const char * literal) -> bool {
             return std::strncmp(command.begin(), literal, command.length()) == 0;
@@ -208,42 +208,42 @@ namespace cachelot {
         switch (command.length()) {
         case 3:
             switch (first_char) {
-            case 'a': return is_("add") ? ADD : UNDEFINED;
-            case 'c': return is_("cas") ? CAS : UNDEFINED;
-            case 'g': return is_("get") ? GET : UNDEFINED;
-            case 's': return is_("set") ? SET : UNDEFINED;
-            default : return UNDEFINED;
+            case 'a': return is_("add") ? cache::ADD : cache::UNDEFINED;
+            case 'c': return is_("cas") ? cache::CAS : cache::UNDEFINED;
+            case 'g': return is_("get") ? cache::GET : cache::UNDEFINED;
+            case 's': return is_("set") ? cache::SET : cache::UNDEFINED;
+            default : return cache::UNDEFINED;
             }
         case 4:
             switch (first_char) {
-            case 'd': return is_("decr") ? DECR : UNDEFINED;
-            case 'g': return is_("gets") ? GETS : UNDEFINED;
-            case 'i': return is_("incr") ? INCR : UNDEFINED;
-            case 'q': return is_("quit") ? QUIT : UNDEFINED;
-            default : return UNDEFINED;
+            case 'd': return is_("decr") ? cache::DECR : cache::UNDEFINED;
+            case 'g': return is_("gets") ? cache::GETS : cache::UNDEFINED;
+            case 'i': return is_("incr") ? cache::INCR : cache::UNDEFINED;
+            case 'q': return is_("quit") ? cache::QUIT : cache::UNDEFINED;
+            default : return cache::UNDEFINED;
             }
         case 5:
-            return is_("touch") ? TOUCH : UNDEFINED;
+            return is_("touch") ? cache::TOUCH : cache::UNDEFINED;
         case 6:
             switch (first_char) {
-            case 'a': return is_("append") ? APPEND : UNDEFINED;
-            case 'd': return is_("delete") ? DELETE : UNDEFINED;
-            default : return UNDEFINED;
+            case 'a': return is_("append") ? cache::APPEND : cache::UNDEFINED;
+            case 'd': return is_("delete") ? cache::DELETE : cache::UNDEFINED;
+            default : return cache::UNDEFINED;
             }
         case 7:
             switch (first_char) {
-            case 'p': return is_("prepend") ? PREPEND : UNDEFINED;
-            case 'r': return is_("replace") ? REPLACE : UNDEFINED;
-            default : return UNDEFINED;
+            case 'p': return is_("prepend") ? cache::PREPEND : cache::UNDEFINED;
+            case 'r': return is_("replace") ? cache::REPLACE : cache::UNDEFINED;
+            default : return cache::UNDEFINED;
             }
         default : 
-            return UNDEFINED;
+            return cache::UNDEFINED;
         }
     }
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_storage_command_header(Command cmd, bytes arguments_buf) {
+    inline void text_protocol_handler<Sock>::handle_storage_command_header(cache::Command cmd, bytes arguments_buf) {
         // command arguments
         bytes key;
         tie(key, arguments_buf) = arguments_buf.split(SPACE);
@@ -259,7 +259,7 @@ namespace cachelot {
             throw client_error("Maximum value length exceeded");
         }
         cache::cas_value_type cas_unique = 0;
-        if (cmd == CAS) {
+        if (cmd == cache::CAS) {
             tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
             cas_unique = str_to_int<cache::cas_value_type>(parsed.begin(), parsed.length());
         }
@@ -287,19 +287,10 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_storage_command_data(Command cmd, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply) {
-        error_code cache_error; Response response;
+    inline void text_protocol_handler<Sock>::handle_storage_command_data(cache::Command cmd, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply) {
         const auto hash = calc_hash(key);
-        switch(cmd) {
-        case SET:
-            cache_error = cache.do_set(key, hash, value, flags, expires_after, cas_unique);
-            response = STORED;
-            break;
-        default:
-            debug_assert(false);
-        }
-
-
+        error_code cache_error; cache::Response response;
+        tie(cache_error, response) = cache.do_storage(cmd, key, hash, value, flags, expires_after, cas_unique);
         if (not cache_error) {
             if (not noreply) {
                 send_response(response);
@@ -311,8 +302,8 @@ namespace cachelot {
     }
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_retrieval_command(Command cmd, bytes args_buf) {
-        const bool send_cas = cmd == GETS ? true : false;
+    inline void text_protocol_handler<Sock>::handle_retrieval_command(cache::Command cmd, bytes args_buf) {
+        const bool send_cas = cmd == cache::GETS ? true : false;
         do {
             bytes key;
             tie(key, args_buf) = args_buf.split(SPACE);
@@ -329,7 +320,7 @@ namespace cachelot {
     }
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_service_command(Command cmd, bytes args_buf) {
+    inline void text_protocol_handler<Sock>::handle_service_command(cache::Command cmd, bytes args_buf) {
         (void)args_buf;
     }
 

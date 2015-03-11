@@ -1,6 +1,9 @@
 #ifndef CACHELOT_CACHE_H_INCLUDED
 #define CACHELOT_CACHE_H_INCLUDED
 
+#ifndef CACHELOT_CACHE_DEFS_H_INCLUDED
+#  include <cachelot/cache_defs.h>
+#endif
 #ifndef CACHELOT_MEMALLOC_H_INCLUDED
 #  include <cachelot/memalloc.h>
 #endif
@@ -9,6 +12,9 @@
 #endif
 #ifndef CACHELOT_DICT_H_INCLUDED
 #  include <cachelot/dict.h>
+#endif
+#ifndef CACHELOT_HASH_FNV1A_H_INCLUDED
+#  include <cachelot/hash_fnv1a.h>
 #endif
 #ifndef CACHELOT_ERROR_H_INCLUDED
 #  include <cachelot/error.h>
@@ -24,19 +30,27 @@ namespace cachelot {
 
     /// @ref cache
     namespace cache {
-
         /// Pointer to single cache Item
         typedef Item * ItemPtr;
+
         /// Hash value type
         typedef Item::hash_type hash_type;
+
+        /// Hashing algorithm
+        typedef fnv1a<cache::hash_type>::hasher HashFunction;
+
         /// Clock to maintain expiration
         typedef Item::clock clock;
+
         /// Expiration time point
         typedef Item::expiration_time_point expiration_time_point;
+
         /// User defined flags
         typedef Item::opaque_flags_type opaque_flags_type;
+
         /// Value type of CAS operation
         typedef Item::cas_value_type cas_value_type;
+
         /// Maximum key length in bytes
         static constexpr auto max_key_length = Item::max_key_length;
 
@@ -117,7 +131,7 @@ namespace cachelot {
              * @code
              *    void on_get(error_code error, bool found, bytes value, opaque_flags_type flags, cas_value_type cas_value)
              * @endcode
-             * @note Key/value pointers may not be valid outside of this call.
+             * @warning Key/value pointers may not be valid outside of callback.
              */
             template <typename Callback>
             void do_get(const bytes key, const hash_type hash, Callback on_get) noexcept;
@@ -126,59 +140,60 @@ namespace cachelot {
             /**
              * @class doxygen_store_command
              *
-             * @tparam Callback - callback will be called when request is completed
-             * Callback must have following signature:
-             * @code
-             *    void on_complete(error_code error, bool stored)
-             * @endcode
+             * @return `tuple<error_code, Response>`
+             *  - error: indicates that Item has *not* stored because of an error (the most likely out of memory)
+             *  - Response: one of a possible cache responses
              */
+
+
+            /**
+             * execute on of the storage command
+             *
+             * @copydoc doxygen_store_command
+             */
+            tuple<error_code, Response> do_storage(Command cmd, const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
 
             /**
              * `set` - store item unconditionally
              *
-             * @return error indicates whether Item has stored because of an error (the most likely out of memory)
+             * @copydoc doxygen_store_command
              */
-            error_code do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+            tuple<error_code, Response> do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
 
             /**
              * `add` - store non-existing item
              *
              * @copydoc doxygen_store_command
              */
-            template <typename Callback>
-            void do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_add) noexcept;
+            tuple<error_code, Response> do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
 
             /**
              * `replace` - modify existing item
              *
              * @copydoc doxygen_store_command
              */
-            template <typename Callback>
-            void do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_replace) noexcept;
+            tuple<error_code, Response> do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
 
             /**
              * `cas` - compare-and-swap items
              *
              * @copydoc doxygen_store_command
              */
-            template <typename Callback>
-            void do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_cas) noexcept;
+            tuple<error_code, Response> do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
 
             /**
              * `append` - write additional data 'after' existing item data
              *
              * @copydoc doxygen_store_command
              */
-            template <typename Callback>
-            void do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_append) noexcept;
+            tuple<error_code, Response> do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
 
             /**
              * `prepend` - write additional data 'before' existing item data
              *
              * @copydoc doxygen_store_command
              */
-            template <typename Callback>
-            void do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_prepend) noexcept;
+            tuple<error_code, Response> do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
 
             /**
              * `del` - delete existing item
@@ -189,8 +204,7 @@ namespace cachelot {
              *    void on_del(error_code error, bool deleted)
              * @endcode
              */
-            template <typename Callback>
-            void do_del(const bytes key, const hash_type hash, Callback on_del) noexcept;
+            tuple<error_code, Response> do_del(const bytes key, const hash_type hash) noexcept;
 
             /**
              * `touch` - prolong item lifetime
@@ -201,8 +215,7 @@ namespace cachelot {
              *    void on_touch(error_code error, bool touched)
              * @endcode
              */
-            template <typename Callback>
-            void do_touch(const bytes key, const hash_type hash, seconds expires, Callback on_touch) noexcept;
+            tuple<error_code, Response> do_touch(const bytes key, const hash_type hash, seconds expires) noexcept;
 
         private:
             /**
@@ -280,7 +293,27 @@ namespace cachelot {
         }
 
 
-        inline error_code Cache::do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
+        inline tuple<error_code, Response> Cache::do_storage(Command cmd, const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
+            switch (cmd) {
+            case SET:
+                return do_set(key, hash, value, flags, expires, cas_value);
+            case ADD:
+                return do_add(key, hash, value, flags, expires, cas_value);
+            case REPLACE:
+                return do_replace(key, hash, value, flags, expires, cas_value);
+            case APPEND:
+                return do_append(key, hash, value, flags, expires, cas_value);
+            case PREPEND:
+                return do_prepend(key, hash, value, flags, expires, cas_value);
+            default:
+                debug_assert(false);
+                return make_tuple(error::unknown_error, NOT_A_RESPONSE);
+            }
+        }
+
+
+
+        inline tuple<error_code, Response> Cache::do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
             bool found; iterator at;
             try {
                 tie(found, at) = retrieve_item(key, hash);
@@ -290,15 +323,14 @@ namespace cachelot {
                 } else {
                     item_reassign_at(at, value, flags, expires, cas_value);
                 }
-                return error::success;
+                return make_tuple(error::success, STORED);
             } catch (const std::bad_alloc &) {
-                return error::out_of_memory;
+                return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
             }
         }
 
 
-        template <typename Callback>
-        inline void Cache::do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_add) noexcept {
+        inline tuple<error_code, Response> Cache::do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
             bool found; iterator at;
             try {
                 tie(found, at) = retrieve_item(key, hash);
@@ -306,48 +338,58 @@ namespace cachelot {
                     auto item = item_new(key, hash, value, flags, expires, cas_value);
                     m_dict.insert(at, key, hash, item);
                 }
-                on_add(error::success, not found);
+                return make_tuple(error::success, not found ? STORED : NOT_STORED);
             } catch (const std::bad_alloc &) {
-                on_add(error::out_of_memory, false);
+                return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
             }
         }
 
 
-        template <typename Callback>
-        inline void Cache::do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_replace) noexcept {
+        inline tuple<error_code, Response> Cache::do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
             bool found; iterator at;
             try {
                 tie(found, at) = retrieve_item(key, hash);
                 if (found) {
                     item_reassign_at(at, value, flags, expires, cas_value);
                 }
-                on_replace(error::success, found);
+                return make_tuple(error::success, found ? STORED : NOT_STORED);
             } catch (const std::bad_alloc &) {
-                on_replace(error::out_of_memory, false);
+                return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
             }
         }
 
 
-        template <typename Callback>
-        inline void Cache::do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_cas) noexcept {
+        inline tuple<error_code, Response> Cache::do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_unique) noexcept {
+            bool found; iterator at;
+            try {
+                tie(found, at) = retrieve_item(key, hash);
+                if (found) {
+                    if (cas_unique == at.value()->cas_value()) {
+                        item_reassign_at(at, value, flags, expires, cas_unique);
+                        return make_tuple(error::success, STORED);
+                    } else {
+                        return make_tuple(error::success, EXISTS);
+                    }
+                } else {
+                    return make_tuple(error::success, NOT_FOUND);
+                }
+            } catch (const std::bad_alloc &) {
+                return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
+            }
+        }
+
+
+        inline tuple<error_code, Response> Cache::do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
             (void)key; (void)hash; (void)value; (void)flags; (void)expires; (void)cas_value;
         }
 
 
-        template <typename Callback>
-        inline void Cache::do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_append) noexcept {
+        inline tuple<error_code, Response> Cache::do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
             (void)key; (void)hash; (void)value; (void)flags; (void)expires; (void)cas_value;
         }
 
 
-        template <typename Callback>
-        inline void Cache::do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value, Callback on_prepend) noexcept {
-            (void)key; (void)hash; (void)value; (void)flags; (void)expires; (void)cas_value;
-        }
-
-
-        template <typename Callback>
-        inline void Cache::do_del(const bytes key, const hash_type hash, Callback on_del) noexcept {
+        inline tuple<error_code, Response> Cache::do_del(const bytes key, const hash_type hash) noexcept {
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
@@ -355,18 +397,17 @@ namespace cachelot {
                 m_dict.remove(at);
                 item_free(item);
             }
-            on_del(error::success, found);
+            return make_tuple(error::success, found ? DELETED : NOT_FOUND);
         }
 
 
-        template <typename Callback>
-        inline void Cache::do_touch(const bytes key, const hash_type hash, seconds expires, Callback on_touch) noexcept {
+        inline tuple<error_code, Response> Cache::do_touch(const bytes key, const hash_type hash, seconds expires) noexcept {
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
                 at.value()->touch(time_from(expires));
             }
-            on_touch(error::success, found);
+            return make_tuple(error::success, found ? TOUCHED : NOT_FOUND);
         }
 
 
