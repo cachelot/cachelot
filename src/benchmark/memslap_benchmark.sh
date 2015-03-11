@@ -1,13 +1,13 @@
 #!/bin/sh
 
-REMOTE_SSH="centos-dev"
-SERVER_ADDR="10.37.129.3"
+REMOTE_SSH="servantus"
+SERVER_ADDR="192.168.0.114"
 MEMSLAP="$HOME/workspace/libmemcached-1.0.18/clients/memslap"
 CACHELOT="/home/rider/workspace/cachelot/bin/release/cachelot"
 MEMCACHED="/usr/bin/memcached"
 NUM_ITEMS=100000
 NUM_WARMUP_ITERATIONS=2
-NUM_ITERATIONS=10
+NUM_REPEATS=1
 
 function ssh_command() {
     ssh "$REMOTE_SSH" "$*"
@@ -15,8 +15,10 @@ function ssh_command() {
 }
 
 function ssh_bg_command() {
-    echo "running \"$*\" ..."
-    ssh -n -f "$REMOTE_SSH" "sh -c 'nohup $* > /dev/null 2>&1 < /dev/null &' "
+    local remote_command=$(echo "nohup $* > /dev/null 2>&1 < /dev/null & ; sleep .3 ; ps -p \$! > /dev/null || exit 1")
+    echo "running \"$remote_command\" ..."
+    ssh "$REMOTE_SSH" "$remote_command" || exit 1
+    sleep 2
 }
 
 function memslap() {
@@ -24,16 +26,17 @@ function memslap() {
     local the_test="$2"
     local times="$3"
     local concurrency="$4"
-    # Behold! Mighty bash
-    $MEMSLAP -s $(echo "$servers" | sed 's/\([^ :]\+\)[ :]\([0-9]\+\),\?/\"\1\" \"\2\" /'g) "--test=$the_test" "--execute-number=$times" "--concurrency=$concurrency" || exit 1
-    # Ok seriously, memslap requires that -s host port were 3 different arguments, so I quote them
+    # Unwrap quoted arguments
+    local memslap_cmd=$(echo "$MEMSLAP $servers --test=$the_test --execute-number=$times --concurrency=$concurrency")
+    echo "running $memslap_cmd"
+    eval $memslap_cmd 2>&1 | tee /dev/tty | grep --color "CONNECTION FAILURE" && exit 1
 }
 
 
 function stop_cachelot_and_memcached() {
     ssh_command killall "memcached" 2>/dev/null
     ssh_command killall "cachelot" 2>/dev/null
-    sleep 20  # socket stays used sometimes
+    sleep 2
 }
 
 function warmup() {
@@ -52,13 +55,13 @@ function run_test_for() {
     local execute_times=$NUM_ITEMS
     # memory consumption is too much
     [ $concurrency -gt 16 ] && [ $execute_times -gt 10000 ] && let "execute_times = 10000"
-    warmup "$servers"
+    #warmup "$servers"
     echo " * set $execute_times items, concurrency: $concurrency"
-    for t in $(seq 1 $NUM_ITERATIONS); do
+    for t in $(seq 1 $NUM_REPEATS); do
         memslap "$servers" "set" "$execute_times"  "$concurrency"
     done
     echo " * get $execute_times items, concurrency: $concurrency"
-    for t in $(seq 1 $NUM_ITERATIONS); do
+    for t in $(seq 1 $NUM_REPEATS); do
         memslap "$servers" "get" "$execute_times"  "$concurrency"
     done
 }
@@ -66,23 +69,24 @@ function run_test_for() {
 function execute_benchmark() {
     local concurrency=$1
     echo "*** CONCURRENCY: $concurrency ******************************"
-    echo "+++ memcached"
-    ssh_bg_command $MEMCACHED -p 11211
-    run_test_for "$SERVER_ADDR 11211" "$concurrency"
     stop_cachelot_and_memcached
     echo "+++ cachelot"
-    ssh_bg_command $CACHELOT -p 11211
-    run_test_for "$SERVER_ADDR 11211" "$concurrency"
+    ssh_bg_command $CACHELOT -p 11212
+    run_test_for "-s $SERVER_ADDR:11212" "$concurrency"
+    stop_cachelot_and_memcached
+    echo "+++ memcached"
+    ssh_bg_command $MEMCACHED -p 11211
+    run_test_for "-s $SERVER_ADDR:11211" "$concurrency"
     stop_cachelot_and_memcached
     echo "+++ memcached cluster"
-    ssh_bg_command $MEMCACHED -p 11211
-    ssh_bg_command $MEMCACHED -p 11212
-    run_test_for "$SERVER_ADDR 11211,$SERVER_ADDR 11212" "$concurrency"
+    ssh_bg_command $MEMCACHED -p 11213
+    ssh_bg_command $MEMCACHED -p 11214
+    run_test_for "-s $SERVER_ADDR:11213 -s $SERVER_ADDR:11214" "$concurrency"
     stop_cachelot_and_memcached
     echo "+++ cachelot cluster"
-    ssh_bg_command $CACHELOT -p 11211
-    ssh_bg_command $CACHELOT -p 11212
-    run_test_for "$SERVER_ADDR 11211,$SERVER_ADDR 11212" "$concurrency"
+    ssh_bg_command $CACHELOT -p 11215
+    ssh_bg_command $CACHELOT -p 11216
+    run_test_for "-s $SERVER_ADDR:11215 -s $SERVER_ADDR:11216" "$concurrency"
     stop_cachelot_and_memcached
 }
 
