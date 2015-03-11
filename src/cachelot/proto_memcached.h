@@ -53,19 +53,19 @@ namespace cachelot {
 
         /// TODO: replace exception classes with error_code / system_error
         /// exception class that indicates request execution error
-        struct cache_error : public std::runtime_error {
-            explicit cache_error(const char * msg) : std::runtime_error(msg) {}
-            explicit cache_error(const string & msg) : std::runtime_error(msg) {}
+        struct memcached_error : public std::runtime_error {
+            explicit memcached_error(const char * msg) : std::runtime_error(msg) {}
+            explicit memcached_error(const string & msg) : std::runtime_error(msg) {}
         };
 
         /// exception class that indicates that given comman is unknown
-        struct non_existing_command_error : cache_error {
-            non_existing_command_error() : cache_error("ERROR") {}
+        struct non_existing_command_error : memcached_error {
+            non_existing_command_error() : memcached_error("ERROR") {}
         };
 
         /// exception class that indicates error in client request
-        struct client_error : public cache_error {
-            explicit client_error(const char * msg) : cache_error(msg) {}
+        struct client_error : public memcached_error {
+            explicit client_error(const char * msg) : memcached_error(msg) {}
         };
 
 
