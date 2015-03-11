@@ -28,6 +28,10 @@ namespace cachelot {
             , cache(the_cache) {
         }
 
+        ~text_tcp_server() {
+            super::stop();
+        }
+
         tcp_text_protocol_handler * new_connection() {
             return tcp_text_protocol_handler::create(super::get_io_service(), cache);
         }
@@ -51,6 +55,10 @@ namespace cachelot {
         explicit text_unix_server(asio::io_service & ios, cache::Cache & the_cache)
             : super(ios)
             , cache(the_cache) {
+        }
+
+        ~text_unix_server() {
+            super::stop();
         }
 
         unix_text_protocol_handler * new_connection() {
