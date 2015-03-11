@@ -48,7 +48,7 @@ namespace cachelot { namespace net {
         }
 
         /// interrupt all activity
-        void stop() {
+        void stop() noexcept {
             error_code __;
             m_acceptor.close(__);
         }
