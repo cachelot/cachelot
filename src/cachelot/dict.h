@@ -133,7 +133,7 @@ namespace cachelot {
         dict & operator= (const dict &) = delete;
 
         /// @copydoc hash_table::get
-        tuple<bool, mapped_type> get(const key_type key, const hash_type hash) const {
+        tuple<bool, mapped_type> get(const key_type key, const hash_type hash) const noexcept {
             if (not is_expanding()) {
                 return m_primary_tbl->get(key, hash);
             } else {
@@ -180,7 +180,7 @@ namespace cachelot {
         }
 
         /// @copydoc hash_table::remove
-        void remove(iterator where) {
+        void remove(iterator where) noexcept {
             hash_table_type * table = where.m_table;
             debug_assert(raw_pointer(m_primary_tbl) == table ||  raw_pointer(m_secondary_tbl) == table);
             return table->remove(where.m_pos);
