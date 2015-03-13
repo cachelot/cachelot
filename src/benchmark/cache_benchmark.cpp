@@ -44,7 +44,7 @@ typedef std::tuple<string, string> kv_type;
 typedef std::vector<kv_type> array_type;
 typedef array_type::const_iterator iterator;
 
-constexpr cache::seconds forever = cache::seconds(0);
+constexpr auto forever = cache::seconds(0);
 
 class CacheWrapper {
 public:
@@ -53,7 +53,8 @@ public:
     void set(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
-        error_code error = m_cache.do_set(k, calc_hash(k), v, /*flags*/0, forever, /*CAS*/0);
+        error_code error; cache::Response cache_reply;
+        tie(error, cache_reply) = m_cache.do_set(k, calc_hash(k), v, /*flags*/0, forever, /*CAS*/0);
         stats.num_set += 1;
         if (error) {
             stats.num_error += 1;
@@ -76,16 +77,16 @@ public:
 
     void del(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
-        m_cache.do_del(k, calc_hash(k),
-                       [=](error_code error, bool deleted) {
-                           stats.num_del += 1;
-                           if (not error) {
-                               auto & counter = deleted ? stats.num_cache_hit : stats.num_cache_miss;
-                               counter += 1;
-                           } else {
-                               stats.num_error += 1;
-                           }
-                       });
+        error_code error; cache::Response cache_reply;
+        tie(error, cache_reply) = m_cache.do_del(k, calc_hash(k));
+        stats.num_del += 1;
+        if (not error) {
+            auto & counter = (cache_reply == cache::DELETED) ? stats.num_cache_hit : stats.num_cache_miss;
+            counter += 1;
+        } else {
+            stats.num_error += 1;
+        }
+
     }
 private:
     cache::Cache m_cache;
@@ -93,7 +94,7 @@ private:
 
 
 array_type data_array;
-CacheWrapper csh;
+std::unique_ptr<CacheWrapper> csh;
 
 inline iterator random_pick() {
     debug_assert(data_array.size() > 0);
@@ -115,7 +116,7 @@ static void generate_test_data() {
 
 static void warmup() {
     for (auto n=hash_initial; n > 0; --n) {
-        csh.set(random_pick());
+        csh->set(random_pick());
     }
 }
 
@@ -126,24 +127,24 @@ int main(int /*argc*/, char * /*argv*/[]) {
     // setup cache
     settings.cache.memory_limit = cache_memory;
     settings.cache.initial_hash_table_size = hash_initial;
-
+    csh.reset(new CacheWrapper());
     generate_test_data();
     warmup();
     reset_stats();
     auto start_time = std::chrono::high_resolution_clock::now();
     for (int i=0; i<3; ++i) {
         for (iterator kv = data_array.begin(); kv < data_array.end(); ++kv) {
-            csh.set(kv);
+            csh->set(kv);
             if (chance() > 70) {
-                csh.del(random_pick());
+                csh->del(random_pick());
             }
             if (chance() > 30) {
-                csh.get(random_pick());
+                csh->get(random_pick());
             }
         }
     }
-    auto time_passed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
-    const double sec = time_passed.count() / 1000000;
+    auto time_passed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start_time);
+    const double sec = time_passed.count() / 1000000000;
     std::cout << std::fixed << std::setprecision(3);
     std::cout << "Time spent: " << sec << "s" << std::endl;
     std::cout << "get:        " << stats.num_get << std::endl;
@@ -154,7 +155,7 @@ int main(int /*argc*/, char * /*argv*/[]) {
     std::cout << "error:      " << stats.num_error << std::endl;
     const double RPS = (stats.num_get + stats.num_set + stats.num_del) / sec;
     std::cout << "rps:        " << RPS << std::endl;
-    std::cout << "avg. cost:  " << static_cast<unsigned>(1000000000 / RPS) << "us" << std::endl;
+    std::cout << "avg. cost:  " << static_cast<unsigned>(1000000000 / RPS) << "ns" << std::endl;
 
     return 0;
 }
