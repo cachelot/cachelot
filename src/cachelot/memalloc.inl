@@ -1,3 +1,6 @@
+#ifndef CACHELOT_MEMALLOC_H_INCLUDED
+#  error "Header is not for direct use"
+#endif
 /**
  * @page   memalloc
  * @brief  memalloc implementation
@@ -79,7 +82,7 @@ namespace cachelot {
             link_type * prev, * next;
         } link;             /// link for circular list of blocks in group_by_size table
 
-        uint8 memory_[1];   // pointer to actual memory given to user
+        uint8 memory_[1];   /// pointer to actual memory given to user
 
     public:
         /// minimal allowed block size
@@ -107,26 +110,27 @@ namespace cachelot {
         }
 
         /// constructor used for normal blocks
-        explicit block(const uint32 sz, const block * left_adjacent_block) noexcept {
+        explicit block(const uint32 the_size, const block * left_adjacent_block) noexcept {
             static_assert(min_size >= alignment, "Minimal block size must be greater or equal block alignment");
             // User memory must be properly aligned
             debug_assert(unaligned_bytes(memory_, alignof(void *)) == 0);
             // check size
-            debug_assert(sz >= min_size || sz == 0);
-            debug_assert(sz <= max_size);
+            debug_assert((the_size >= min_size || the_size == 0) && the_size <= max_size);
             // set debug marker
             debug_only(meta.dbg_marker = DBG_MARKER);
+            debug_only(link.prev = &link);
+            debug_only(link.next = &link);
             // Fill-in memory with debug pattern
-            debug_only(std::memset(memory_, DBG_FILLER, sz));
-            meta.size = sz;
+            debug_only(std::memset(memory_, DBG_FILLER, the_size));
+            meta.size = the_size;
             meta.used = false;
             meta.left_adjacent_offset = left_adjacent_block->size_with_meta();
             // check previous block for consistency
             debug_only(left_adjacent_block->test_check());
-            debug_only(link.prev = &link);
-            debug_only(link.next = &link);
         }
         ///@}
+
+        ~block(); // Must never be called
 
         /// amount of memory available to user
         uint32 size() const noexcept { return meta.size; }
@@ -213,16 +217,17 @@ namespace cachelot {
         }
 
         /// split given block `blk` to the smaller block of `new_size`, returns splited block and leftover space as a block
-        static tuple<block *, block *> split(block * blk, const uint32 new_size) noexcept {
+        static tuple<block *, block *> split(block * blk, uint32 new_size) noexcept {
             debug_only(blk->test_check());
             debug_assert(blk->is_free());
             debug_assert(not blk->is_technical());
             const uint32 new_round_size = new_size > min_size ? new_size + unaligned_bytes(blk->memory_ + new_size, alignment) : min_size;
             memalloc::block * leftover = nullptr;
-            if (new_round_size <= blk->size() && blk->size() - new_round_size >= split_threshold) {
+            if (new_round_size < blk->size() && blk->size() - new_round_size > split_threshold) {
                 const uint32 old_size = blk->size();
                 memalloc::block * block_after_next = blk->right_adjacent();
                 blk->set_size(new_round_size);
+                debug_assert(old_size - new_round_size > block::meta_size + block::alignment);
                 leftover = new (blk->right_adjacent()) memalloc::block(old_size - new_round_size - memalloc::block::meta_size, blk);
                 block_after_next->meta.left_adjacent_offset = leftover->size_with_meta();
                 debug_only(leftover->test_check());
@@ -788,6 +793,7 @@ namespace cachelot {
     inline memalloc::memalloc(void * arena, const size_t arena_size) noexcept {
         debug_only(const size_t min_arena_size = sizeof(group_by_size) * 2 + sizeof(block) * 2 + 4096);
         debug_assert(arena_size >= min_arena_size);
+        debug_only(std::memset(arena, 'X', arena_size));
         // pointer to currently non-used memory
         uint8 * available = reinterpret_cast<uint8 *>(arena);
         // End-Of-Memory marker
@@ -988,8 +994,8 @@ namespace cachelot {
                 block::unuse(used_blk);
                 // TODO: This particular merge breaks O(1) complexity
                 while (used_blk->size() < nsize) {
-                    uint32 available_left = not used_blk->left_adjacent()->is_technical() ? used_blk->left_adjacent()->size() : 0;
-                    uint32 available_right = not used_blk->right_adjacent()->is_technical() ? used_blk->right_adjacent()->size() : 0;
+                    uint32 available_left = used_blk->left_adjacent()->size();
+                    uint32 available_right = used_blk->right_adjacent()->size();
                     debug_assert(available_left != 0 || available_right != 0);
                     if (available_right > available_left) {
                         block * right = used_blk->right_adjacent();
