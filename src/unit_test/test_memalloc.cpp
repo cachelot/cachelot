@@ -12,48 +12,51 @@ static constexpr size_t NUM_REPEAT = 5;
 static constexpr size_t MIN_ALLOC_SIZE = 4;
 static constexpr size_t MAX_ALLOC_SIZE = 1024 * 1024;
 
-
 BOOST_AUTO_TEST_SUITE(test_memalloc)
 
 BOOST_AUTO_TEST_CASE(test_block_list) {
     memalloc::block_list the_list;
     BOOST_CHECK(the_list.empty());
-    memalloc::block b1;
+    uint8 b1_memory[sizeof(memalloc::block)];
+    memalloc::block * b1 = new (b1_memory) memalloc::block();
     // single item basic operations
-    the_list.push_front(&b1);
+    the_list.push_front(b1);
     BOOST_CHECK(not the_list.empty());
-    BOOST_CHECK_EQUAL(the_list.front(), &b1);
-    BOOST_CHECK_EQUAL(the_list.back(), &b1);
-    BOOST_CHECK(the_list.is_head(&b1));
-    BOOST_CHECK(the_list.is_tail(&b1));
-    BOOST_CHECK_EQUAL(the_list.pop_front(), &b1);
+    BOOST_CHECK_EQUAL(the_list.front(), b1);
+    BOOST_CHECK_EQUAL(the_list.back(), b1);
+    BOOST_CHECK(the_list.is_head(b1));
+    BOOST_CHECK(the_list.is_tail(b1));
+    BOOST_CHECK_EQUAL(the_list.pop_front(), b1);
     BOOST_CHECK(the_list.empty());
-    memalloc::block b2, b3;
+    uint8 b2_memory[sizeof(memalloc::block)];
+    uint8 b3_memory[sizeof(memalloc::block)];
+    memalloc::block * b2 = new (b2_memory) memalloc::block();
+    memalloc::block * b3 = new (b3_memory) memalloc::block();
     // multiple item operations
-    the_list.push_front(&b1);
-    the_list.push_front(&b2);
-    the_list.push_back(&b3);
+    the_list.push_front(b1);
+    the_list.push_front(b2);
+    the_list.push_back(b3);
     BOOST_CHECK(not the_list.empty());
-    BOOST_CHECK_EQUAL(the_list.front(), &b2);
-    BOOST_CHECK_EQUAL(the_list.back(), &b3);
-    BOOST_CHECK(the_list.is_head(&b2));
-    BOOST_CHECK(the_list.is_tail(&b3));
+    BOOST_CHECK_EQUAL(the_list.front(), b2);
+    BOOST_CHECK_EQUAL(the_list.back(), b3);
+    BOOST_CHECK(the_list.is_head(b2));
+    BOOST_CHECK(the_list.is_tail(b3));
     // remove one item
-    memalloc::block_list::unlink(&b1);
+    memalloc::block_list::unlink(b1);
     BOOST_CHECK(not the_list.empty());
-    BOOST_CHECK_EQUAL(the_list.front(), &b2);
-    BOOST_CHECK_EQUAL(the_list.back(), &b3);
-    BOOST_CHECK(the_list.is_head(&b2));
-    BOOST_CHECK(the_list.is_tail(&b3));
+    BOOST_CHECK_EQUAL(the_list.front(), b2);
+    BOOST_CHECK_EQUAL(the_list.back(), b3);
+    BOOST_CHECK(the_list.is_head(b2));
+    BOOST_CHECK(the_list.is_tail(b3));
     // remove second element
-    BOOST_CHECK_EQUAL(the_list.pop_front(), &b2);
+    BOOST_CHECK_EQUAL(the_list.pop_front(), b2);
     BOOST_CHECK(not the_list.empty());
-    BOOST_CHECK_EQUAL(the_list.front(), &b3);
-    BOOST_CHECK_EQUAL(the_list.back(), &b3);
-    BOOST_CHECK(the_list.is_head(&b3));
-    BOOST_CHECK(the_list.is_tail(&b3));
+    BOOST_CHECK_EQUAL(the_list.front(), b3);
+    BOOST_CHECK_EQUAL(the_list.back(), b3);
+    BOOST_CHECK(the_list.is_head(b3));
+    BOOST_CHECK(the_list.is_tail(b3));
     // remove last element
-    memalloc::block_list::unlink(&b3);
+    memalloc::block_list::unlink(b3);
     BOOST_CHECK(the_list.empty());
 }
 

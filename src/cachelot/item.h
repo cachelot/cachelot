@@ -126,13 +126,13 @@ namespace cachelot {
         };
 
 
-        inline Item::Item(bytes the_key, hash_type the_hash, bytes the_value, opaque_flags_type the_flags, expiration_time_point expiration, cas_value_type cas_value) noexcept
+        inline Item::Item(bytes the_key, hash_type the_hash, bytes the_value, opaque_flags_type the_flags, expiration_time_point expiration, cas_value_type the_cas) noexcept
                 : m_hash(the_hash)
                 , m_key_length(the_key.length()) {
             debug_assert(unaligned_bytes(this, alignof(Item) == 0));
             auto this_ = reinterpret_cast<uint8 *>(this);
             std::memcpy(this_ + KeyOffset(this), the_key.begin(), the_key.length());
-            reassign(the_value, the_flags, expiration, cas_value);
+            reassign(the_value, the_flags, expiration, the_cas);
         }
 
 

@@ -13,6 +13,7 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/dict.h
                 ${CMAKE_CURRENT_LIST_DIR}/hash_fnv1a.h
                 ${CMAKE_CURRENT_LIST_DIR}/random.h
+                ${CMAKE_CURRENT_LIST_DIR}/debug_trace.h
                 ${CMAKE_CURRENT_LIST_DIR}/io_buffer.h
                 ${CMAKE_CURRENT_LIST_DIR}/io_serialization.h
                 ${CMAKE_CURRENT_LIST_DIR}/settings.h
@@ -23,6 +24,8 @@ set (CACHELOT_SOURCES
                 ${CMAKE_CURRENT_LIST_DIR}/item.h
                 ${CMAKE_CURRENT_LIST_DIR}/cache.h
                 ${CMAKE_CURRENT_LIST_DIR}/cache_defs.h
+                ${CMAKE_CURRENT_LIST_DIR}/stats.h
+                ${CMAKE_CURRENT_LIST_DIR}/stats.cpp
                 ${CMAKE_CURRENT_LIST_DIR}/network.h
                 ${CMAKE_CURRENT_LIST_DIR}/async_connection.h
                 ${CMAKE_CURRENT_LIST_DIR}/tcp_server.h
