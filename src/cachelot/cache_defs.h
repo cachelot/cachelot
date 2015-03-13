@@ -1,6 +1,10 @@
 #ifndef CACHELOT_CACHE_DEFS_H_INCLUDED
 #define CACHELOT_CACHE_DEFS_H_INCLUDED
 
+#ifndef CACHELOT_BYTES_H_INCLUDED
+#  include <cachelot/bytes.h>
+#endif
+
 /// @ingroup cache
 /// @{
 
