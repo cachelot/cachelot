@@ -140,6 +140,7 @@ namespace cachelot {
 
         /// check if given `key` is in the hash table
         bool contains(key_type key, hash_type hash) const noexcept {
+            debug_assert(hash != 0);
             bool found; size_t __;
             tie(found, __) = entry_for(key, hash);
             return found;
