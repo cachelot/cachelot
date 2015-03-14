@@ -3,7 +3,7 @@
 REMOTE_SSH="servantus"
 SERVER_ADDR="192.168.0.114"
 MEMSLAP="$HOME/workspace/libmemcached-1.0.18/clients/memslap"
-CACHELOT="/home/rider/workspace/cachelot/bin/release/cachelot"
+CACHELOT="/home/rider/workspace/cachelot/bin/Release/cachelot"
 MEMCACHED="/usr/bin/memcached"
 NUM_ITEMS=100000
 NUM_WARMUP_ITERATIONS=2
@@ -88,7 +88,7 @@ function print_title() {
 trap "stop_cachelot_and_memcached; exit" SIGHUP SIGINT SIGTERM
 stop_cachelot_and_memcached
 
-print_title("cachelot")
+print_title "cachelot"
 ssh_bg_command $CACHELOT -p 11212
 run_test_for "-s $SERVER_ADDR:11212" "$concurrency"
 stop_cachelot_and_memcached
