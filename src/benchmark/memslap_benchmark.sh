@@ -55,12 +55,11 @@ function warmup() {
 
 function run_test_for() {
     local servers="$1"
-    local concurrency="$2"
     local execute_times=$NUM_ITEMS
     # memory consumption is too much
-    [ $concurrency -gt 16 ] && [ $execute_times -gt 10000 ] && let "execute_times = 10000"
     warmup "$servers"
     for concurrency in $(echo "1" && seq 2 2 32); do
+        [ $concurrency -gt 16 ] && [ $execute_times -gt 10000 ] && let "execute_times = 10000"
         echo " *** BEGIN: set $execute_times items, concurrency: $concurrency"
         for t in $(seq 1 $NUM_REPEATS); do
             memslap "$servers" "set" "$execute_times"  "$concurrency"
@@ -90,32 +89,32 @@ stop_cachelot_and_memcached
 
 print_title "cachelot"
 ssh_bg_command $CACHELOT -p 11212
-run_test_for "-s $SERVER_ADDR:11212" "$concurrency"
+run_test_for "-s $SERVER_ADDR:11212"
 stop_cachelot_and_memcached
 sleep 60
 
 print_title "memcached"
 ssh_bg_command $MEMCACHED -p 11211
-run_test_for "-s $SERVER_ADDR:11211" "$concurrency"
+run_test_for "-s $SERVER_ADDR:11211"
 stop_cachelot_and_memcached
 sleep 60
 
 print_title "memcached cluster"
 ssh_bg_command $MEMCACHED -p 11213 -t 1
 ssh_bg_command $MEMCACHED -p 11214 -t 1
-run_test_for "-s $SERVER_ADDR:11213 -s $SERVER_ADDR:11214" "$concurrency"
+run_test_for "-s $SERVER_ADDR:11213 -s $SERVER_ADDR:11214"
 stop_cachelot_and_memcached
 sleep 60
 
 print_title "memcached single thread"
 ssh_bg_command $MEMCACHED -p 11217 -t 1
-run_test_for "-s $SERVER_ADDR:11217" "$concurrency"
+run_test_for "-s $SERVER_ADDR:11217"
 stop_cachelot_and_memcached
 sleep 60
 
 print_title "cachelot cluster"
 ssh_bg_command $CACHELOT -p 11215
 ssh_bg_command $CACHELOT -p 11216
-run_test_for "-s $SERVER_ADDR:11215 -s $SERVER_ADDR:11216" "$concurrency"
+run_test_for "-s $SERVER_ADDR:11215 -s $SERVER_ADDR:11216"
 stop_cachelot_and_memcached
 
