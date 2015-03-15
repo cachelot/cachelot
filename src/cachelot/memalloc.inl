@@ -30,6 +30,9 @@
 
 namespace cachelot {
 
+// TODO: Use bit in left_adjacent_offset as "is left block free" marker
+// This will speedup many lookups
+
 
 //////// constants //////////////////////////////////
 
@@ -156,14 +159,21 @@ namespace cachelot {
 
         /// block adjacent to the left in arena
         block * left_adjacent() noexcept {
+            debug_assert(meta.left_adjacent_offset > 0);
             uint8 * this_ = reinterpret_cast<uint8 *>(this);
-            return reinterpret_cast<memalloc::block *>(this_ - meta.left_adjacent_offset);
+            block * left = reinterpret_cast<block *>(this_ - meta.left_adjacent_offset);
+            debug_only(left->test_check());
+            return left;
         }
 
         /// block adjacent to the right in arena
         block * right_adjacent() noexcept {
+            // this must be either non-technical or left border block
+            debug_assert(not is_technical() || (meta.left_adjacent_offset == 0));
             uint8 * this_ = reinterpret_cast<uint8 *>(this);
-            return reinterpret_cast<memalloc::block *>(this_ + size_with_meta());
+            block * right = reinterpret_cast<block *>(this_ + size_with_meta());
+            debug_only(right->test_check());
+            return right;
         }
 
         /// return pointer to memory available to user
@@ -174,17 +184,27 @@ namespace cachelot {
 
         /// debug only block self check
         void test_check() const noexcept {
+            // check self
             debug_assert(this != nullptr); // Yep! It is
             debug_assert(meta.dbg_marker == DBG_MARKER);
             debug_assert(meta.size >= min_size || is_technical());
             debug_assert(meta.size <= max_size);
-            if (not is_technical()) {
-                // allow test_check() to be `const`
-                debug_only(block * non_const = const_cast<block *>(this));
-                debug_assert(non_const->right_adjacent()->meta.dbg_marker == DBG_MARKER);
-                debug_assert(non_const->right_adjacent()->left_adjacent() == this);
-                debug_assert(non_const->left_adjacent()->meta.dbg_marker == DBG_MARKER);
-                debug_assert(non_const->left_adjacent()->right_adjacent() == this);
+            debug_only(const auto this_ = reinterpret_cast<const uint8 *>(this));
+            // check left
+            debug_only(if (meta.left_adjacent_offset > 0) {);
+                debug_only(auto left = reinterpret_cast<const block *>(this_ - meta.left_adjacent_offset));
+                debug_assert(left->meta.dbg_marker == DBG_MARKER);
+                debug_assert(reinterpret_cast<const uint8 *>(left) + left->size_with_meta() == this_);
+                // TODO: Too deep debug must be on the higher level of debug
+                debug_only(if (left->meta.left_adjacent_offset > 0) { left->test_check(); });
+            debug_only(});
+            // check right (this must be either non-technical or left border block)
+            debug_only(if (not is_technical() || (meta.left_adjacent_offset == 0)) { );
+                debug_only(auto right = reinterpret_cast<const block *>(this_ + size_with_meta()));
+                debug_assert(right->meta.dbg_marker == DBG_MARKER);
+                debug_assert(reinterpret_cast<const uint8 *>(right) - right->meta.left_adjacent_offset == this_);
+                // TODO: Too deep debug must be on the higher level of debug
+                debug_only(if (right->meta.size > 0) { right->test_check(); });
             }
         }
 
