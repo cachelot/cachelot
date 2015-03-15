@@ -3,7 +3,7 @@
 REMOTE_SSH="servantus"
 SERVER_ADDR="192.168.0.114"
 MEMSLAP="$HOME/workspace/libmemcached-1.0.18/clients/memslap"
-CACHELOT="/home/rider/workspace/cachelot/bin/Release/cachelot"
+CACHELOT="/home/rider/workspace/cachelot/bin/release/cachelot"
 MEMCACHED="/usr/bin/memcached"
 NUM_ITEMS=100000
 NUM_WARMUP_ITERATIONS=2
@@ -31,8 +31,10 @@ function memslap() {
     local concurrency="$4"
     # Unwrap quoted arguments
     local memslap_cmd=$(echo "$MEMSLAP $servers --test=$the_test --execute-number=$times --concurrency=$concurrency")
-    echo "running $memslap_cmd"
-    eval $memslap_cmd 2>&1 | tee /dev/tty | grep --color "CONNECTION FAILURE" && exit 1
+    echo "running \"$memslap_cmd\""
+    local memslap_output=$(eval "$memslap_cmd" 2>&1)
+    echo "$memslap_output"
+    echo "$memslap_output" | grep -q "CONNECTION FAILURE" && exit 1
 }
 
 
@@ -87,15 +89,15 @@ function print_title() {
 trap "stop_cachelot_and_memcached; exit" SIGHUP SIGINT SIGTERM
 stop_cachelot_and_memcached
 
-print_title "cachelot"
-ssh_bg_command $CACHELOT -p 11212
-run_test_for "-s $SERVER_ADDR:11212"
-stop_cachelot_and_memcached
-sleep 60
-
 print_title "memcached"
 ssh_bg_command $MEMCACHED -p 11211
 run_test_for "-s $SERVER_ADDR:11211"
+stop_cachelot_and_memcached
+sleep 60
+
+print_title "cachelot"
+ssh_bg_command $CACHELOT -p 11212
+run_test_for "-s $SERVER_ADDR:11212"
 stop_cachelot_and_memcached
 sleep 60
 
@@ -106,15 +108,15 @@ run_test_for "-s $SERVER_ADDR:11213 -s $SERVER_ADDR:11214"
 stop_cachelot_and_memcached
 sleep 60
 
-print_title "memcached single thread"
-ssh_bg_command $MEMCACHED -p 11217 -t 1
-run_test_for "-s $SERVER_ADDR:11217"
-stop_cachelot_and_memcached
-sleep 60
-
 print_title "cachelot cluster"
 ssh_bg_command $CACHELOT -p 11215
 ssh_bg_command $CACHELOT -p 11216
 run_test_for "-s $SERVER_ADDR:11215 -s $SERVER_ADDR:11216"
 stop_cachelot_and_memcached
+
+print_title "memcached single thread"
+ssh_bg_command $MEMCACHED -p 11217 -t 1
+run_test_for "-s $SERVER_ADDR:11217"
+stop_cachelot_and_memcached
+sleep 60
 
