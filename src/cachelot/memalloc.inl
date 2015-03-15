@@ -129,7 +129,7 @@ namespace cachelot {
             meta.used = false;
             meta.left_adjacent_offset = left_adjacent_block->size_with_meta();
             // check previous block for consistency
-            debug_only(left_adjacent_block->test_check());
+            debug_only(left_adjacent_block->test_check(/*skip_left*/ false, /*skip_right*/ true));
         }
         ///@}
 
@@ -170,10 +170,8 @@ namespace cachelot {
         block * right_adjacent() noexcept {
             // this must be either non-technical or left border block
             debug_assert(not is_technical() || (meta.left_adjacent_offset == 0));
-            uint8 * this_ = reinterpret_cast<uint8 *>(this);
-            block * right = reinterpret_cast<block *>(this_ + size_with_meta());
-            debug_only(right->test_check());
-            return right;
+            auto this_ = reinterpret_cast<uint8 *>(this);
+            return reinterpret_cast<block *>(this_ + size_with_meta());
         }
 
         /// return pointer to memory available to user
@@ -183,7 +181,7 @@ namespace cachelot {
         }
 
         /// debug only block self check
-        void test_check() const noexcept {
+        void test_check(bool skip_left = false, bool skip_right = false) const noexcept {
             // check self
             debug_assert(this != nullptr); // Yep! It is
             debug_assert(meta.dbg_marker == DBG_MARKER);
@@ -191,21 +189,22 @@ namespace cachelot {
             debug_assert(meta.size <= max_size);
             debug_only(const auto this_ = reinterpret_cast<const uint8 *>(this));
             // check left
-            debug_only(if (meta.left_adjacent_offset > 0) {);
+            debug_only(if (not skip_left && meta.left_adjacent_offset > 0) {);
                 debug_only(auto left = reinterpret_cast<const block *>(this_ - meta.left_adjacent_offset));
                 debug_assert(left->meta.dbg_marker == DBG_MARKER);
                 debug_assert(reinterpret_cast<const uint8 *>(left) + left->size_with_meta() == this_);
                 // TODO: Too deep debug must be on the higher level of debug
-                debug_only(if (left->meta.left_adjacent_offset > 0) { left->test_check(); });
+                debug_only(if (left->meta.left_adjacent_offset > 0) { left->test_check(skip_left = false, skip_right = true); });
             debug_only(});
             // check right (this must be either non-technical or left border block)
-            debug_only(if (not is_technical() || (meta.left_adjacent_offset == 0)) { );
+            debug_only(if (not skip_right && (not is_technical() || (meta.left_adjacent_offset == 0))) { );
                 debug_only(auto right = reinterpret_cast<const block *>(this_ + size_with_meta()));
                 debug_assert(right->meta.dbg_marker == DBG_MARKER);
                 debug_assert(reinterpret_cast<const uint8 *>(right) - right->meta.left_adjacent_offset == this_);
                 // TODO: Too deep debug must be on the higher level of debug
-                debug_only(if (right->meta.size > 0) { right->test_check(); });
+                debug_only(if (right->meta.size > 0) { right->test_check(skip_left = true, skip_right = false); });
             }
+            (void) skip_left; (void) skip_right;
         }
 
         /// get block structure back from pointer given to user
@@ -297,6 +296,7 @@ namespace cachelot {
         void push_front(block * blk) noexcept {
             debug_assert(not islinked(blk));
             debug_assert(not has(blk));
+            debug_only(blk->test_check());
             block::link_type *  link = &blk->link;
             debug_assert(dummy_link.next->prev == &dummy_link);
             link->next = dummy_link.next;
@@ -310,6 +310,7 @@ namespace cachelot {
         void push_back(block * blk) noexcept {
             debug_assert(not islinked(blk));
             debug_assert(not has(blk));
+            debug_only(blk->test_check());
             block::link_type * link = &blk->link;
             link->prev = dummy_link.prev;
             debug_assert(link->prev->next == &dummy_link);
@@ -384,6 +385,7 @@ namespace cachelot {
         /// remove block `blk` from the any list in which it is linked
         static void unlink(block * blk) noexcept {
             debug_assert(islinked(blk));
+            debug_only(blk->test_check());
             unlink(&blk->link);
         }
 
@@ -418,7 +420,9 @@ namespace cachelot {
 
         static block * block_from_link(block::link_type * link) noexcept {
             auto ui8_ptr = reinterpret_cast<uint8 *>(link);
-            return reinterpret_cast<block *>(ui8_ptr - offsetof(block, link));
+            auto blk = reinterpret_cast<block *>(ui8_ptr - offsetof(block, link));
+            debug_only(blk->test_check());
+            return blk;
         }
 
     private:
@@ -841,7 +845,6 @@ namespace cachelot {
         // left technical border block to prevent block merge underflow
         available += unaligned_bytes(available, block::alignment); // alignment
         block * left_border = new (available) block();
-        block::checkout(left_border); // mark block as used so it will not be merged with others
         available += left_border->size_with_meta();
         // leave space to 'right border' that will prevent block merge overflow
         EOM -= block::meta_size;
@@ -874,6 +877,9 @@ namespace cachelot {
         }
         // right technical border block to prevent block merge overflow
         block * right_border = new (EOM) block(0, prev_allocated_block);
+
+        // mark borders as used so they will not be merged with others
+        block::checkout(left_border);
         block::checkout(right_border);
         // remember how much memory left to user
         user_available_memory_size = reinterpret_cast<char *>(right_border) - reinterpret_cast<char *>(left_border) - block::meta_size;
