@@ -5,11 +5,16 @@
  * @page   memalloc
  * @brief  memalloc implementation
  *
+ * ## Memalloc Internals
+ *
+ * ### Blocks
  * memalloc splits all provided memory on blocks (aka slabs) of variable size;<br/>
  * All blocks are doubly-linked with adjacents:<br/>
  *  `prev <- left_adjacent_offset [block] size -> next`<br/>
  * Linkage allows to coalesce smaller blocks into bigger<br/>
- *<br/>
+ *
+ * ### Blocks grouping
+ * Blocks of the similar size stored in the same *size class*, double-linked circular list of blocks
  * There is a table grouping blocks by their size (@ref group_by_size), to serve allocations. Each cell of this table is doubly-linked list of blocks of near size.<br/>
  * The easiest way to think about grouping near size blocks  as of the sizes are powers of 2, as follows:<br/>
  *  `[256, 512, 1024, 2048 ... 2^last_power_of_2]`<br/>
@@ -20,6 +25,9 @@
  * Moreover, blocks of size below 2^<sup>(first_power_of_2_offset+1)</sup> are considered as a small. The range `[0..small_block_boundary)` also split on `num_sub_cells_per_power` cells and stored in the `table[0]`.<br/>
  * Finally, table looks as follows:<br/>
  *  `[0, 8, 16, 24 ... 248, 256, 264, ... 2^last_power_of_2, 2^last_power_of_2 + cell_difference ...]`<br/>
+ *
+ *  ### Block split / merge and border blocks
+ *
  *<br/>
  */
 
@@ -154,12 +162,18 @@ namespace cachelot {
         /// check whether block is free
         bool is_free () const noexcept { return not meta.used; }
 
-        /// check whether block is technical border block
-        bool is_technical() const noexcept { return size() == 0; }
+        /// check whether block is left border block
+        bool is_border() const noexcept { return meta.size == 0; }
+
+        /// check whether block is left border block
+        bool is_left_border() const noexcept { return is_border() && meta.left_adjacent_offset == 0; }
+
+        /// check whether block is right border block
+        bool is_right_border() const noexcept { return is_border() && meta.left_adjacent_offset > 0; }
 
         /// block adjacent to the left in arena
         block * left_adjacent() noexcept {
-            debug_assert(meta.left_adjacent_offset > 0);
+            debug_assert(not is_left_border());
             uint8 * this_ = reinterpret_cast<uint8 *>(this);
             block * left = reinterpret_cast<block *>(this_ - meta.left_adjacent_offset);
             debug_only(left->test_check());
@@ -169,41 +183,49 @@ namespace cachelot {
         /// block adjacent to the right in arena
         block * right_adjacent() noexcept {
             // this must be either non-technical or left border block
-            debug_assert(not is_technical() || (meta.left_adjacent_offset == 0));
+            debug_assert(not is_right_border());
             auto this_ = reinterpret_cast<uint8 *>(this);
             return reinterpret_cast<block *>(this_ + size_with_meta());
         }
 
         /// return pointer to memory available to user
         void * memory() noexcept {
-            debug_assert(not is_technical());
+            debug_assert(not is_border());
             return memory_;
         }
 
-        /// debug only block self check
+        /// debug only block health check (against memory corruptions)
         void test_check(bool skip_left = false, bool skip_right = false) const noexcept {
-            // check self
-            debug_assert(this != nullptr); // Yep! It is
-            debug_assert(meta.dbg_marker == DBG_MARKER);
-            debug_assert(meta.size >= min_size || is_technical());
-            debug_assert(meta.size <= max_size);
-            debug_only(const auto this_ = reinterpret_cast<const uint8 *>(this));
-            // check left
-            debug_only(if (not skip_left && meta.left_adjacent_offset > 0) {);
-                debug_only(auto left = reinterpret_cast<const block *>(this_ - meta.left_adjacent_offset));
-                debug_assert(left->meta.dbg_marker == DBG_MARKER);
-                debug_assert(reinterpret_cast<const uint8 *>(left) + left->size_with_meta() == this_);
-                // TODO: Too deep debug must be on the higher level of debug
-                debug_only(if (left->meta.left_adjacent_offset > 0) { left->test_check(skip_left = false, skip_right = true); });
-            debug_only(});
-            // check right (this must be either non-technical or left border block)
-            debug_only(if (not skip_right && (not is_technical() || (meta.left_adjacent_offset == 0))) { );
-                debug_only(auto right = reinterpret_cast<const block *>(this_ + size_with_meta()));
-                debug_assert(right->meta.dbg_marker == DBG_MARKER);
-                debug_assert(reinterpret_cast<const uint8 *>(right) - right->meta.left_adjacent_offset == this_);
-                // TODO: Too deep debug must be on the higher level of debug
-                debug_only(if (right->meta.size > 0) { right->test_check(skip_left = true, skip_right = false); });
-            debug_only(});
+                            // check self
+            debug_assert(   this != nullptr                                                                         ); // Yep! It is
+            debug_assert(   meta.dbg_marker == DBG_MARKER                                                           );
+            debug_assert(   meta.size >= min_size || is_border()                                                    );
+            debug_assert(   meta.left_adjacent_offset > 0 || is_left_border()                                       );
+            debug_assert(   meta.size <= max_size                                                                   );
+            debug_only(     const auto this_ = reinterpret_cast<const uint8 *>(this)                                );
+                            // check left
+            debug_only(     if (not skip_left && not is_left_border()) {                                            );
+            debug_only(         auto left = reinterpret_cast<const block *>(this_ - meta.left_adjacent_offset)      );
+            debug_assert(       left->meta.dbg_marker == DBG_MARKER                                                 );
+            debug_assert(       reinterpret_cast<const uint8 *>(left) + left->size_with_meta() == this_             );
+                                // TODO: Too deep debug must be on the higher level of debug
+            debug_only(         while (not left->is_left_border()) {                                                );
+            debug_only(             left->test_check(skip_left = true, skip_right = true);                          );
+            debug_only(             left = const_cast<block *>(left)->left_adjacent()                               );
+            debug_only(         }                                                                                   );
+            debug_only(     }                                                                                       );
+                            // check right
+            debug_only(     if (not skip_right && not is_right_border()) {                                          );
+            debug_only(         auto right = reinterpret_cast<const block *>(this_ + size_with_meta())              );
+            debug_assert(       right->meta.dbg_marker == DBG_MARKER                                                );
+            debug_assert(       reinterpret_cast<const uint8 *>(right) - right->meta.left_adjacent_offset == this_  );
+                                // TODO: Too deep debug must be on the higher level of debug
+            debug_only(         while (not right->is_right_border()) {                                              );
+            debug_only(             right->test_check(skip_left = true, skip_right = true);                         );
+            debug_only(             right = const_cast<block *>(right)->right_adjacent()                            );
+            debug_only(         }                                                                                   );
+            debug_only(     }                                                                                       );
+            // Unuse arguments in release
             (void) skip_left; (void) skip_right;
         }
 
@@ -229,7 +251,8 @@ namespace cachelot {
         /// mark block as free
         static void unuse(block * blk) noexcept {
             debug_only(blk->test_check());
-            debug_assert(not blk->is_technical());
+            // block borders must stay used all the time
+            debug_assert(not blk->is_border());
             debug_assert(blk->is_used());
             blk->meta.used = false;
             debug_only(std::memset(blk->memory_, DBG_FILLER, blk->size()));
@@ -239,7 +262,7 @@ namespace cachelot {
         static tuple<block *, block *> split(block * blk, uint32 new_size) noexcept {
             debug_only(blk->test_check());
             debug_assert(blk->is_free());
-            debug_assert(not blk->is_technical());
+            debug_assert(not blk->is_border());
             const uint32 new_round_size = new_size > min_size ? new_size + unaligned_bytes(blk->memory_ + new_size, alignment) : min_size;
             memalloc::block * leftover = nullptr;
             if (new_round_size < blk->size() && blk->size() - new_round_size > split_threshold) {
@@ -260,8 +283,8 @@ namespace cachelot {
         static block * merge(block * left_block, block * right_block) noexcept {
             debug_only(left_block->test_check());
             debug_only(right_block->test_check());
-            debug_assert(not left_block->is_technical());
-            debug_assert(not right_block->is_technical());
+            debug_assert(not left_block->is_border());
+            debug_assert(not right_block->is_border());
             debug_assert(right_block->left_adjacent() == left_block);
             debug_assert(left_block->right_adjacent() == right_block);
             debug_assert(left_block->is_free()); debug_assert(right_block->is_free());
@@ -411,6 +434,9 @@ namespace cachelot {
     private:
         static void unlink(block::link_type * link) noexcept {
             debug_assert(link != nullptr);
+            // It's not allowed to mess with border blocks
+            debug_assert(not block_from_link(link)->is_border());
+            // Integrity check, unlink
             debug_assert(link->prev->next == link);
             link->prev->next = link->next;
             debug_assert(link->next->prev == link);
@@ -732,8 +758,6 @@ namespace cachelot {
 
         /// store block `blk` at position corresponding to its size
         void put_block(block * blk) {
-            debug_assert(not blk->is_technical());
-            debug_only(blk->test_check());
             position pos = insert_position_from_size(blk->size());
             put_block_at(blk, pos);
         }
@@ -752,6 +776,7 @@ namespace cachelot {
             block_list & size_class = table[pos.absolute()];
             if (not size_class.empty()) {
                 blk = size_class.pop_front();
+                debug_assert(not blk->is_border());
                 debug_only(blk->test_check());
                 debug_only(pos.test_size_check(blk->size()));
                 debug_only(pos.test_check());
@@ -768,6 +793,7 @@ namespace cachelot {
 
         /// store block `blk` at position `pos`
         void put_block_at(block * blk, const position pos) noexcept {
+            debug_assert(not blk->is_border());
             debug_only(blk->test_check());
             debug_only(pos.test_size_check(blk->size()));
             debug_only(pos.test_check());

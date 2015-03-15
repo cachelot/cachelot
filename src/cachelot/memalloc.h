@@ -25,6 +25,8 @@ namespace cachelot {
     *  - does not give unused memory back to OS (actually it doesn't call malloc / free or equivalents at all,
     *    initial contiguous memory volume 'arena' must be pre-allocated by user)
     *  - contrary to standard malloc implementations allocated memory is aligned to sizeof(void *) bytes boundary (not 16)
+    *
+    * @see @ref memalloc (memalloc.inl) for implementation details
     */
     class memalloc {
         class block;
