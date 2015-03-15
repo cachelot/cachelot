@@ -203,7 +203,7 @@ namespace cachelot {
                 debug_assert(reinterpret_cast<const uint8 *>(right) - right->meta.left_adjacent_offset == this_);
                 // TODO: Too deep debug must be on the higher level of debug
                 debug_only(if (right->meta.size > 0) { right->test_check(skip_left = true, skip_right = false); });
-            }
+            debug_only(});
             (void) skip_left; (void) skip_right;
         }
 
@@ -567,7 +567,7 @@ namespace cachelot {
                     debug_assert(size == block::min_size);
                     debug_assert(block_size() == block::min_size);
                 }
-                (void)size; // warning in Release build
+                (void) size; // warning in Release build
             }
 
         //private:
