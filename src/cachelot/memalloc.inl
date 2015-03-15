@@ -154,8 +154,14 @@ namespace cachelot {
         /// check whether block is free
         bool is_free () const noexcept { return not meta.used; }
 
-        /// check whether block is technical border block
-        bool is_technical() const noexcept { return size() == 0; }
+        /// check whether block is left border block
+        bool is_left_border() const noexcept { return meta.size == 0 && meta.left_adjacent_offset == 0; }
+
+        /// check whether block is right border block
+        bool is_right_border() const noexcept { return meta.size == 0 && meta.left_adjacent_offset > 0; }
+
+        /// check whether block is one of two border blocks
+        bool is_border() const noexcept { return is_left_border() || is_right_border(); }
 
         /// block adjacent to the left in arena
         block * left_adjacent() noexcept {
@@ -169,14 +175,14 @@ namespace cachelot {
         /// block adjacent to the right in arena
         block * right_adjacent() noexcept {
             // this must be either non-technical or left border block
-            debug_assert(not is_technical() || (meta.left_adjacent_offset == 0));
+            debug_assert(not is_right_border());
             auto this_ = reinterpret_cast<uint8 *>(this);
             return reinterpret_cast<block *>(this_ + size_with_meta());
         }
 
         /// return pointer to memory available to user
         void * memory() noexcept {
-            debug_assert(not is_technical());
+            debug_assert(not is_border());
             return memory_;
         }
 
@@ -185,8 +191,9 @@ namespace cachelot {
             // check self
             debug_assert(this != nullptr); // Yep! It is
             debug_assert(meta.dbg_marker == DBG_MARKER);
-            debug_assert(meta.size >= min_size || is_technical());
+            debug_assert(meta.size >= min_size || is_border());
             debug_assert(meta.size <= max_size);
+            debug_assert(meta.left_adjacent_offset >= min_size + meta_size);
             debug_only(const auto this_ = reinterpret_cast<const uint8 *>(this));
             // check left
             debug_only(if (not skip_left && meta.left_adjacent_offset > 0) {);
@@ -194,16 +201,15 @@ namespace cachelot {
                 debug_assert(left->meta.dbg_marker == DBG_MARKER);
                 debug_assert(reinterpret_cast<const uint8 *>(left) + left->size_with_meta() == this_);
                 // TODO: Too deep debug must be on the higher level of debug
-                debug_only(if (left->meta.left_adjacent_offset > 0) { left->test_check(skip_left = false, skip_right = true); });
+                debug_only(if (not left->is_left_border()) { left->test_check(skip_left = false, skip_right = true); });
             debug_only(});
-            // check right (this must be either non-technical or left border block)
-            debug_only(if (not skip_right && (not is_technical() || (meta.left_adjacent_offset == 0))) { );
+            debug_only(if (not skip_right && not is_left_border()) { );
                 debug_only(auto right = reinterpret_cast<const block *>(this_ + size_with_meta()));
                 debug_assert(right->meta.dbg_marker == DBG_MARKER);
                 debug_assert(reinterpret_cast<const uint8 *>(right) - right->meta.left_adjacent_offset == this_);
                 // TODO: Too deep debug must be on the higher level of debug
-                debug_only(if (right->meta.size > 0) { right->test_check(skip_left = true, skip_right = false); });
-            }
+                debug_only(if (not right->is_right_border()) { right->test_check(skip_left = true, skip_right = false); });
+            debug_only(});
             (void) skip_left; (void) skip_right;
         }
 
@@ -220,16 +226,13 @@ namespace cachelot {
             debug_only(blk->test_check());
             debug_assert(not blk->meta.used);
             blk->meta.used = true;
-            // ensure that user memory is still filled with debug pattern
-            debug_only(uint32 half_size = blk->size() > 0 ? (blk->size() - sizeof(link)) / 2 : 0);
-            debug_assert(std::memcmp(blk->memory_ + sizeof(link), blk->memory_ + sizeof(link) + half_size, half_size) == 0);
             return blk->memory_;
         }
 
         /// mark block as free
         static void unuse(block * blk) noexcept {
             debug_only(blk->test_check());
-            debug_assert(not blk->is_technical());
+            debug_assert(not blk->is_border());
             debug_assert(blk->is_used());
             blk->meta.used = false;
             debug_only(std::memset(blk->memory_, DBG_FILLER, blk->size()));
@@ -239,7 +242,7 @@ namespace cachelot {
         static tuple<block *, block *> split(block * blk, uint32 new_size) noexcept {
             debug_only(blk->test_check());
             debug_assert(blk->is_free());
-            debug_assert(not blk->is_technical());
+            debug_assert(not blk->is_border());
             const uint32 new_round_size = new_size > min_size ? new_size + unaligned_bytes(blk->memory_ + new_size, alignment) : min_size;
             memalloc::block * leftover = nullptr;
             if (new_round_size < blk->size() && blk->size() - new_round_size > split_threshold) {
@@ -260,8 +263,8 @@ namespace cachelot {
         static block * merge(block * left_block, block * right_block) noexcept {
             debug_only(left_block->test_check());
             debug_only(right_block->test_check());
-            debug_assert(not left_block->is_technical());
-            debug_assert(not right_block->is_technical());
+            debug_assert(not left_block->is_border());
+            debug_assert(not right_block->is_border());
             debug_assert(right_block->left_adjacent() == left_block);
             debug_assert(left_block->right_adjacent() == right_block);
             debug_assert(left_block->is_free()); debug_assert(right_block->is_free());
@@ -732,8 +735,6 @@ namespace cachelot {
 
         /// store block `blk` at position corresponding to its size
         void put_block(block * blk) {
-            debug_assert(not blk->is_technical());
-            debug_only(blk->test_check());
             position pos = insert_position_from_size(blk->size());
             put_block_at(blk, pos);
         }
@@ -768,9 +769,10 @@ namespace cachelot {
 
         /// store block `blk` at position `pos`
         void put_block_at(block * blk, const position pos) noexcept {
+            debug_assert(not blk->is_border());
             debug_only(blk->test_check());
-            debug_only(pos.test_size_check(blk->size()));
             debug_only(pos.test_check());
+            debug_only(pos.test_size_check(blk->size()));
             memalloc::block_list & size_class = table[pos.absolute()];
             size_class.push_front(blk);
             // unconditionally update bit index
