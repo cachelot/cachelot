@@ -181,7 +181,7 @@ namespace cachelot {
         }
 
         /// block adjacent to the right in arena
-        block * right_adjacent()const noexcept {
+        block * right_adjacent() const noexcept {
             // this must be either non-technical or left border block
             debug_assert(not is_right_border());
             auto this_ = reinterpret_cast<const uint8 *>(this);
@@ -882,7 +882,7 @@ namespace cachelot {
         while (static_cast<size_t>(EOM - available) >= block::max_size + block::meta_size) {
             block * huge_block = new (available) block(block::max_size, prev_allocated_block);
             // temporarily create block on the right to pass block consistency test
-            debug_only(new (huge_block->right_adjacent()) block(0, huge_block));
+            debug_only(new (reinterpret_cast<uint8 *>(huge_block) + huge_block->size_with_meta()) block(0, huge_block));
             // store block at max pos of table
             free_blocks->put_biggest_block(huge_block);
             available += huge_block->size_with_meta();
@@ -895,7 +895,7 @@ namespace cachelot {
         if (leftover_size >= block::split_threshold) {
             block * leftover_block = new (available) block(leftover_size, prev_allocated_block);
             // temporarily create block on the right to pass block consistency test
-            debug_only(new (leftover_block->right_adjacent()) block(0, leftover_block));
+            debug_only(new (reinterpret_cast<uint8 *>(leftover_block) + leftover_block->size_with_meta()) block(0, leftover_block));
             free_blocks->put_block(leftover_block);
             prev_allocated_block = leftover_block;
             EOM = available + leftover_block->size_with_meta();
