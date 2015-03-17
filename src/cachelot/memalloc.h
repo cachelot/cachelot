@@ -98,6 +98,8 @@ namespace cachelot {
             uint64 num_free = 0;
             uint64 num_realloc = 0;
             uint64 num_errors = 0;
+            /// amount of memory that has requested but wasn't served due to errors
+            uint64 total_unserved_mem = 0;
             uint64 total_requested_mem = 0;
             uint64 total_served_mem = 0;
             uint64 requested_mem = 0;
