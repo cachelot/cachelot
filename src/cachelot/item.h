@@ -38,12 +38,6 @@ namespace cachelot {
          */
         class Item {
         public:
-
-             /// Item lock to synchronise Item across asynchronous operation calls
-            class Lock {
-                /// TODO: Ensure that we need to lock items
-            };
-        public:
             // There are primary type specifications
             // Modify with care! Memory Layout and Alignment!
             typedef uint32 hash_type;
@@ -60,10 +54,6 @@ namespace cachelot {
             opaque_flags_type m_opaque_flags; // user defined item flags
             const uint8 m_key_length; // length of key [1..MAX_KEY_LENGTH]
             bool m_ignore_cas; // does item have a CAS value
-//            union {
-//                cas_value_type maybe_cas;
-//                uint8 key_begin_if_no_cas[];
-//            };
 
         private:
             /// private destructor

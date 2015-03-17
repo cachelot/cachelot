@@ -137,7 +137,7 @@ namespace cachelot {
             meta.used = false;
             meta.left_adjacent_offset = left_adjacent_block->size_with_meta();
             // check previous block for consistency
-            debug_only(left_adjacent_block->test_check(/*skip_left*/ true, /*skip_right*/ true));
+            debug_only(left_adjacent_block->test_check());
         }
         ///@}
 
@@ -176,7 +176,7 @@ namespace cachelot {
             debug_assert(not is_left_border());
             const uint8 * this_ = reinterpret_cast<const uint8 *>(this);
             const block * left = reinterpret_cast<const block *>(this_ - meta.left_adjacent_offset);
-            debug_only(left->test_check(true, true));
+            debug_only(left->test_check());
             return const_cast<block *>(left);
         }
 
@@ -197,7 +197,7 @@ namespace cachelot {
         }
 
         /// debug only block health check (against memory corruptions)
-        void test_check(bool skip_left = false, bool skip_right = false) const noexcept {
+        void test_check() const noexcept {
                             // check self
             debug_assert(   this != nullptr                                                                         ); // Yep! It is
             debug_assert(   meta.dbg_marker == DBG_MARKER                                                           );
@@ -206,29 +206,17 @@ namespace cachelot {
             debug_assert(   meta.size <= max_size                                                                   );
             debug_only(     const auto this_ = reinterpret_cast<const uint8 *>(this)                                );
                             // check left
-            debug_only(     if (not skip_left && not is_left_border()) {                                            );
+            debug_only(     if (not is_left_border()) {                                                             );
             debug_only(         auto left = reinterpret_cast<const block *>(this_ - meta.left_adjacent_offset)      );
             debug_assert(       left->meta.dbg_marker == DBG_MARKER                                                 );
             debug_assert(       reinterpret_cast<const uint8 *>(left) + left->size_with_meta() == this_             );
-                                // TODO: Too deep debug must be on the higher level of debug
-            debug_only(         while (not left->is_left_border()) {                                                );
-            debug_only(             left->test_check(skip_left = true, skip_right = true);                          );
-            debug_only(             left = const_cast<block *>(left)->left_adjacent()                               );
-            debug_only(         }                                                                                   );
             debug_only(     }                                                                                       );
                             // check right
-            debug_only(     if (not skip_right && not is_right_border()) {                                          );
+            debug_only(     if (not is_right_border()) {                                                            );
             debug_only(         auto right = reinterpret_cast<const block *>(this_ + size_with_meta())              );
             debug_assert(       right->meta.dbg_marker == DBG_MARKER                                                );
             debug_assert(       reinterpret_cast<const uint8 *>(right) - right->meta.left_adjacent_offset == this_  );
-                                // TODO: Too deep debug must be on the higher level of debug
-            debug_only(         while (not right->is_right_border()) {                                              );
-            debug_only(             right->test_check(skip_left = true, skip_right = true);                         );
-            debug_only(             right = const_cast<block *>(right)->right_adjacent()                            );
-            debug_only(         }                                                                                   );
             debug_only(     }                                                                                       );
-            // Unuse arguments in release
-            (void) skip_left; (void) skip_right;
         }
 
         /// get block structure back from pointer given to user
@@ -272,18 +260,19 @@ namespace cachelot {
                 memalloc::block * block_after_next = blk->right_adjacent();
                 blk->set_size(new_round_size);
                 debug_assert(old_size - new_round_size > block::meta_size + block::alignment);
+                // temporary block to pass integrity check
+                debug_only(new (reinterpret_cast<uint8 *>(blk) + blk->size_with_meta()) block(0, blk));
                 leftover = new (blk->right_adjacent()) memalloc::block(old_size - new_round_size - memalloc::block::meta_size, blk);
                 block_after_next->meta.left_adjacent_offset = leftover->size_with_meta();
-                debug_only(leftover->test_check(true, true));
-                return make_tuple(blk, leftover);
+                debug_only(leftover->test_check());
             }
-            debug_only(blk->test_check(true, true));
+            debug_only(blk->test_check());
             return make_tuple(blk, leftover);
         }
 
         /// merge two blocks up to `max_block_size`
         static block * merge(block * left_block, block * right_block) noexcept {
-            debug_only(left_block->test_check(true, true));
+            debug_only(left_block->test_check());
             debug_only(right_block->test_check());
             debug_assert(not left_block->is_border());
             debug_assert(not right_block->is_border());
@@ -321,7 +310,7 @@ namespace cachelot {
         void push_front(block * blk) noexcept {
             debug_assert(not islinked(blk));
             debug_assert(not has(blk));
-            debug_only(blk->test_check(true, true));
+            debug_only(blk->test_check());
             block::link_type *  link = &blk->link;
             debug_assert(dummy_link.next->prev == &dummy_link);
             link->next = dummy_link.next;
@@ -335,7 +324,7 @@ namespace cachelot {
         void push_back(block * blk) noexcept {
             debug_assert(not islinked(blk));
             debug_assert(not has(blk));
-            debug_only(blk->test_check(true, true));
+            debug_only(blk->test_check());
             block::link_type * link = &blk->link;
             link->prev = dummy_link.prev;
             debug_assert(link->prev->next == &dummy_link);
@@ -410,7 +399,7 @@ namespace cachelot {
         /// remove block `blk` from the any list in which it is linked
         static void unlink(block * blk) noexcept {
             debug_assert(islinked(blk));
-            debug_only(blk->test_check(true, true));
+            debug_only(blk->test_check());
             unlink(&blk->link);
         }
 
@@ -449,7 +438,7 @@ namespace cachelot {
         static block * block_from_link(block::link_type * link) noexcept {
             auto ui8_ptr = reinterpret_cast<uint8 *>(link);
             auto blk = reinterpret_cast<block *>(ui8_ptr - offsetof(block, link));
-            debug_only(blk->test_check(true, true));
+            debug_only(blk->test_check());
             return blk;
         }
 
@@ -675,7 +664,7 @@ namespace cachelot {
             if (bit_index_probe(pos)) {
                 block * blk = get_block_at(pos);
                 if (blk != nullptr) {
-                    debug_only(blk->test_check(true, true));
+                    debug_only(blk->test_check());
                     debug_only(pos.test_size_check(blk->size()));
                     return make_tuple(blk, pos);
                 }
@@ -774,28 +763,29 @@ namespace cachelot {
         /// try to retrieve block at position `pos`, return `nullptr` if there are no blocks
         block * get_block_at(const position pos) noexcept {
             debug_only(pos.test_check());
-            block * blk;
-            block_list & size_class = table[pos.absolute()];
-            if (not size_class.empty()) {
-                blk = size_class.pop_front();
-                debug_assert(not blk->is_border());
-                debug_only(blk->test_check());
-                debug_only(pos.test_size_check(blk->size()));
-                debug_assert(blk->size() >= pos.block_size());
+            if (bit_index_probe(pos)) {
+                block_list & size_class = table[pos.absolute()];
+                if (not size_class.empty()) {
+                    block * blk = size_class.pop_front();
+                    debug_assert(not blk->is_border());
+                    debug_only(blk->test_check());
+                    debug_only(pos.test_size_check(blk->size()));
+                    debug_assert(blk->size() >= pos.block_size());
+                    return blk;
+                } else {
+                    bit_index_mark_empty(pos);
+                    return nullptr;
+                }
             } else {
-                blk = nullptr;
+                debug_assert(table[pos.absolute()].empty());
+                return nullptr;
             }
-            // we must update bit indexes if there are no free blocks left
-            if (size_class.empty()) {
-                bit_index_mark_empty(pos);
-            }
-            return blk;
         }
 
         /// store block `blk` at position `pos`
         void put_block_at(block * blk, const position pos) noexcept {
-            debug_assert(not blk->is_border());
             debug_only(blk->test_check());
+            debug_assert(not blk->is_border());
             debug_only(pos.test_size_check(blk->size()));
             debug_only(pos.test_check());
             memalloc::block_list & size_class = table[pos.absolute()];
@@ -965,7 +955,7 @@ namespace cachelot {
     inline bool memalloc::valid_addr(void * ptr) const noexcept {
         uint8 * u8_ptr = reinterpret_cast<uint8 *>(ptr);
         if (arena_begin < u8_ptr && u8_ptr < arena_end) {
-            debug_only(block::from_user_ptr(ptr)->test_check(true, true));
+            debug_only(block::from_user_ptr(ptr)->test_check());
             return true;
         } else {
             debug_assert(false);
@@ -981,6 +971,8 @@ namespace cachelot {
         debug_assert(size <= block::max_size);
         debug_assert(size > 0);
         const uint32 nsize = size > block::min_size ? static_cast<uint32>(size) : block::min_size;
+        debug_only(free_blocks->test_bit_index_integrity_check());
+        debug_only(used_blocks->test_bit_index_integrity_check());
         // 1. Lookup for the free block
         group_by_size::position found_blk_pos;
         {
@@ -1009,72 +1001,71 @@ namespace cachelot {
                 }
             }
         }
-        {
-            // 1.3. Try to satisfy allocation from the smaller blocks
-            if (found_blk_pos.block_size() > size && (found_blk_pos.pow_index > 0 || found_blk_pos.sub_index > 0)) {
-                for (unsigned attempt = 0; attempt < 10; ++attempt) {
-
-                }
-            }
-        }
 
         // 2. Try to evict existing block to free some space
         if (evict_if_necessary) {
+        {
             // 2.1. Lookup within same class size of used blocks
             //block_list & size_class = used_blocks->size_class_at(found_blk_pos);
             //block * used_blk = size_class.back();
             block * used_blk = used_blocks->get_block_at(found_blk_pos);
             if (used_blk != nullptr) {
+                debug_assert(used_blk->size() >= nsize);
                 on_free_block(used_blk->memory());
                 block::unuse(used_blk);
                 stats.num_used_table_hits += 1;
                 return checkout(used_blk, size);
             }
-
+        }
+        {
             // 2.2. Try to evict bigger available block
+            block * used_blk;
             tie(used_blk, found_blk_pos) = used_blocks->try_get_block_after(found_blk_pos);
             if (used_blk != nullptr) {
+                debug_assert(used_blk->size() >= nsize);
                 on_free_block(used_blk->memory());
                 block::unuse(used_blk);
                 return checkout(used_blk, size);
             }
+        }
+        {
             // 2.3 Merge one of biggest used blocks
-            used_blk = used_blocks->get_biggest_block();
-            if (used_blk != nullptr) {
-                on_free_block(used_blk->memory());
-                block::unuse(used_blk);
+            block * big_used_blk;
+            big_used_blk = used_blocks->get_biggest_block();
+            if (big_used_blk != nullptr) {
+                on_free_block(big_used_blk->memory());
+                block::unuse(big_used_blk);
                 // TODO: This particular merge breaks O(1) complexity
-                while (used_blk->size() < nsize) {
-                    uint32 available_left = used_blk->left_adjacent()->size();
-                    uint32 available_right = used_blk->right_adjacent()->size();
+                while (big_used_blk->size() < nsize) {
+                    uint32 available_left = big_used_blk->left_adjacent()->size();
+                    uint32 available_right = big_used_blk->right_adjacent()->size();
                     debug_assert(available_left != 0 || available_right != 0);
                     if (available_right > available_left) {
-                        block * right = used_blk->right_adjacent();
+                        block * right = big_used_blk->right_adjacent();
                         if (right->is_used()) {
                             on_free_block(right->memory());
                             block::unuse(right);
                         }
                         block_list::unlink(right);
-                        used_blk = block::merge(used_blk, right);
+                        big_used_blk = block::merge(big_used_blk, right);
                     } else {
-                        block * left = used_blk->left_adjacent();
+                        block * left = big_used_blk->left_adjacent();
                         if (left->is_used()) {
                             on_free_block(left->memory());
                             block::unuse(left);
                         }
                         block_list::unlink(left);
-                        used_blk = block::merge(left, used_blk);
+                        big_used_blk = block::merge(left, big_used_blk);
                     }
                 }
-                if (used_blk->size() >= nsize) {
-                    return checkout(used_blk, size);
+                if (big_used_blk->size() >= nsize) {
+                    return checkout(big_used_blk, size);
                 } else {
-                    free_blocks->put_block(used_blk);
+                    free_blocks->put_block(big_used_blk);
                 }
             }
         }
-        debug_only(free_blocks->test_bit_index_integrity_check());
-        debug_only(used_blocks->test_bit_index_integrity_check());
+        }
         stats.total_requested_mem -= size;
         stats.num_errors += 1;
         return nullptr;
@@ -1120,6 +1111,8 @@ namespace cachelot {
 
 
     inline void memalloc::free(void * ptr) noexcept {
+        debug_only(free_blocks->test_bit_index_integrity_check());
+        debug_only(used_blocks->test_bit_index_integrity_check());
         stats.num_free += 1;
         debug_assert(valid_addr(ptr));
         block * blk = block::from_user_ptr(ptr);
