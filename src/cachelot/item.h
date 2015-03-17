@@ -188,6 +188,7 @@ namespace cachelot {
 
 
         inline size_t Item::ValueOffset(const Item * i) noexcept {
+            debug_assert(i != nullptr && i->m_key_length > 0);
             return KeyOffset(i) + i->m_key_length;
         }
 
