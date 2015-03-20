@@ -443,6 +443,7 @@ namespace cachelot {
             if (m_allocator.try_realloc_inplace(item, size_required)) {
                 item->reassign(new_value, new_flags, time_from(new_expires), new_cas_value);
             } else {
+                throw std::bad_alloc();
                 m_dict.remove(at);
                 auto new_item = item_new(item->key(), item->hash(), new_value, new_flags, new_expires, new_cas_value);
                 // TODO: we may double delete same Item (previously during eviction)
