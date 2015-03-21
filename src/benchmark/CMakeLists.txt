@@ -3,9 +3,15 @@ project (cachelot_benchmarks)
 include (${CMAKE_SOURCE_DIR}/src/cachelot/CMakeLists.txt)
 
 ### Cache benchmark
-add_executable(cache_benchmark cache_benchmark.cpp ${CACHELOT_SOURCES})
+add_executable(benchmark_cache benchmark_cache.cpp ${CACHELOT_SOURCES})
+set_target_properties (benchmark_cache PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${CACHELOT_BUILD})
+target_link_libraries (benchmark_cache ${Boost_LIBRARIES})
 
-set_target_properties (cache_benchmark PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${CACHELOT_BUILD})
-target_link_libraries (cache_benchmark ${Boost_LIBRARIES})
+### Memalloc benchmark
+add_executable(benchmark_memalloc benchmark_memalloc.cpp ${CACHELOT_SOURCES})
+set_target_properties (benchmark_memalloc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${CACHELOT_BUILD})
+target_link_libraries (benchmark_memalloc ${Boost_LIBRARIES})
+
+
 
 #######
