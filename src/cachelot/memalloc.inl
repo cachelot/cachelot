@@ -277,7 +277,7 @@ namespace cachelot {
             debug_assert(right_block->left_adjacent() == left_block);
             debug_assert(left_block->right_adjacent() == right_block);
             debug_assert(left_block->is_free()); debug_assert(right_block->is_free());
-            debug_assert(left_block->size() + right_block->size_with_meta() < block::max_size);
+            debug_assert(left_block->size() + right_block->size_with_meta() <= block::max_size);
             memalloc::block * block_after_right = right_block->right_adjacent();
             left_block->set_size(left_block->size() + right_block->size_with_meta());
             //debug_only(std::memset(right_block, DBG_FILLER, sizeof(block)));
