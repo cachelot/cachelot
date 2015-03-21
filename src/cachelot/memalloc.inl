@@ -132,7 +132,7 @@ namespace cachelot {
             debug_only(link.prev = &link);
             debug_only(link.next = &link);
             // Fill-in memory with debug pattern
-            //debug_only(std::memset(memory_, DBG_FILLER, the_size));
+            debug_only(std::memset(memory_, DBG_FILLER, the_size));
             meta.size = the_size;
             meta.used = false;
             meta.left_adjacent_offset = left_adjacent_block->size_with_meta();
@@ -233,8 +233,6 @@ namespace cachelot {
             debug_assert(not blk->meta.used);
             blk->meta.used = true;
             // ensure that user memory is still filled with debug pattern
-            debug_only(uint32 half_size = blk->size() > 0 ? (blk->size() - sizeof(link)) / 2 : 0);
-            //debug_assert(std::memcmp(blk->memory_ + sizeof(link), blk->memory_ + sizeof(link) + half_size, half_size) == 0);
             return blk->memory_;
         }
 
@@ -245,7 +243,7 @@ namespace cachelot {
             debug_assert(not blk->is_border());
             debug_assert(blk->is_used());
             blk->meta.used = false;
-            //debug_only(std::memset(blk->memory_, DBG_FILLER, blk->size()));
+            debug_only(std::memset(blk->memory_, DBG_FILLER, blk->size()));
         }
 
         /// split given block `blk` to the smaller block of `new_size`, returns splited block and leftover space as a block
