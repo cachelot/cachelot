@@ -91,27 +91,6 @@ namespace cachelot {
         group_by_size * free_blocks; // free blocks are stored here
         group_by_size * used_blocks; // used for block eviction
 
-    public:
-        // stats
-        struct {
-            uint64 num_malloc = 0;
-            uint64 num_free = 0;
-            uint64 num_realloc = 0;
-            uint64 num_errors = 0;
-            /// amount of memory that has requested but wasn't served due to errors
-            uint64 total_unserved_mem = 0;
-            uint64 total_requested_mem = 0;
-            uint64 total_served_mem = 0;
-            uint64 requested_mem = 0;
-            uint64 served_mem = 0;
-            uint64 num_free_table_hits = 0;
-            uint64 num_used_table_hits = 0;
-            uint64 num_free_table_splits = 0;
-            uint64 num_used_table_splits = 0;
-            uint64 num_splits = 0;
-            uint64 num_merges = 0;
-        } stats;
-
     private:
         // unit tests
         friend struct test_memalloc::test_block_list;
