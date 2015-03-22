@@ -344,6 +344,15 @@ namespace cachelot {
             return block_from_link(link);
         }
 
+        /// remove tail of the list
+        block * pop_back() noexcept {
+            debug_assert(not empty());
+            block::link_type * link = dummy_link.prev;
+            debug_assert(link->next == &dummy_link);
+            unlink(link);
+            return block_from_link(link);
+        }
+
         /// return list head of the list
         block * front() noexcept {
             debug_assert(not empty());
@@ -655,6 +664,12 @@ namespace cachelot {
     public:
         group_by_size() = default;
 
+        /// choose the side of bi-directional block list
+        enum BlockAge {
+            OLDEST_BLOCK,
+            NEWEST_BLOCK
+        };
+
         /// try to get block of a `requested_size`
         /// @return block pointer or `nullptr` if fail
         tuple<block *, position> try_get_block(const uint32 requested_size) noexcept {
@@ -685,7 +700,7 @@ namespace cachelot {
 
         /// try to get the biggest available block
         /// @return block pointer or `nullptr` if fail
-        block * get_biggest_block() noexcept {
+        block * get_biggest_block(BlockAge age_of_block) noexcept {
             // accessing indexes first
             while (first_level_bit_index > 0) {
                 // 1. retrieve maximal non-empty size_classs group among powers of 2
@@ -695,7 +710,7 @@ namespace cachelot {
                 const uint32 sub_index = bit::most_significant(second_level_bit_index[pow_index]);
                 const position biggest_block_pos = position(pow_index, sub_index);
                 // get_block_at will update bit indexes if there's no block
-                block * big_block = get_block_at(biggest_block_pos);
+                block * big_block = get_block_at(biggest_block_pos, age_of_block);
                 if (big_block) {
                     return big_block;
                 }
@@ -705,7 +720,7 @@ namespace cachelot {
 
         /// try to get block after given `pos`
         /// @return block pointer or `nullptr` if fail
-        tuple<block *, position> try_get_block_after(position pos) noexcept {
+        tuple<block *, position> try_get_block_after(position pos, BlockAge age_of_block) noexcept {
             const auto has_non_empty_after = [this](position p) -> bool {
                 return (bit::most_significant(first_level_bit_index) > p.pow_index) || (bit::most_significant(second_level_bit_index[p.pow_index]) > p.sub_index);
             };
@@ -727,7 +742,7 @@ namespace cachelot {
                     debug_assert(next_non_empty_sub_index > lookup_pos.sub_index || next_non_empty_sub_index == 0);
                     if (next_non_empty_sub_index != 0) {
                         lookup_pos = position(lookup_pos.pow_index, next_non_empty_sub_index);
-                        block * blk = get_block_at(lookup_pos);
+                        block * blk = get_block_at(lookup_pos, age_of_block);
                         if (blk) {
                             return tuple<block *, position>(blk, lookup_pos);
                         }
@@ -739,7 +754,7 @@ namespace cachelot {
                 if (next_non_empty_power_index != 0) {
                     debug_assert(second_level_bit_index[next_non_empty_power_index] > 0);
                     lookup_pos = position(next_non_empty_power_index, bit::least_significant(second_level_bit_index[next_non_empty_power_index]) - 1);
-                    block * blk = get_block_at(lookup_pos);
+                    block * blk = get_block_at(lookup_pos, age_of_block);
                     if (blk) {
                         return tuple<block *, position>(blk, lookup_pos);
                     }
@@ -763,13 +778,17 @@ namespace cachelot {
         }
 
         /// try to retrieve block at position `pos`, return `nullptr` if there are no blocks
-        block * get_block_at(const position pos) noexcept {
+        block * get_block_at(const position pos, BlockAge age_of_block) noexcept {
             debug_only(pos.test_check());
             block * blk = nullptr;
             if (bit_index_probe(pos)) {
                 block_list & size_class = table[pos.absolute()];
                 if (not size_class.empty()) {
-                    blk = size_class.pop_front();
+                    if (age_of_block == NEWEST_BLOCK) {
+                        blk = size_class.pop_front();
+                    } else {
+                        blk = size_class.pop_back();
+                    }
                     debug_assert(not blk->is_border());
                     debug_only(blk->test_check());
                     debug_only(pos.test_size_check(blk->size()));
@@ -985,7 +1004,7 @@ namespace cachelot {
         }
         {
             // 1.2. Try to split the biggest available block
-            block * huge_block = free_blocks->get_biggest_block();
+            block * huge_block = free_blocks->get_biggest_block(group_by_size::NEWEST_BLOCK);
             if (huge_block != nullptr) {
                 debug_assert(not block_list::islinked(huge_block));
                 if (huge_block->size() >= nsize) {
@@ -1009,7 +1028,7 @@ namespace cachelot {
             // 2.1. Lookup within same class size of used blocks
             //block_list & size_class = used_blocks->size_class_at(found_blk_pos);
             //block * used_blk = size_class.back();
-            block * used_blk = used_blocks->get_block_at(found_blk_pos);
+            block * used_blk = used_blocks->get_block_at(found_blk_pos, group_by_size::OLDEST_BLOCK);
             if (used_blk != nullptr) {
                 debug_assert(used_blk->size() >= nsize);
                 on_free_block(used_blk->memory());
@@ -1021,7 +1040,7 @@ namespace cachelot {
         {
             // 2.2. Try to evict bigger available block
             block * used_blk;
-            tie(used_blk, found_blk_pos) = used_blocks->try_get_block_after(found_blk_pos);
+            tie(used_blk, found_blk_pos) = used_blocks->try_get_block_after(found_blk_pos, group_by_size::OLDEST_BLOCK);
             if (used_blk != nullptr) {
                 debug_assert(used_blk->size() >= nsize);
                 on_free_block(used_blk->memory());
@@ -1033,7 +1052,7 @@ namespace cachelot {
         {
             // 2.3 Merge one of biggest used blocks
             block * big_used_blk;
-            big_used_blk = used_blocks->get_biggest_block();
+            big_used_blk = used_blocks->get_biggest_block(group_by_size::OLDEST_BLOCK);
             if (big_used_blk != nullptr) {
                 on_free_block(big_used_blk->memory());
                 block::unuse(big_used_blk);
