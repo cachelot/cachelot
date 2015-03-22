@@ -3,6 +3,7 @@
 #include <cachelot/random.h>
 #include <cachelot/hash_fnv1a.h>
 #include <cachelot/settings.h>
+#include <cachelot/stats.h>
 
 #include <iostream>
 #include <iomanip>
@@ -34,10 +35,10 @@ static struct stats_type {
     uint64 num_cache_hit = 0;
     uint64 num_cache_miss = 0;
     uint64 num_error = 0;
-} stats;
+} __stats__;
 
 inline void reset_stats() {
-    new (&stats)stats_type();
+    new (&__stats__)stats_type();
 }
 
 typedef std::tuple<string, string> kv_type;
@@ -55,9 +56,9 @@ public:
         bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
         error_code error; cache::Response cache_reply;
         tie(error, cache_reply) = m_cache.do_set(k, calc_hash(k), v, /*flags*/0, forever, /*CAS*/0);
-        stats.num_set += 1;
+        __stats__.num_set += 1;
         if (error) {
-            stats.num_error += 1;
+            __stats__.num_error += 1;
         }
     }
 
@@ -65,12 +66,12 @@ public:
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         m_cache.do_get(k, calc_hash(k),
                     [=](error_code error, bool found, bytes, cache::opaque_flags_type, cache::cas_value_type) {
-                        stats.num_get += 1;
+                        __stats__.num_get += 1;
                         if (not error) {
-                            auto & counter = found ? stats.num_cache_hit : stats.num_cache_miss;
+                            auto & counter = found ? __stats__.num_cache_hit : __stats__.num_cache_miss;
                             counter += 1;
                         } else {
-                            stats.num_error += 1;
+                            __stats__.num_error += 1;
                         }
                     });
     }
@@ -79,12 +80,12 @@ public:
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         error_code error; cache::Response cache_reply;
         tie(error, cache_reply) = m_cache.do_del(k, calc_hash(k));
-        stats.num_del += 1;
+        __stats__.num_del += 1;
         if (not error) {
-            auto & counter = (cache_reply == cache::DELETED) ? stats.num_cache_hit : stats.num_cache_miss;
+            auto & counter = (cache_reply == cache::DELETED) ? __stats__.num_cache_hit : __stats__.num_cache_miss;
             counter += 1;
         } else {
-            stats.num_error += 1;
+            __stats__.num_error += 1;
         }
 
     }
@@ -147,15 +148,17 @@ int main(int /*argc*/, char * /*argv*/[]) {
     const double sec = time_passed.count() / 1000000000;
     std::cout << std::fixed << std::setprecision(3);
     std::cout << "Time spent: " << sec << "s" << std::endl;
-    std::cout << "get:        " << stats.num_get << std::endl;
-    std::cout << "set:        " << stats.num_set << std::endl;
-    std::cout << "del:        " << stats.num_del << std::endl;
-    std::cout << "cache_hit:  " << stats.num_cache_hit << std::endl;
-    std::cout << "cache_miss: " << stats.num_cache_miss << std::endl;
-    std::cout << "error:      " << stats.num_error << std::endl;
-    const double RPS = (stats.num_get + stats.num_set + stats.num_del) / sec;
+    std::cout << "get:        " << __stats__.num_get << std::endl;
+    std::cout << "set:        " << __stats__.num_set << std::endl;
+    std::cout << "del:        " << __stats__.num_del << std::endl;
+    std::cout << "cache_hit:  " << __stats__.num_cache_hit << std::endl;
+    std::cout << "cache_miss: " << __stats__.num_cache_miss << std::endl;
+    std::cout << "error:      " << __stats__.num_error << std::endl;
+    const double RPS = (__stats__.num_get + __stats__.num_set + __stats__.num_del) / sec;
     std::cout << "rps:        " << RPS << std::endl;
     std::cout << "avg. cost:  " << static_cast<unsigned>(1000000000 / RPS) << "ns" << std::endl;
+    std::cout << std::endl;
+    PrintStats();
 
     return 0;
 }

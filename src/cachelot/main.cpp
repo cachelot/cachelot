@@ -2,6 +2,7 @@
 #include <cachelot/proto_memcached_servers.h>
 #include <cachelot/cache.h>
 #include <cachelot/settings.h>
+#include <cachelot/stats.h>
 
 #include <iostream>
 #include <boost/program_options.hpp>
@@ -24,11 +25,16 @@ namespace  {
         reactor.stop();
     }
 
+    void on_signal_print_stats(int) {
+        try { PrintStats(); } catch (...) {}
+    }
+
     void setup_signals() {
         signal(SIGTERM, &on_signal_terminate);
         signal(SIGKILL, &on_signal_terminate);
         signal(SIGINT, &on_signal_terminate);
         signal(SIGQUIT, &on_signal_terminate);
+        signal(SIGUSR1, &on_signal_print_stats);
     }
 
     /// Command line arguments parser
