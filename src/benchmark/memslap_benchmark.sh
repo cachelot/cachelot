@@ -1,8 +1,9 @@
 #!/bin/sh
 
-REMOTE_SSH="servantus"
-SERVER_ADDR="192.168.0.114"
-MEMSLAP="$HOME/workspace/libmemcached-1.0.18/clients/memslap"
+REMOTE_SSH="devel-centos"
+SERVER_ADDR="192.168.14.2"
+#MEMSLAP="$HOME/workspace/libmemcached-1.0.18/clients/memslap"
+MEMSLAP="/usr/bin/memslap"
 CACHELOT="/home/rider/workspace/cachelot/bin/release/cachelot"
 MEMCACHED="/usr/bin/memcached"
 NUM_ITEMS=100000
@@ -17,9 +18,9 @@ function ssh_command() {
 
 
 function ssh_bg_command() {
-    local remote_command=$(echo "nohup $* > /dev/null 2>&1 < /dev/null & ; sleep .3 ; ps -p \$! > /dev/null || exit 1")
+    local remote_command=$(echo "nohup $* > /dev/null 2>&1 < /dev/null &")
     echo "running \"$remote_command\" ..."
-    ssh "$REMOTE_SSH" "$remote_command" || exit 1
+    ssh "$REMOTE_SSH" "${remote_command}"
     sleep 10
 }
 
@@ -86,18 +87,18 @@ function print_title() {
 }
 
 ## Main ----------------------------------------------------------
-trap "stop_cachelot_and_memcached; exit" SIGHUP SIGINT SIGTERM
+trap "stop_cachelot_and_memcached" SIGHUP SIGINT SIGTERM
 stop_cachelot_and_memcached
-
-print_title "memcached"
-ssh_bg_command $MEMCACHED -p 11211
-run_test_for "-s $SERVER_ADDR:11211"
-stop_cachelot_and_memcached
-sleep 60
 
 print_title "cachelot"
 ssh_bg_command $CACHELOT -p 11212
 run_test_for "-s $SERVER_ADDR:11212"
+stop_cachelot_and_memcached
+sleep 60
+
+print_title "memcached"
+ssh_bg_command $MEMCACHED -p 11211
+run_test_for "-s $SERVER_ADDR:11211"
 stop_cachelot_and_memcached
 sleep 60
 
