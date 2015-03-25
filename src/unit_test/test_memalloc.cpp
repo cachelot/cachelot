@@ -112,19 +112,7 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
         }
         // start over again
     }
-    std::cout << "num_malloc = " << allocator.stats.num_malloc << std::endl;
-    std::cout << "num_free = " << allocator.stats.num_free << std::endl;
-    std::cout << "num_realloc = " << allocator.stats.num_realloc << std::endl;
-    std::cout << "num_errors = " << allocator.stats.num_errors << std::endl;
-    std::cout << "total_requested_mem = " << allocator.stats.total_requested_mem << std::endl;
-    std::cout << "total_served_mem = " << allocator.stats.total_served_mem << std::endl;
-    std::cout << "served_mem = " << allocator.stats.served_mem << std::endl;
-    std::cout << "num_free_table_hits = " << allocator.stats.num_free_table_hits << std::endl;
-    std::cout << "num_used_table_hits = " << allocator.stats.num_used_table_hits << std::endl;
-    std::cout << "num_free_table_splits = " << allocator.stats.num_free_table_splits << std::endl;
-    std::cout << "num_used_table_merges = " << allocator.stats.num_used_table_splits << std::endl;
-    std::cout << "num_splits = " << allocator.stats.num_splits << std::endl;
-    std::cout << "num_merges = " << allocator.stats.num_merges << std::endl;
+    PrintStats();
 }
 
 
