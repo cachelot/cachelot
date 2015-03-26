@@ -1,6 +1,13 @@
 #ifndef CACHELOT_IO_SERIALIZATION_H_INCLUDED
 #define CACHELOT_IO_SERIALIZATION_H_INCLUDED
 
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
 #ifndef CACHELOT_IO_BUFFER_H_INCLUDED
 #  include <cachelot/io_buffer.h>
 #endif

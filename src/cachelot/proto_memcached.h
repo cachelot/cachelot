@@ -1,6 +1,13 @@
 #ifndef CACHELOT_PROTO_MEMCACHED_H_INCLUDED
 #define CACHELOT_PROTO_MEMCACHED_H_INCLUDED
 
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
 #ifndef CACHELOT_ERROR_H_INCLUDED
 #  include <cachelot/error.h>
 #endif

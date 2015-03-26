@@ -1,6 +1,13 @@
 #ifndef CACHELOT_MEMCACHED_TCP_H_INCLUDED
 #define CACHELOT_MEMCACHED_TCP_H_INCLUDED
 
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
 #include <cachelot/tcp_server.h>
 #include <cachelot/unix_socket_server.h>
 #include <cachelot/proto_memcached_text.h>

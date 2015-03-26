@@ -1,6 +1,13 @@
 #ifndef CACHELOT_CACHE_ITEM_H_INCLUDED
 #define CACHELOT_CACHE_ITEM_H_INCLUDED
 
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
 #ifndef CACHELOT_BYTES_H_INCLUDED
 #  include <cachelot/bytes.h> // key, value
 #endif
