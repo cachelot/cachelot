@@ -6,16 +6,14 @@ Cachelot is high-performance caching library and distributed caching server. It 
 How To Build
 ------------
 
-Prerequisites
-~~~~~~~~~~~~~
+### Prerequisites ###
 
  * C++11 capable compiler
  * [Boost libraries](http://boost.org/) either includes / libraries must be at the standard locations or ${BOOST_ROOT} environment variable must point to the libraries location. Please note that cachelot links with boost statically
  * [cmake](http://cmake.org/)
  * optionally [Doxygen](http://doxygen.org/) to build docs
 
-Build
-~~~~~~
+### Build ###
 
 Clone source code repository
 
