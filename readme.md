@@ -1,7 +1,9 @@
 Cachelot
 ========
 
-Cachelot is high-performance caching library and distributed caching server. It is compatible with [Memcached](http://memcached.org) but introduces higher performance, less memory consumption, and some new features. 
+Cachelot is high-performance caching library and distributed caching server. 
+
+It is compatible with [Memcached](http://memcached.org) but introduces higher performance, less memory consumption, and some new features. 
 
 How To Build
 ------------
@@ -67,5 +69,6 @@ Credits
 
 License
 -------
-*Cachelot* distributed under the terms of Simplified BSD License
+Cachelot distributed under the terms of Simplified BSD License
+
 [http://opensource.org/licenses/BSD-2-Clause](http://opensource.org/licenses/BSD-2-Clause)
