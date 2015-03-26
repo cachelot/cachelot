@@ -1,6 +1,13 @@
 #ifndef CACHELOT_PROTO_MEMCACHED_TEXT
 #define CACHELOT_PROTO_MEMCACHED_TEXT
 
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
 #include <cachelot/proto_memcached.h>
 
 /**

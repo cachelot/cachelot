@@ -1,6 +1,13 @@
 #ifndef CACHELOT_DEBUG_TRACE_H_INCLUDED
 #define CACHELOT_DEBUG_TRACE_H_INCLUDED
 
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
 #ifdef DEBUG
 
 #include <iostream>

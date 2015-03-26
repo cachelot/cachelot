@@ -1,6 +1,13 @@
 #ifndef CACHELOT_ERROR_H_INCLUDED
 #define CACHELOT_ERROR_H_INCLUDED
 
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
 #include <boost/system/error_code.hpp>   // error_code, error_category
 #include <boost/system/system_error.hpp> // system_error exception
 

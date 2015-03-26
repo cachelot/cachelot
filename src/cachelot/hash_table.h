@@ -1,6 +1,13 @@
 #ifndef CACHELOT_HASH_TABLE_H_INCLUDED
 #define CACHELOT_HASH_TABLE_H_INCLUDED
 
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
 #include <cachelot/bits.h> // is_pow2
 
 /// @ingroup common

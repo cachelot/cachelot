@@ -1,24 +1,29 @@
-Cachelot                         {#mainpage}
+Cachelot
 ========
 
-*Cachelot* is memory key-value cache. It is compatible with [memcached](http://memcached.org/), but introduces higher performance, less memory consumption and new features.
+Cachelot is high-performance caching library and distributed caching server. It is compatible with [Memcached](http://memcached.org) but introduces higher performance, less memory consumption, and some new features. 
 
+How To Build
+------------
 
-## How To Build
+Prerequisites
+~~~~~~~~~~~~~
 
-### Prerequisites
  * C++11 capable compiler
- * [boost libraries](http://boost.org/) either includes / libraries must be at the standard locations or `${BOOST_ROOT}` environment variable must be set
+ * [Boost libraries](http://boost.org/) either includes / libraries must be at the standard locations or ${BOOST_ROOT} environment variable must point to the libraries location. Please note that cachelot links with boost statically
  * [cmake](http://cmake.org/)
  * optionally [Doxygen](http://doxygen.org/) to build docs
 
-### Build
-Clone project repository
+Build
+~~~~~~
 
-    $ hg clone https://d.rider@bitbucket.org/d.rider/cachelot
+Clone source code repository
+
+    $ hg clone https://bitbucket.org/cachelot/cachelot
     $ cd cachelot
 
 Generate project files for your favorite IDE or Makefile by running `cmake -G "{generator}"` in main project directory.
+
 For example:
 
     $ cmake -G "Unix Makefiles"
@@ -27,49 +32,40 @@ or
 
     $ cmake -G "Xcode"
 
-It's possible to configure build by passing parameters to cmake:
+It's possible to configure the build by passing parameters to cmake:
 
- * `-DFORCE_32_BITS=1` to force creation of 32 bit executable on x64 platform
- * `-DCMAKE_BUILD_TYPE` to choose build type while generationg Makefiles.
+Build with IDE or by running make in root project directory. All binaries (main executable, unit tests, etc.) will be in ./bin/<build_type> directory.
+
+
+ * `-DCMAKE_BUILD_TYPE` to choose build type.
    Must be one of:
      - Debug - enable debug messages, assertions and disable optimization
      - Release - release build
      - RelWithDebInfo - release build with debug information enabled
-     - MinSizeRel - release build optimized for size
      - AddressSanitizer - special build to run under [Address Sanitizer](https://code.google.com/p/address-sanitizer/) (compiler support required)
 
-Build with IDE or by running `make` in root project directory. All binaries (main executable, unit tests, etc.) will be placed in `./bin/{configuration}` directory.
-
-#### Build using clang and libc++ on Linux (when primary compiler is GCC)
-Assume you have working clang and libc++ (including libc++ ABI with headers) at this point
-Generate Makefile:
-
-    $ CC=clang CXX=clang++ cmake -G "Unix Makefiles" -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXX_LIBCXXABI_INCLUDE_PATHS="${path_to}/libcxxabi/include"
+Build with IDE or by running `make` in root project directory. All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
 
 
-Contact
--------
- * [Facebook](https://www.facebook.com/cachelot.io)
- * [Bitbucket](https://bitbucket.org/d.rider/cachelot)
-
-Limitations
------------
-*TODO*: contents
-
-Found a Bug?
-------------
-*TODO*: contents
-
-How To Contribute
------------------
-*TODO*: contents
-
-Limitations
------------
-*TODO*: contents
 
 Known Issues
 ------------
 *TODO*: contents
 
+Contact
+-------
+ * [www.cachelot.io](http://www.cachelot.io)
+ * [Facebook](https://www.facebook.com/cachelot.io)
+ * [Twitter](https://twitter.com/cachelot_io)
+ * [Bugs](http://dev.cachelot.io/cachelot/issues)
+ * [Github mirror](http://github.com/cachelot)
 
+
+Credits
+-------
+ * [boost C++ libraries](http://www.boost.org)
+ * [C++ String Toolkit Library](http://www.partow.net/programming/strtk/index.html)
+
+License
+-------
+*Cachelot* distributed under the terms of Simplified BSD License

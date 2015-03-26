@@ -1,6 +1,14 @@
 #ifndef CACHELOT_MEMALLOC_H_INCLUDED
 #  error "Header is not for direct use"
 #endif
+
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
 /**
  * @page   memalloc
  * @brief  memalloc implementation

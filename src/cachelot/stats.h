@@ -1,6 +1,13 @@
 #ifndef CACHELOT_STATS_H_INCLUDED
 #define CACHELOT_STATS_H_INCLUDED
 
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
 /// @ingroup stats Cache usage statistics
 /// @{
 
