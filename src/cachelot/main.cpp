@@ -46,8 +46,7 @@ namespace  {
             ("udp-port,U", po::value<uint16>()->default_value(11211),   "UDP port number to listen on (0 is off)")
             ("socket,s",   po::value<string>(),                         "UNIX socket path to listen on")
             ("socket_access,a", po::value<unsigned>(),                  "access mask for UNIX socket, in octal (default: 0700)")
-            ("listen,l",   po::value<std::vector<string>>(),
-                                                                        "interface to listen on (default: INADDR_ANY, all addresses)\n"
+            ("listen,l",   po::value<std::vector<string>>(),            "interface to listen on (default: INADDR_ANY, all addresses)\n"
                                                                         "<arg> may be specified as host:port. If you don't specify a port number,"
                                                                         "the value you specified with -p or -U is used."
                                                                         "You may specify multiple addresses separated by comma or by using -l multiple times")
@@ -107,6 +106,13 @@ int main(int argc, char * argv[]) {
             memcached_tcp_text->start(settings.net.TCP_port);
         }
 
+        // Unix socket
+        std::unique_ptr<memcached::text_unix_stream_server> memcached_unix_stream_text = nullptr;
+        if (settings.net.has_unix_socket) {
+            memcached_unix_stream_text.reset(new memcached::text_unix_stream_server(reactor, *the_cache));
+            memcached_unix_stream_text->start(settings.net.unix_socket);
+        }
+
         error_code error;
         do {
             reactor.run(error);
@@ -114,6 +120,9 @@ int main(int argc, char * argv[]) {
 
         if (memcached_tcp_text) {
             memcached_tcp_text->stop();
+        }
+        if (memcached_unix_stream_text) {
+            memcached_unix_stream_text->stop();
         }
 
         return EXIT_SUCCESS;

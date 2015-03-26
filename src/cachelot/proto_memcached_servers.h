@@ -1,5 +1,5 @@
-#ifndef CACHELOT_MEMCACHED_TCP_H_INCLUDED
-#define CACHELOT_MEMCACHED_TCP_H_INCLUDED
+#ifndef CACHELOT_PROTO_MEMCACHED_SERVERS_H_INCLUDED
+#define CACHELOT_PROTO_MEMCACHED_SERVERS_H_INCLUDED
 
 //
 //  (C) Copyright 2015 Iurii Krasnoshchok
@@ -56,15 +56,15 @@ namespace cachelot {
     typedef text_protocol_handler<local::stream_protocol::socket> unix_text_protocol_handler;
 
     /// Unix socket based memcached server handling text protocol
-    class text_unix_server : public unix_stream_server<text_unix_server, unix_text_protocol_handler> {
-        typedef unix_stream_server<text_unix_server, unix_text_protocol_handler> super;
+    class text_unix_stream_server : public unix_stream_server<text_unix_stream_server, unix_text_protocol_handler> {
+        typedef unix_stream_server<text_unix_stream_server, unix_text_protocol_handler> super;
     public:
-        explicit text_unix_server(asio::io_service & ios, cache::Cache & the_cache)
+        explicit text_unix_stream_server(asio::io_service & ios, cache::Cache & the_cache)
             : super(ios)
             , cache(the_cache) {
         }
 
-        ~text_unix_server() {
+        ~text_unix_stream_server() {
             super::stop();
         }
 
@@ -85,4 +85,5 @@ namespace cachelot {
 
 /// @}
 
-#endif // CACHELOT_MEMCACHED_UNIX_H_INCLUDED
+#endif // CACHELOT_PROTO_MEMCACHED_SERVERS_H_INCLUDED
+
