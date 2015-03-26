@@ -1,11 +1,14 @@
-Cachelot
-========
+# What is Cachelot Library #
+If your application needs to cache some data and retrieve it from the cache with a speed of light, the easiest way is to store data right into application's memory. That's what cachelot library is. One library with the simple interface. All you need is to provide fixed amount of memory for the cache and access or store 3 millions of items per second (depending on CPU cache size). Maybe 3 million operations per second doesn't sound like too big number for embedded cache, but that number means ~333 nanosecond of one execution while RAM reference costs [~100 nanoseconds](http://www.eecs.berkeley.edu/~rcs/research/interactive_latency.html)
+Cachelot can work as a consistent cache returning an error when out of memory or evict old items to store new.
 
-Cachelot is high-performance caching library and distributed caching server. 
-It is compatible with [Memcached](http://memcached.org) but introduces higher performance, less memory consumption, and some new features. 
+# What is Cachelot Distributed Cache Server #
+Think Memcached (it is Memcached compatible) but while Memcached aims to serve hundreds of thousands of connections (bandwidth) Cachelot serves tens of them with higher RPS rate (latency). Additionally cachelot is single-threaded application, so you can run it consuming fewer resources (cheaper VPS servers can save a lot). 
+And yet cachelot is faster (up to 16% in terms of RPS, depending on a test setup).
 
-How To Build
-------------
+
+## How To Build ##
+Currently, Windows build is broken. Cachelot proved to work on Linux and Mac OS (probably on BSD too)
 
 ### Prerequisites ###
 
@@ -43,16 +46,20 @@ Build with IDE or by running make in root project directory. All binaries (main 
      - RelWithDebInfo - release build with debug information enabled
      - AddressSanitizer - special build to run under [Address Sanitizer](https://code.google.com/p/address-sanitizer/) (compiler support required)
 
-Build with IDE or by running `make` in root project directory. All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
+Build with IDE or by running `make` in root project directory.
+
+### Run tests or benchmarks ###
+All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
 
 
+## Known Issues ##
+ Cachelot is still in 'work in progress' state
+ * Some Memcached commands not implemented yet (`cas`, `touch`, `append`, `prepend`, `stats`)
+ * Windows build is broken
+ * There is no UDP and binary protocol support
+ * Cachelot library doesn't have proper build packaging
 
-Known Issues
-------------
-*TODO*: contents
-
-Contact
--------
+## Contact ##
  * [www.cachelot.io](http://www.cachelot.io)
  * [Facebook](https://www.facebook.com/cachelot.io)
  * [Twitter](https://twitter.com/cachelot_io)
@@ -60,13 +67,11 @@ Contact
  * [Github mirror](http://github.com/cachelot)
 
 
-Credits
--------
+## License ##
+Cachelot distributed under the terms of Simplified BSD License<br/>
+[http://opensource.org/licenses/BSD-2-Clause](http://opensource.org/licenses/BSD-2-Clause)
+
+## Credits ##
  * [boost C++ libraries](http://www.boost.org)
  * [C++ String Toolkit Library](http://www.partow.net/programming/strtk/index.html)
  * Thanks to all open source community
-
-License
--------
-Cachelot distributed under the terms of Simplified BSD License
-[http://opensource.org/licenses/BSD-2-Clause](http://opensource.org/licenses/BSD-2-Clause)
