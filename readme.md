@@ -1,5 +1,6 @@
 # What is Cachelot Library #
-If your application needs to cache some data and retrieve it from the cache with a speed of light, the easiest way is to store data right into application's memory. That's what cachelot library is. One library with the simple interface. All you need is to provide fixed amount of memory for the cache and access or store 3 millions of items per second (depending on CPU cache size). Maybe 3 million operations per second doesn't sound like too big number for embedded cache, but that number means ~333 nanosecond of one execution while RAM reference costs [~100 nanoseconds](http://www.eecs.berkeley.edu/~rcs/research/interactive_latency.html)
+If your application needs to cache some data and retrieve it from the cache with a speed of light, the easiest way is to store data right into application's memory. That's what cachelot library is. One library with the simple interface. All you need is to provide fixed amount of memory for the cache and access or store 3 millions of items per second (depending on CPU cache size).<br/>
+Maybe 3MOps doesn't sound like too big number, but it means ~333 nanosecond spent on a single operation while RAM reference costs [~100 nanoseconds](http://www.eecs.berkeley.edu/~rcs/research/interactive_latency.html).<br/>
 Cachelot can work as a consistent cache returning an error when out of memory or evict old items to store new.
 
 # What is Cachelot Distributed Cache Server #
