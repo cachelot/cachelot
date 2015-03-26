@@ -63,7 +63,9 @@ Credits
 -------
  * [boost C++ libraries](http://www.boost.org)
  * [C++ String Toolkit Library](http://www.partow.net/programming/strtk/index.html)
+ * Thanks to all open source community
 
 License
 -------
 *Cachelot* distributed under the terms of Simplified BSD License
+[http://opensource.org/licenses/BSD-2-Clause](http://opensource.org/licenses/BSD-2-Clause)
