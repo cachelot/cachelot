@@ -26,7 +26,7 @@ Currently, Windows build is broken. Cachelot proved to work on Linux and Mac OS 
 
 Clone source code repository
 
-    $ hg clone https://bitbucket.org/cachelot/cachelot
+    $ hg clone http://dev.cachelot.io/cachelot/cachelot
     $ cd cachelot
 
 Generate project files for your favorite IDE or Makefile by running `cmake -G "{generator}"` in main project directory.
