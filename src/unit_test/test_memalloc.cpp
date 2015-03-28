@@ -15,10 +15,25 @@ static constexpr size_t MAX_ALLOC_SIZE = 1024 * 1024;
 BOOST_AUTO_TEST_SUITE(test_memalloc)
 
 BOOST_AUTO_TEST_CASE(test_block_list) {
+    std::unique_ptr<uint8[]> blocks_layout(new uint8[5 * memalloc::block::min_size]);
+    uint8 * layout_ptr = blocks_layout.get();
+    memalloc::block * left_border = new (layout_ptr) memalloc::block();
+    layout_ptr += left_border->size_with_meta();
+
+    memalloc::block * b1 = new (layout_ptr) memalloc::block(memalloc::block::min_size, left_border);
+    layout_ptr += b1->size_with_meta();
+    memalloc::block * b2 = new (layout_ptr) memalloc::block(memalloc::block::min_size, b1);
+    layout_ptr += b2->size_with_meta();
+    memalloc::block * b3 = new (layout_ptr) memalloc::block(memalloc::block::min_size, b2);
+    layout_ptr += b3->size_with_meta();
+
+    memalloc::block * right_border = new (layout_ptr) memalloc::block(0, b3);
+    memalloc::block::checkout(left_border);
+    memalloc::block::checkout(right_border);
+
+
     memalloc::block_list the_list;
     BOOST_CHECK(the_list.empty());
-    uint8 b1_memory[sizeof(memalloc::block)];
-    memalloc::block * b1 = new (b1_memory) memalloc::block();
     // single item basic operations
     the_list.push_front(b1);
     BOOST_CHECK(not the_list.empty());
@@ -26,12 +41,16 @@ BOOST_AUTO_TEST_CASE(test_block_list) {
     BOOST_CHECK_EQUAL(the_list.back(), b1);
     BOOST_CHECK(the_list.is_head(b1));
     BOOST_CHECK(the_list.is_tail(b1));
+    BOOST_CHECK_EQUAL(the_list.pop_back(), b1);
+    BOOST_CHECK(the_list.empty());
+    the_list.push_back(b1);
+    BOOST_CHECK_EQUAL(the_list.back(), b1);
+    BOOST_CHECK_EQUAL(the_list.front(), b1);
+    BOOST_CHECK(the_list.is_head(b1));
+    BOOST_CHECK(the_list.is_tail(b1));
     BOOST_CHECK_EQUAL(the_list.pop_front(), b1);
     BOOST_CHECK(the_list.empty());
-    uint8 b2_memory[sizeof(memalloc::block)];
-    uint8 b3_memory[sizeof(memalloc::block)];
-    memalloc::block * b2 = new (b2_memory) memalloc::block();
-    memalloc::block * b3 = new (b3_memory) memalloc::block();
+
     // multiple item operations
     the_list.push_front(b1);
     the_list.push_front(b2);

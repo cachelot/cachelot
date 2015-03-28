@@ -47,11 +47,10 @@ BOOST_AUTO_TEST_CASE(test_bit_basic) {
     BOOST_CHECK_EQUAL(bit::most_significant(0xFFFFFFFF), 31);
     BOOST_CHECK_EQUAL(bit::most_significant(0xFFFFFFFE), 31);
     BOOST_CHECK_EQUAL(bit::most_significant(0xFFFFFFFE), 31);
-    BOOST_CHECK_EQUAL(bit::least_significant(0xFFFFFFFF), 1);
-    BOOST_CHECK_EQUAL(bit::least_significant(0xFFFFFFFE), 2);
-    BOOST_CHECK_EQUAL(bit::least_significant(0x80000000), 32);
-    BOOST_CHECK_EQUAL(bit::least_significant(0x80000001), 1);
-    BOOST_CHECK_EQUAL(bit::least_significant(0), 0);
+    BOOST_CHECK_EQUAL(bit::least_significant(0xFFFFFFFF), 0);
+    BOOST_CHECK_EQUAL(bit::least_significant(0xFFFFFFFE), 1);
+    BOOST_CHECK_EQUAL(bit::least_significant(0x80000000), 31);
+    BOOST_CHECK_EQUAL(bit::least_significant(0x80000001), 0);
 }
 
 BOOST_AUTO_TEST_CASE(test_alignment) {
