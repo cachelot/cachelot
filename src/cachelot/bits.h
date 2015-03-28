@@ -86,7 +86,7 @@ namespace cachelot {
         /// @note: result is undefined if `value` is zero
         template <typename IntType>
         constexpr unsigned least_significant(IntType value) noexcept {
-            return internal::ffs<IntType>(value);
+            return internal::ffs<IntType>(value) - 1;
         }
 
     } // namespace bit
