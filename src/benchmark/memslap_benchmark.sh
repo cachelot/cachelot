@@ -1,14 +1,15 @@
 #!/bin/sh
 
-REMOTE_SSH="devel-centos"
-SERVER_ADDR="192.168.0.107"
-MEMSLAP="${HOME}/workspace/libmemcached-1.0.18/clients/memslap"
-#MEMSLAP="/usr/bin/memslap"
+REMOTE_SSH="192.168.14.3"
+SERVER_ADDR="192.168.14.3"
+#MEMSLAP="${HOME}/workspace/libmemcached-1.0.18/clients/memslap"
+MEMSLAP="/usr/bin/memslap"
 CACHELOT="/home/rider/workspace/cachelot/bin/release/cachelot"
 MEMCACHED="/usr/bin/memcached"
 NUM_ITEMS=100000
 NUM_WARMUP_ITERATIONS=2
 NUM_REPEATS=16
+MAX_CONCURRENCY=16
 
 
 function ssh_command() {
@@ -61,7 +62,7 @@ function run_test_for() {
     local execute_times=${NUM_ITEMS}
     # memory consumption is too much
     warmup "${servers}"
-    for concurrency in $(echo "1" && seq 2 2 32); do
+    for concurrency in $(seq 2 2 ${MAX_CONCURRENCY}); do
         [ ${concurrency} -gt 16 ] && [ ${execute_times} -gt 10000 ] && let "execute_times = 10000"
         echo " *** BEGIN: set ${execute_times} items, concurrency: ${concurrency}"
         for t in $(seq 1 ${NUM_REPEATS}); do
@@ -114,10 +115,4 @@ sleep 60
 #ssh_bg_command ${CACHELOT} -p 11216
 #run_test_for "-s ${SERVER_ADDR}:11215 -s ${SERVER_ADDR}:11216"
 #stop_cachelot_and_memcached
-
-#print_title "memcached single thread"
-#ssh_bg_command ${MEMCACHED} -p 11217 -t 1
-#run_test_for "-s ${SERVER_ADDR}:11217"
-#stop_cachelot_and_memcached
-#sleep 60
 
