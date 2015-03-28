@@ -373,33 +373,6 @@ namespace cachelot {
             return block_from_link(dummy_link.prev);
         }
 
-        /// find first block that satisfies requested size
-        block * find_first_of(uint32 size) noexcept {
-            block::link_type * node = dummy_link.next;
-            while (node != &dummy_link) {
-                block * blk = block_from_link(node);
-                if (blk->size() >= size) {
-                    unlink(blk);
-                    return blk;
-                } else {
-                    auto left = blk->left_adjacent();
-                    if (left->is_free() && left->size() + blk->size() >= size) {
-                        unlink(blk);
-                        unlink(left);
-                        return block::merge(left, blk);
-                    }
-                    auto right = blk->right_adjacent();
-                    if (right->is_free() && blk->size() + right->size() >= size) {
-                        unlink(blk);
-                        unlink(right);
-                        return block::merge(blk, right);
-                    }
-                }
-                node = node->next;
-            }
-            return nullptr;
-        }
-
         /// check if block `blk` is list head
         bool is_head(block * blk) const noexcept {
             debug_assert(islinked(blk));
@@ -531,11 +504,7 @@ namespace cachelot {
                 return position(const_::last_power_of_2 - const_::first_power_of_2_offset, const_::num_sub_cells_per_power - 1);
             }
 
-            void debug_print() {
-                std::cout << "[" << pow_index << ":" << sub_index << "]";
-            }
-
-        //private:
+        private:
             /// calculate index of target list in the linear table
             uint32 absolute() const noexcept {
                 const uint32 abs_index = pow_index * const_::num_sub_cells_per_power + sub_index;
@@ -605,7 +574,7 @@ namespace cachelot {
                 (void) size; // warning in Release build
             }
 
-        //private:
+        private:
             /// corresponding power of 2
             uint32 pow_index;
             /// index of sub-block within current [pow_index .. next_power_of_2) range
@@ -730,14 +699,22 @@ namespace cachelot {
         /// @return block pointer or `nullptr` if fail
         tuple<block *, position> try_get_block_after(position pos, BlockAge age_of_block) noexcept {
             const auto has_non_empty_after = [this](position p) -> bool {
-                return (bit::most_significant(first_level_bit_index) > p.pow_index) || (bit::most_significant(second_level_bit_index[p.pow_index]) > p.sub_index);
+                if (first_level_bit_index > 0 && bit::most_significant(first_level_bit_index) > p.pow_index) {
+                    return true;
+                }
+                if (second_level_bit_index[p.pow_index] > 0 && bit::most_significant(second_level_bit_index[p.pow_index]) > p.sub_index) {
+                    return true;
+                }
+                return false;
             };
             const auto find_next_set = [](uint32 bit_index, uint32 current) -> uint32 {
-                const auto MSB = bit::most_significant(bit_index);
                 debug_assert(current < 31);
-                for (uint32 bitno = current + 1; bitno <= MSB; ++bitno) { // TODO: Replace with CPU instruction
-                    if (bit::isset(bit_index, bitno)) {
-                        return bitno;
+                if (bit_index > 0) {
+                    const auto MSB = bit::most_significant(bit_index);
+                    for (uint32 bitno = current + 1; bitno <= MSB; ++bitno) { // TODO: Replace with CPU instruction
+                        if (bit::isset(bit_index, bitno)) {
+                            return bitno;
+                        }
                     }
                 }
                 return 0;
@@ -745,6 +722,7 @@ namespace cachelot {
             auto lookup_pos = pos;
             while (has_non_empty_after(lookup_pos)) {
                 debug_assert(table[lookup_pos.absolute()].empty());
+                // Next non-empty block within current power of 2
                 if (lookup_pos.sub_index < const_::num_sub_cells_per_power - 1) {
                     uint32 next_non_empty_sub_index = find_next_set(second_level_bit_index[lookup_pos.pow_index], lookup_pos.sub_index);
                     debug_assert(next_non_empty_sub_index > lookup_pos.sub_index || next_non_empty_sub_index == 0);
@@ -756,16 +734,19 @@ namespace cachelot {
                         }
                     }
                 }
+                // Next non-empty power of 2
                 debug_assert(lookup_pos.pow_index < group_by_size::position::max().pow_index);
                 uint32 next_non_empty_power_index = find_next_set(first_level_bit_index, lookup_pos.pow_index);
                 debug_assert(next_non_empty_power_index > lookup_pos.pow_index || next_non_empty_power_index == 0);
                 if (next_non_empty_power_index != 0) {
                     debug_assert(second_level_bit_index[next_non_empty_power_index] > 0);
-                    lookup_pos = position(next_non_empty_power_index, bit::least_significant(second_level_bit_index[next_non_empty_power_index]) - 1);
+                    lookup_pos = position(next_non_empty_power_index, bit::least_significant(second_level_bit_index[next_non_empty_power_index]));
                     block * blk = get_block_at(lookup_pos, age_of_block);
                     if (blk) {
                         return tuple<block *, position>(blk, lookup_pos);
                     }
+                } else {
+                    break;
                 }
             }
             return tuple<block *, position>(nullptr, lookup_pos);
