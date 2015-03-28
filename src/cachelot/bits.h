@@ -75,15 +75,15 @@ namespace cachelot {
             return value ^ (IntType(1) << bitno);
         }
 
-        /// Retrieve no of the most significant bit counting from zero
+        /// Retrieve no of the most significant bit, counting from zero
         /// @note: result is undefined if `value` is zero
         template <typename IntType>
         constexpr unsigned most_significant(IntType value) noexcept {
             return (sizeof(IntType) * 8) - internal::clz<IntType>(value) - 1;
         }
 
-        /// Retrieve no of the least significant bit + 1
-        /// @note: Bit counts from 1 in this function
+        /// Retrieve no of the least significant bit, counting from zero
+        /// @note: result is undefined if `value` is zero
         template <typename IntType>
         constexpr unsigned least_significant(IntType value) noexcept {
             return internal::ffs<IntType>(value);
