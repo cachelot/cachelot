@@ -1,14 +1,17 @@
 # What is Cachelot Library #
-If your application needs to cache some data and retrieve it from the cache with a speed of light, the easiest way is to store data right into application's memory. That's what cachelot library is. One library with the simple interface. All you need is to provide fixed amount of memory for the cache and access or store 3 millions of items per second (depending on CPU cache size).
+If your application needs to cache some data and then retrieve it from the cache with a speed of light, the only way is to store this data right into application's memory. That's what Cachelot library is.
+One library with a simple interface. All you need to provide is a fixed amount of memory for the cache, and you will be able to access or store 3 million of items per second (depending on the CPU cache size). 
 
-Maybe 3MOps doesn't sound like too big number, but it means ~333 nanosecond spent on a single operation while RAM reference costs [~100 nanoseconds](http://www.eecs.berkeley.edu/~rcs/research/interactive_latency.html).
+Maybe 3MOps doesn't sound like such a big number, but it does mean ~333 nanosecond spent on a single operation while RAM reference costs [~100 nanoseconds](http://www.eecs.berkeley.edu/~rcs/research/interactive_latency.html).
 
-Cachelot can work as a consistent cache returning an error when out of memory or evict old items to store new.
+Cachelot can work as a consistent cache, returning an error when out of memory or evicting old items to store the new ones.
 
 # What is Cachelot Distributed Cache Server #
-Think Memcached (it is Memcached compatible) but while Memcached aims to serve hundreds of thousands of connections (bandwidth) Cachelot serves tens of them with higher RPS rate (latency). Additionally cachelot is single-threaded application, so you can run it consuming fewer resources (cheaper VPS servers can save a lot).
+Think Memcached (Cachelot is Memcached compatible). Though, while original [Memcached](http://memcached.org) aims to serve thousands of connections (bandwidth), Cachelot serves tens of those, but with a higher RPS rate (latency).
 
-And yet cachelot is faster (up to 16% in terms of RPS, depending on a test setup).
+Another good news: Cachelot is a single-threaded application, so you can run it consuming fewer resources (for instance, cheaper VPS servers can be a huge saving).
+
+And yet single Cachelot instance is faster than Memcached while serving a certain number of connections. Never the less, you're free to scale up horizontally by running more instances.
 
 * * *
 
@@ -71,5 +74,6 @@ Cachelot distributed under the terms of [Simplified BSD License](http://opensour
 
 ## Credits ##
  * [boost C++ libraries](http://www.boost.org)
+ * [TLSF](http://www.gii.upv.es/tlsf/)
  * [C++ String Toolkit Library](http://www.partow.net/programming/strtk/index.html)
  * Thanks to all open source community
