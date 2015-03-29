@@ -243,7 +243,6 @@ namespace cachelot {
             debug_only(blk->test_check());
             debug_assert(not blk->meta.used);
             blk->meta.used = true;
-            // ensure that user memory is still filled with debug pattern
             return blk->memory_;
         }
 
