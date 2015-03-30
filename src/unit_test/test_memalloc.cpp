@@ -15,7 +15,8 @@ static constexpr size_t MAX_ALLOC_SIZE = 1024 * 1024;
 BOOST_AUTO_TEST_SUITE(test_memalloc)
 
 BOOST_AUTO_TEST_CASE(test_block_list) {
-    std::unique_ptr<uint8[]> blocks_layout(new uint8[5 * memalloc::block::min_size]);
+    const size_t blocks_mem_size = (memalloc::block::min_size + memalloc::block::meta_size) * 5;
+    std::unique_ptr<uint8[]> blocks_layout(new uint8[blocks_mem_size]);
     uint8 * layout_ptr = blocks_layout.get();
     memalloc::block * left_border = new (layout_ptr) memalloc::block();
     layout_ptr += left_border->size_with_meta();
