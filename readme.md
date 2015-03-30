@@ -1,6 +1,6 @@
 # What is Cachelot Library #
 If your application needs to cache some data and then retrieve it from the cache with a speed of light, the only way is to store this data right into application's memory. That's what Cachelot library is.
-One library with a simple interface. All you need to provide is a fixed amount of memory for the cache, and you will be able to access or store 3 million of items per second (depending on the CPU cache size). 
+One library with a simple interface. All you need to provide is a fixed amount of memory for the cache, and you will be able to access or store 3 million of items per second (depending on the CPU cache size).
 
 Maybe 3MOps doesn't sound like such a big number, but it does mean ~333 nanosecond spent on a single operation while RAM reference costs [~100 nanoseconds](http://www.eecs.berkeley.edu/~rcs/research/interactive_latency.html).
 
@@ -52,7 +52,7 @@ Build with IDE or by running make in root project directory. All binaries (main 
      - `Debug` - enable debug messages, assertions and disable optimization
      - `Release` - release build
      - `RelWithDebInfo` - release build with debug information enabled
-     - `AddressSanitizer` - special build to run under [Address Sanitizer](https://code.google.com/p/address-sanitizer/) (compiler support required)
+     - `AddressSanitizer` - special build to run under [Address Sanitizer](https://code.google.com/p/address-sanitizer/) (compiler support and libasan required)
 
 Build with IDE or by running `make` in root project directory.
 
