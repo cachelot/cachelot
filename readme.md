@@ -59,6 +59,9 @@ Build with IDE or by running `make` in root project directory.
 ### Run tests or benchmarks ###
 All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
 
+### Visit web site for more information ###
+[www.cachelot.io](http://www.cachelot.io/)
+
 * * *
 
 ## Known Issues ##
