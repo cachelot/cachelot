@@ -1,0 +1,14 @@
+bin
+ipch
+build_files
+doc
+CMakeFiles
+CMakeScripts
+CMakeCache.txt
+CTestTestfile.cmake
+cmake_install.cmake
+*.vcxproj*
+*.sln
+*.xcodeproj
+cachelot.build
+Makefile
