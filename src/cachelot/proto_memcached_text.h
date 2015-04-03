@@ -243,7 +243,7 @@ namespace cachelot {
                 case 'r': return is_7("replace") ? cache::REPLACE : cache::UNDEFINED;
                 default : return cache::UNDEFINED;
                 }
-            default : 
+            default :
                 return cache::UNDEFINED;
             }
         }
