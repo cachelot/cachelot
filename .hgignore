@@ -1,6 +1,5 @@
 syntax: glob
 
-./.git/*
 ./bin/*
 ./ipch/*
 ./build_files/*

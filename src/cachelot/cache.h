@@ -158,49 +158,49 @@ namespace cachelot {
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_storage(Command cmd, const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+            tuple<error_code, Response> do_storage(Command cmd, ItemPtr item) noexcept;
 
             /**
              * `set` - store item unconditionally
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+            tuple<error_code, Response> do_set(ItemPtr item) noexcept;
 
             /**
              * `add` - store non-existing item
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+            tuple<error_code, Response> do_add(ItemPtr item) noexcept;
 
             /**
              * `replace` - modify existing item
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+            tuple<error_code, Response> do_replace(ItemPtr item) noexcept;
 
             /**
              * `cas` - compare-and-swap items
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+            tuple<error_code, Response> do_cas(ItemPtr item) noexcept;
 
             /**
              * `append` - write additional data 'after' existing item data
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+            tuple<error_code, Response> do_append(ItemPtr item) noexcept;
 
             /**
              * `prepend` - write additional data 'before' existing item data
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+            tuple<error_code, Response> do_prepend(ItemPtr item) noexcept;
 
             /**
              * `del` - delete existing item
@@ -224,6 +224,16 @@ namespace cachelot {
              */
             tuple<error_code, Response> do_touch(const bytes key, const hash_type hash, seconds expires) noexcept;
 
+            /**
+             * Create new Item using memalloc
+             */
+            tuple<error_code, ItemPtr> item_new(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+
+            /**
+             * Free existing Item and return memory to the memalloc
+             */
+            void item_free(ItemPtr item) noexcept;
+
         private:
             /**
              * utility function to create point in time from duration in seconds
@@ -235,21 +245,9 @@ namespace cachelot {
             }
 
             /**
-             * Create new Item using memalloc for allocation
-             * throws std::bad_alloc on allocation failure
+             * Replace Item at position with another one
              */
-            ItemPtr item_new(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value);
-
-            /**
-             * Free existing Item and return memory to the memalloc
-             */
-            void item_free(ItemPtr item) noexcept;
-
-            /**
-             * Try to assign new fields to the existing Item in dict at given position
-             * throws std::bad_alloc on allocation failure
-             */
-            void item_reassign_at(const iterator at, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value);
+            void replace_item_at(const iterator at, ItemPtr new_item) noexcept;
 
             /**
              * retrieve item from cache taking in account its expiration time,
@@ -275,7 +273,7 @@ namespace cachelot {
             bool found; iterator at;
             tie(found, at) = m_dict.entry_for(key, hash, readonly);
             if (found && at.value()->is_expired()) {
-                Item * item = at.value();
+                ItemPtr item = at.value();
                 m_dict.remove(at);
                 item_free(item);
                 found = false;
@@ -300,18 +298,18 @@ namespace cachelot {
         }
 
 
-        inline tuple<error_code, Response> Cache::do_storage(Command cmd, const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
+        inline tuple<error_code, Response> Cache::do_storage(Command cmd, ItemPtr item) noexcept {
             switch (cmd) {
             case SET:
-                return do_set(key, hash, value, flags, expires, cas_value);
+                return do_set(item);
             case ADD:
-                return do_add(key, hash, value, flags, expires, cas_value);
+                return do_add(item);
             case REPLACE:
-                return do_replace(key, hash, value, flags, expires, cas_value);
+                return do_replace(item);
             case APPEND:
-                return do_append(key, hash, value, flags, expires, cas_value);
+                return do_append(item);
             case PREPEND:
-                return do_prepend(key, hash, value, flags, expires, cas_value);
+                return do_prepend(item);
             default:
                 debug_assert(false);
                 return make_tuple(error::unknown_error, NOT_A_RESPONSE);
@@ -320,16 +318,15 @@ namespace cachelot {
 
 
 
-        inline tuple<error_code, Response> Cache::do_set(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
-            bool found; iterator at;
+        inline tuple<error_code, Response> Cache::do_set(ItemPtr item) noexcept {
             try {
-                tie(found, at) = retrieve_item(key, hash);
-                if (not found) {
-                    auto item = item_new(key, hash, value, flags, expires, cas_value);
-                    m_dict.insert(at, key, hash, item);
-                } else {
-                    item_reassign_at(at, value, flags, expires, cas_value);
+                bool found; iterator at;
+                tie(found, at) = retrieve_item(item->key(), item->hash());
+                if (found) {
+                    m_dict.remove(at);
+                    item_free(at.value());
                 }
+                m_dict.insert(at, item->key(), item->hash(), item);
                 return make_tuple(error::success, STORED);
             } catch (const std::bad_alloc &) {
                 return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
@@ -337,13 +334,12 @@ namespace cachelot {
         }
 
 
-        inline tuple<error_code, Response> Cache::do_add(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
+        inline tuple<error_code, Response> Cache::do_add(ItemPtr item) noexcept {
             bool found; iterator at;
             try {
-                tie(found, at) = retrieve_item(key, hash);
+                tie(found, at) = retrieve_item(item->key(), item->hash());
                 if (not found) {
-                    auto item = item_new(key, hash, value, flags, expires, cas_value);
-                    m_dict.insert(at, key, hash, item);
+                    m_dict.insert(at, item->key(), item->hash(), item);
                 }
                 return make_tuple(error::success, not found ? STORED : NOT_STORED);
             } catch (const std::bad_alloc &) {
@@ -352,12 +348,12 @@ namespace cachelot {
         }
 
 
-        inline tuple<error_code, Response> Cache::do_replace(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
+        inline tuple<error_code, Response> Cache::do_replace(ItemPtr item) noexcept {
             bool found; iterator at;
             try {
-                tie(found, at) = retrieve_item(key, hash);
+                tie(found, at) = retrieve_item(item->key(), item->hash());
                 if (found) {
-                    item_reassign_at(at, value, flags, expires, cas_value);
+                    replace_item_at(at, item);
                 }
                 return make_tuple(error::success, found ? STORED : NOT_STORED);
             } catch (const std::bad_alloc &) {
@@ -366,13 +362,13 @@ namespace cachelot {
         }
 
 
-        inline tuple<error_code, Response> Cache::do_cas(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_unique) noexcept {
+        inline tuple<error_code, Response> Cache::do_cas(ItemPtr item) noexcept {
             bool found; iterator at;
             try {
-                tie(found, at) = retrieve_item(key, hash);
+                tie(found, at) = retrieve_item(item->key(), item->hash());
                 if (found) {
-                    if (cas_unique == at.value()->cas_value()) {
-                        item_reassign_at(at, value, flags, expires, cas_unique);
+                    if (item->cas_value() == at.value()->cas_value()) {
+                        replace_item_at(at, item);
                         return make_tuple(error::success, STORED);
                     } else {
                         return make_tuple(error::success, EXISTS);
@@ -386,14 +382,12 @@ namespace cachelot {
         }
 
 
-        inline tuple<error_code, Response> Cache::do_append(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
-            (void)key; (void)hash; (void)value; (void)flags; (void)expires; (void)cas_value;
+        inline tuple<error_code, Response> Cache::do_append(ItemPtr item) noexcept {
             return make_tuple(error::not_implemented, NOT_A_RESPONSE);
         }
 
 
-        inline tuple<error_code, Response> Cache::do_prepend(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
-            (void)key; (void)hash; (void)value; (void)flags; (void)expires; (void)cas_value;
+        inline tuple<error_code, Response> Cache::do_prepend(ItemPtr item) noexcept {
             return make_tuple(error::not_implemented, NOT_A_RESPONSE);
         }
 
@@ -402,7 +396,7 @@ namespace cachelot {
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
-                Item * item = at.value();
+                ItemPtr item = at.value();
                 m_dict.remove(at);
                 item_free(item);
             }
@@ -420,9 +414,9 @@ namespace cachelot {
         }
 
 
-        inline ItemPtr Cache::item_new(const bytes key, const hash_type hash, bytes value, opaque_flags_type flags, seconds expires, cas_value_type cas_value) {
+        inline tuple<error_code, ItemPtr> Cache::item_new(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
             void * memory;
-            const size_t size_required = Item::CalcSizeRequired(key, value, cas_value);
+            const size_t size_required = Item::CalcSizeRequired(key, value_length, cas_value);
             static const auto on_delete = [=](void * ptr) -> void {
                 auto i = reinterpret_cast<Item *>(ptr);
                 debug_only(bool deleted = ) this->m_dict.del(i->key(), i->hash());
@@ -430,33 +424,24 @@ namespace cachelot {
             };
             memory = m_allocator.alloc_or_evict(size_required, settings.cache.has_evictions, on_delete);
             if (memory != nullptr) {
-                return new (memory) Item(key, hash, value, flags, time_from(expires), cas_value);
+                auto item = new (memory) Item(key, hash, value_length, flags, time_from(expires), cas_value);
+                return make_tuple(error::success, item);
             } else {
-                throw std::bad_alloc();
+                return make_tuple(error::out_of_memory, nullptr);
             }
         }
 
 
         inline void Cache::item_free(ItemPtr item) noexcept {
-            debug_assert(not m_dict.contains(item->key(), item->hash()));
             m_allocator.free(item);
         }
 
 
-        inline void Cache::item_reassign_at(const iterator at, bytes new_value, opaque_flags_type new_flags, seconds new_expires, cas_value_type new_cas_value) {
-            Item * item = at.value();
-            const size_t size_required = Item::CalcSizeRequired(item->key(), new_value, new_cas_value);
-            // Try to resize Item's memory without touching contents
-            if (m_allocator.try_realloc_inplace(item, size_required)) {
-                item->reassign(new_value, new_flags, time_from(new_expires), new_cas_value);
-            } else {
-                throw std::bad_alloc();
-                m_dict.remove(at);
-                auto new_item = item_new(item->key(), item->hash(), new_value, new_flags, new_expires, new_cas_value);
-                // TODO: we may double delete same Item (previously during eviction)
-                item_free(item);
-                m_dict.insert(at, new_item->key(), new_item->hash(), new_item);
-            }
+        inline void Cache::replace_item_at(const iterator at, ItemPtr new_item) noexcept {
+            debug_assert(at.value()->hash() == new_item->hash() && at.value()->key() == new_item->key());
+            m_dict.remove(at);
+            item_free(at.value());
+            m_dict.insert(at, new_item->key(), new_item->hash(), new_item);
         }
 
 

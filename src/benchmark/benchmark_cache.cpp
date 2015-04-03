@@ -54,10 +54,16 @@ public:
     void set(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
-        error_code error; cache::Response cache_reply;
-        tie(error, cache_reply) = m_cache.do_set(k, calc_hash(k), v, /*flags*/0, forever, /*CAS*/0);
-        __stats__.num_set += 1;
-        if (error) {
+        error_code error; cache::ItemPtr item;
+        tie(error, item) = m_cache.item_new(k, calc_hash(k), v.length(), /*flags*/0, forever, /*CAS*/0);
+        if (not error) {
+            item->assign_value(v);
+            cache::Response cache_reply;
+            tie(error, cache_reply) = m_cache.do_set(item);
+        }
+        if (not error) {
+            __stats__.num_set += 1;
+        } else {
             __stats__.num_error += 1;
         }
     }

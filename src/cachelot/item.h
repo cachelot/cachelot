@@ -73,7 +73,7 @@ namespace cachelot {
             Item & operator= (Item &&) = delete;
         public:
             /// constructor
-            explicit Item(bytes the_key, hash_type the_hash, bytes the_value, opaque_flags_type the_flags, expiration_time_point expiration_time, cas_value_type cas_value) noexcept;
+            explicit Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration_time, cas_value_type cas_value) noexcept;
 
             /// Destroy existing Item
             static void Destroy(Item * item) noexcept;
@@ -99,9 +99,8 @@ namespace cachelot {
             /// update item's expiration time
             void touch(expiration_time_point expiration_time) noexcept { m_expiration_time = expiration_time; }
 
-            /// replace existing Item fields with the new ones
-            /// @note: caller is responsible for providing enough memory
-            void reassign(bytes new_value, opaque_flags_type new_flags, expiration_time_point new_expiration, cas_value_type new_cas) noexcept;
+            /// assign value to the item
+            void assign_value(bytes the_value) noexcept;
 
             /// try to append item's value with given `data`
             bool append(const bytes data);
@@ -110,7 +109,7 @@ namespace cachelot {
             bool prepend(const bytes data);
 
             /// Calculate total size in bytes required to store provided fields
-            static size_t CalcSizeRequired(const bytes the_key, const bytes the_value, const cas_value_type cas_value) noexcept;
+            static size_t CalcSizeRequired(const bytes the_key, const uint32 value_length, const cas_value_type cas_value) noexcept;
 
         private:
             // Item must be properly initialized to call following functions
@@ -123,13 +122,18 @@ namespace cachelot {
         };
 
 
-        inline Item::Item(bytes the_key, hash_type the_hash, bytes the_value, opaque_flags_type the_flags, expiration_time_point expiration, cas_value_type the_cas) noexcept
+        inline Item::Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration, cas_value_type the_cas) noexcept
                 : m_hash(the_hash)
-                , m_key_length(the_key.length()) {
+                , m_value_length(value_length)
+                , m_expiration_time(expiration)
+                , m_opaque_flags(the_flags)
+                , m_key_length(the_key.length())
+                , m_ignore_cas(the_cas == cas_value_type()) {
             debug_assert(unaligned_bytes(this, alignof(Item) == 0));
+            debug_assert(the_key.length() <= max_key_length);
+            debug_assert(value_length <= settings.cache.max_value_size);
             auto this_ = reinterpret_cast<uint8 *>(this);
             std::memcpy(this_ + KeyOffset(this), the_key.begin(), the_key.length());
-            reassign(the_value, the_flags, expiration, the_cas);
         }
 
 
@@ -143,7 +147,6 @@ namespace cachelot {
 
         inline bytes Item::value() const noexcept {
             const char * value_begin = reinterpret_cast<const char *>(this) + ValueOffset(this);
-            // ensure that we're whithin item memory bounds
             bytes v(value_begin, value_begin + m_value_length);
             return v;
         }
@@ -163,19 +166,10 @@ namespace cachelot {
         }
 
 
-        inline void Item::reassign(bytes new_value, opaque_flags_type new_flags, expiration_time_point new_expiration, cas_value_type new_cas_value) noexcept {
-            debug_assert(key()); // must be already assigned
-            debug_assert(new_value.length() <= settings.cache.max_value_size);
-            bool ignore_cas = (new_cas_value == cas_value_type());
-            m_expiration_time = new_expiration;
-            m_value_length = new_value.length();
-            m_opaque_flags = new_flags;
-            m_ignore_cas = ignore_cas;
+        inline void Item::assign_value(bytes the_value) noexcept {
+            debug_assert(m_value_length == the_value.length());
             auto this_ = reinterpret_cast<uint8 *>(this);
-            std::memcpy(this_ + ValueOffset(this), new_value.begin(), new_value.length());
-            if (not ignore_cas) {
-                *(this_ + CasValueOffset(this)) = new_cas_value;
-            }
+            std::memcpy(this_ + ValueOffset(this), the_value.begin(), the_value.length());
         }
 
 
@@ -197,13 +191,13 @@ namespace cachelot {
         }
 
 
-        inline size_t Item::CalcSizeRequired(const bytes the_key, const bytes the_value, const cas_value_type cas_value) noexcept {
+        inline size_t Item::CalcSizeRequired(const bytes the_key, const uint32 value_length, const cas_value_type cas_value) noexcept {
             debug_assert(the_key.length() > 0);
             debug_assert(the_key.length() <= max_key_length);
-            debug_assert(the_value.length() <= settings.cache.max_value_size);
+            debug_assert(value_length <= settings.cache.max_value_size);
             size_t item_size = sizeof(Item);
             item_size += the_key.length();
-            item_size += the_value.length();
+            item_size += value_length;
             const bool ignore_cas = (cas_value == cas_value_type());
             if (ignore_cas) {
                 return item_size;

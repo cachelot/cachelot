@@ -87,8 +87,7 @@ namespace cachelot {
 
         cache::Command parse_command_name(const bytes command);
         void handle_retrieval_command(cache::Command cmd, bytes args_buf);
-        void handle_storage_command_header(cache::Command cmd, bytes args_buf);
-        void handle_storage_command_data(cache::Command cmd, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply);
+        void handle_storage_command(cache::Command cmd, bytes args_buf);
         void handle_delete_command(cache::Command cmd, bytes args_buf);
         void handle_arithmetic_command(cache::Command cmd, bytes args_buf);
         void handle_touch_command(cache::Command cmd, bytes args_buf);
@@ -165,7 +164,7 @@ namespace cachelot {
             cache::Command cmd = parse_command_name(command_name);
             switch (ClassOfCommand(cmd)) {
                 case cache::STORAGE_COMMAND:
-                    handle_storage_command_header(cmd, command_args);
+                    handle_storage_command(cmd, command_args);
                     return;
                 case cache::DELETE_COMMAND:
                     break;
@@ -272,7 +271,7 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_storage_command_header(cache::Command cmd, bytes arguments_buf) {
+    inline void text_protocol_handler<Sock>::handle_storage_command(cache::Command cmd, bytes arguments_buf) {
         // command arguments
         bytes key;
         tie(key, arguments_buf) = arguments_buf.split(SPACE);
@@ -296,38 +295,39 @@ namespace cachelot {
         if (not arguments_buf.empty()) {
             throw client_error("invalid command: \\r\\n expected");
         }
+        // create new Item
+        error_code alloc_error; cache::Item * new_item;
+        tie(alloc_error, new_item) = cache.item_new(key, calc_hash(key), datalen, flags, expires_after, cas_unique);
+        if (alloc_error) {
+            send_server_error(alloc_error);
+            receive_command();
+            return;
+        }
         // read value
         super::async_receive_n(datalen + CRLF.length(),
             [=](const error_code net_error, const bytes data) noexcept {
-                if (not net_error) {
-                    bytes value;
-                    if (data.endswith(CRLF)) {
-                        value = data.rtrim_n(CRLF.length());
-                    } else {
-                        send_error(CLIENT_ERROR, bytes::from_literal("invalid value: \\r\\n expected"));
-                        suicide();
-                    }
-                    handle_storage_command_data(cmd, key, value, flags, expires_after, cas_unique, noreply);
-                } else {
+                if (net_error) {
+                    cache.item_free(new_item);
                     on_error(net_error);
+                    return;
                 }
+                if (not data.endswith(CRLF)) {
+                    cache.item_free(new_item);
+                    send_error(CLIENT_ERROR, bytes::from_literal("invalid value: \\r\\n expected"));
+                    suicide();
+                    return;
+                }
+                new_item->assign_value(data.rtrim_n(CRLF.length()));
+                error_code cache_error; cache::Response response;
+                tie(cache_error, response) = cache.do_storage(cmd, new_item);
+                if (not cache_error) {
+                    if (not noreply) { send_response(response); }
+                } else {
+                    cache.item_free(new_item);
+                    send_server_error(cache_error);
+                }
+                receive_command();
             });
-    }
-
-
-    template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_storage_command_data(cache::Command cmd, bytes key, bytes value, cache::opaque_flags_type flags, cache::seconds expires_after, cache::cas_value_type cas_unique, bool noreply) {
-        const auto hash = calc_hash(key);
-        error_code cache_error; cache::Response response;
-        tie(cache_error, response) = cache.do_storage(cmd, key, hash, value, flags, expires_after, cas_unique);
-        if (not cache_error) {
-            if (not noreply) {
-                send_response(response);
-            }
-        } else {
-            send_server_error(cache_error);
-        }
-        receive_command();
     }
 
 
