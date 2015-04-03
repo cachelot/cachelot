@@ -40,6 +40,8 @@ namespace cachelot { namespace net {
             : m_ios(ios)
             , m_acceptor(ios) {
             static_assert(std::is_base_of<this_type, Impl>::value, "TCP Server implementation must be derived from tcp_server");
+            tcp::acceptor::reuse_address reuse_address_option(true); error_code ignore_error;
+            m_acceptor.set_option(reuse_address_option, ignore_error);
         }
 
         tcp_server(const tcp_server &) = delete;
