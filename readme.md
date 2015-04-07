@@ -16,7 +16,8 @@ And yet single Cachelot instance is faster than Memcached while serving a certai
 * * *
 
 ## How To Build ##
-Currently, Windows build is broken. Cachelot proved to work on Linux and Mac OS (probably on BSD too)
+Cachelot proved to work on Linux, Mac OS and  BSD Family
+Upcoming Windows build.
 
 ### Prerequisites ###
 
@@ -27,9 +28,16 @@ Currently, Windows build is broken. Cachelot proved to work on Linux and Mac OS 
 
 ### Build ###
 
-Clone source code repository
+Clone source code repository on Bitbucket:
 
     $ hg clone http://dev.cachelot.io/cachelot/cachelot
+
+or if you prefer GitHub:
+
+    $ git clone https://github.com/cachelot/cachelot.git
+
+Next
+
     $ cd cachelot
 
 Generate project files for your favorite IDE or Makefile by running `cmake -G "{generator}"` in main project directory.
@@ -64,16 +72,19 @@ All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
 
 * * *
 
-## Known Issues ##
- Cachelot is still in 'work in progress' state
+## Upcoming Features ##
+ Cachelot is still 'work-in-progress' project
 
  * Some Memcached commands not implemented yet (`cas`, `touch`, `append`, `prepend`, `stats`)
  * Windows build is broken
  * There is no UDP and binary protocol support
  * Cachelot library doesn't have proper build packaging and has no multi-threaded interface
+ * Documentation and examples
+ * Really neat features, and more...
 
 ## License ##
-Cachelot distributed under the terms of [Simplified BSD License](http://opensource.org/licenses/BSD-2-Clause)
+Cachelot is free and open source. 
+Distributed under the terms of [Simplified BSD License](http://cachelot.io/LICENSE.txt)
 
 ## Credits ##
  * [boost C++ libraries](http://www.boost.org)
