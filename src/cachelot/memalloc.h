@@ -58,7 +58,7 @@ namespace cachelot {
         /// @tparam ForeachFreed - `void on_free(void * ptr)`
         template <typename ForeachFreed>
         void * alloc_or_evict(const size_t size, bool evict_if_necessary = false,
-                              ForeachFreed on_free_block = [=](void *) -> void {}) noexcept;
+                              ForeachFreed on_free_block = [](void *) -> void {}) noexcept;
 
         /// try to extend previously allocated memory up to `new_size`, return `nullptr` on fail
         void * try_realloc_inplace(void * ptr, const size_t new_size) noexcept;
