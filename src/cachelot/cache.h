@@ -439,8 +439,8 @@ namespace cachelot {
 
         inline void Cache::replace_item_at(const iterator at, ItemPtr new_item) noexcept {
             debug_assert(at.value()->hash() == new_item->hash() && at.value()->key() == new_item->key());
-            m_dict.remove(at);
             item_free(at.value());
+            m_dict.remove(at); // remove will not touch freed object
             m_dict.insert(at, new_item->key(), new_item->hash(), new_item);
         }
 
