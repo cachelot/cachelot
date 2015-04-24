@@ -9,6 +9,7 @@ syntax: glob
 CMakeCache.txt
 CTestTestfile.cmake
 cmake_install.cmake
+./.git/*
 *.vcxproj*
 *.sln
 ./*.xcodeproj/*
