@@ -13,3 +13,4 @@ cmake_install.cmake
 cachelot.build
 Makefile
 *.pyc
+.hgignore

@@ -35,7 +35,7 @@ Windows build is Upcoming.
 
 Clone source code repository on Bitbucket:
 
-    $ hg clone http://dev.cachelot.io/cachelot/cachelot
+    $ hg clone https://bitbucket.org/cachelot/cachelot
 
 or if you prefer GitHub:
 
@@ -96,3 +96,4 @@ Distributed under the terms of [Simplified BSD License](http://cachelot.io/LICEN
  * [TLSF](http://www.gii.upv.es/tlsf/)
  * [C++ String Toolkit Library](http://www.partow.net/programming/strtk/index.html)
  * Thanks to all open source community
+
