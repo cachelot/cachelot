@@ -71,11 +71,14 @@ namespace cachelot {
         /// error handler
         void on_error(const error_code error) noexcept;
 
-        /// send erroneous response to the client
-        void send_error(const ErrorType errtype, const bytes error_msg) noexcept;
+        /// inform client about an error, type of error is determined from the error category
+        void send_error(const error_code error) noexcept;
 
-        /// send error message of code `error` as server error to the client
-        void send_server_error(const error_code error) noexcept;
+        /// inform client about internal error or out of memory
+        void send_server_error(const char * message) noexcept;
+
+        /// inform client that command is unknown
+        void send_unknown_command_error() noexcept;
 
         /// send standard response to the client
         void send_response(const cache::Response res) noexcept;
@@ -118,16 +121,28 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::send_error(const ErrorType etype, const bytes error_msg) noexcept {
-        serialize() << AsciiErrorType(etype) << ' ' << error_msg << CRLF;
+    inline void text_protocol_handler<Sock>::send_error(const error_code error) noexcept {
+        auto error_message = bytes(error.message().c_str(), error.message().size());
+        if (error.category() == get_protocol_error_category()) {
+            serialize() << CLIENT_ERROR << ' ' << error_message;
+        } else {
+            serialize() << SERVER_ERROR << ' ' << error_message;
+        }
         flush();
     }
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::send_server_error(const error_code error) noexcept {
-        auto error_message = bytes(error.message().c_str(), error.message().size());
-        send_error(SERVER_ERROR, error_message);
+    inline void text_protocol_handler<Sock>::send_server_error(const char * message) noexcept {
+        serialize() << SERVER_ERROR << ' ' << bytes(message, std::strlen(message));
+        flush();
+    }
+
+
+    template <class Sock>
+    inline void text_protocol_handler<Sock>::send_unknown_command_error() noexcept {
+        serialize() << ERROR;
+        flush();
     }
 
 
@@ -167,6 +182,7 @@ namespace cachelot {
                     handle_storage_command(cmd, command_args);
                     return;
                 case cache::DELETE_COMMAND:
+                    handle_delete_command(cmd, command_args);
                     break;
                 case cache::ARITHMETIC_COMMAND:
                     handle_arithmetic_command(cmd, command_args);
@@ -183,19 +199,20 @@ namespace cachelot {
                     super::close();
                     suicide();
                     return;
+                case cache::UNDEFINED_COMMAND:
                 default:
-                    throw non_existing_command_error();
+                    send_unknown_command_error();
+                    suicide();
+                    return;
             }
             receive_command();
             return;
-        } catch(const memcached_error & err) {
-            //this->flush(););
-            // TODO: !!!!
-        } catch(const std::exception & err) {
-            //this->flush(););
-            // TODO: !!!!
+        } catch(const system_error & exc) {
+            send_error(exc.code());
+        } catch(const std::exception & exc) {
+            send_server_error(exc.what());
         } catch(...) {
-            // TODO: !!!!
+            send_server_error("Unknown error");
         }
         // if we reach here ...
         suicide();
@@ -272,62 +289,89 @@ namespace cachelot {
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_storage_command(cache::Command cmd, bytes arguments_buf) {
-        // command arguments
-        bytes key;
-        tie(key, arguments_buf) = arguments_buf.split(SPACE);
-        validate_key(key);
-        bytes parsed;
-        tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
-        cache::opaque_flags_type flags = str_to_int<cache::opaque_flags_type>(parsed.begin(), parsed.length()); // TODO: flags must feed 16bit
-        tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
-        auto expires_after = cache::seconds(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.length()));
-        tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
-        uint32 datalen = str_to_int<uint32>(parsed.begin(), parsed.length());
-        if (datalen > settings.cache.max_value_size) {
-            throw client_error("Maximum value length exceeded");
-        }
-        cache::cas_value_type cas_unique = 0;
-        if (cmd == cache::CAS) {
+        try {
+            // command arguments
+            bytes key;
+            tie(key, arguments_buf) = arguments_buf.split(SPACE);
+            validate_key(key);
+            bytes parsed;
             tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
-            cas_unique = str_to_int<cache::cas_value_type>(parsed.begin(), parsed.length());
-        }
-        bool noreply = maybe_noreply(arguments_buf);
-        if (not arguments_buf.empty()) {
-            throw client_error("invalid command: \\r\\n expected");
-        }
-        // create new Item
-        error_code alloc_error; cache::Item * new_item;
-        tie(alloc_error, new_item) = cache.item_new(key, calc_hash(key), datalen, flags, expires_after, cas_unique);
-        if (alloc_error) {
-            send_server_error(alloc_error);
-            receive_command();
-            return;
-        }
-        // read value
-        super::async_receive_n(datalen + CRLF.length(),
-            [=](const error_code net_error, const bytes data) noexcept {
-                if (net_error) {
-                    cache.item_free(new_item);
-                    on_error(net_error);
-                    return;
-                }
-                if (not data.endswith(CRLF)) {
-                    cache.item_free(new_item);
-                    send_error(CLIENT_ERROR, bytes::from_literal("invalid value: \\r\\n expected"));
-                    suicide();
-                    return;
-                }
-                new_item->assign_value(data.rtrim_n(CRLF.length()));
-                error_code cache_error; cache::Response response;
-                tie(cache_error, response) = cache.do_storage(cmd, new_item);
-                if (not cache_error) {
-                    if (not noreply) { send_response(response); }
-                } else {
-                    cache.item_free(new_item);
-                    send_server_error(cache_error);
-                }
+            cache::opaque_flags_type flags = str_to_int<cache::opaque_flags_type>(parsed.begin(), parsed.length()); // TODO: flags must feed 16bit
+            tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
+            auto expires_after = cache::seconds(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.length()));
+            tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
+            uint32 datalen = str_to_int<uint32>(parsed.begin(), parsed.length());
+            if (datalen > settings.cache.max_value_size) {
+                auto errc = make_protocol_error(error::value_length);
+                throw system_error(errc);
+            }
+            cache::cas_value_type cas_unique = 0;
+            if (cmd == cache::CAS) {
+                tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
+                cas_unique = str_to_int<cache::cas_value_type>(parsed.begin(), parsed.length());
+            }
+            bool noreply = maybe_noreply(arguments_buf);
+            if (not arguments_buf.empty()) {
+                throw system_error(make_protocol_error(error::crlf_expected));
+            }
+            // create new Item
+            error_code alloc_error; cache::Item * new_item;
+            tie(alloc_error, new_item) = cache.item_new(key, calc_hash(key), datalen, flags, expires_after, cas_unique);
+            if (alloc_error) {
+                send_error(alloc_error);
                 receive_command();
-            });
+                return;
+            }
+
+            // read value
+            super::async_receive_n(datalen + CRLF.length(),
+                [=](const error_code net_error, const bytes data) noexcept {
+                    if (net_error) {
+                        cache.item_free(new_item);
+                        on_error(net_error);
+                        return;
+                    }
+                    if (not data.endswith(CRLF)) {
+                        cache.item_free(new_item);
+                        send_error(make_protocol_error(error::value_crlf_expected));
+                        suicide();
+                        return;
+                    }
+                    new_item->assign_value(data.rtrim_n(CRLF.length()));
+                    error_code cache_error; cache::Response response;
+                    tie(cache_error, response) = cache.do_storage(cmd, new_item);
+                    if (not cache_error) {
+                        if (not noreply) { send_response(response); }
+                    } else {
+                        cache.item_free(new_item);
+                        send_error(cache_error);
+                    }
+                    receive_command();
+                });
+
+            return;
+
+        } catch (const std::range_error & ) {
+            send_error(make_protocol_error(error::integer_range));
+        } catch (const std::invalid_argument & ) {
+            send_error(make_protocol_error(error::integer_conv));
+        }
+        // if we reach here...
+        suicide();
+    }
+
+    template <class Sock>
+    inline void text_protocol_handler<Sock>::handle_delete_command(cache::Command /*cmd*/, bytes args_buf) {
+        bytes key = args_buf;
+        validate_key(key);
+        error_code cache_error; cache::Response response;
+        tie(cache_error, response) = cache.do_del(key, calc_hash(key));
+        if (not cache_error) {
+            send_response(response);
+        } else {
+            send_error(cache_error);
+        }
+
     }
 
 
@@ -335,8 +379,7 @@ namespace cachelot {
     inline void text_protocol_handler<Sock>::handle_arithmetic_command(cache::Command cmd, bytes args_buf) {
         (void) cmd; (void) args_buf;
         // TODO: Implementation
-        send_server_error(error::not_implemented);
-        flush();
+        send_error(::cachelot::error::not_implemented);
     }
 
 
@@ -344,26 +387,24 @@ namespace cachelot {
     inline void text_protocol_handler<Sock>::handle_touch_command(cache::Command cmd, bytes args_buf) {
         (void) cmd; (void) args_buf;
         // TODO: Implementation
-        send_server_error(error::not_implemented);
-        flush();
+        send_error(::cachelot::error::not_implemented);
     }
 
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_service_command(cache::Command cmd, bytes args_buf) {
         (void) cmd; (void) args_buf;
-        send_server_error(error::not_implemented);
-        flush();
+        send_error(::cachelot::error::not_implemented);
     }
 
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::validate_key(const bytes key) {
         if (not key) {
-            throw client_error("The key is empty");
+            throw system_error(make_protocol_error(error::key_expected));
         }
         if (key.length() > cache::Item::max_key_length) {
-            throw client_error("The key is too long");
+            throw system_error(make_protocol_error(error::key_length));
         }
     }
 
@@ -377,7 +418,7 @@ namespace cachelot {
         } else if (noreply == NOREPLY) {
             return true;
         } else {
-            throw client_error("invalid command arguments: [noreply] expected");
+            throw system_error(make_protocol_error(error::noreply_expected));
         }
     }
 
