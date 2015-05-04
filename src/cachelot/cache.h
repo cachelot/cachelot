@@ -310,6 +310,8 @@ namespace cachelot {
                 return do_append(item);
             case PREPEND:
                 return do_prepend(item);
+            case CAS:
+                return do_cas(item);
             default:
                 debug_assert(false);
                 return make_tuple(error::unknown_error, NOT_A_RESPONSE);

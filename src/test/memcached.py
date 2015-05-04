@@ -5,8 +5,6 @@ import errno
 import cPickle as pickle
 from cStringIO import StringIO
 
-END = 'END'
-
 log = logging.getLogger(__name__)
 
 CMD_TERMINATOR = '\r\n'
@@ -16,7 +14,7 @@ class ConnectionAbortedException(socket.error):
         # Software caused connection abort
         socket.error.__init__(self, errno.ECONNABORTED, os.strerror(errno.ECONNABORTED))
 
-class KeyNotFoundError(KeyError):
+class KeyNotFoundError(Exception):
     pass
 
 class Error(Exception):
@@ -87,8 +85,26 @@ class Client(object):
             self._sock = None
 
     def get(self, key):
-        rkey, value = next(self.__retrieve('get', key))
+        value = None
+        for rkey, value, _ in self.__retrieve('get', [key]):
+            pass
         return value
+
+    def gets(self, key):
+        value = None
+        cas_unique = None
+        for rkey, value, cas_unique in self.__retrieve('gets', [key]):
+            pass
+        return (value, cas_unique)
+
+    def get_multi(self, keys):
+        for rkey, value, _ in self.__retrieve('get', keys):
+            yield (rkey, value)
+
+    def gets_multi(self, keys):
+        for rkey, value, cas_unique in self.__retrieve('gets', keys):
+            yield (rkey, value, cas_unique)
+
 
     def add(self, key, value, expire_time=0):
         return self.__store('add', key, value, expire_time) == 'STORED'
@@ -98,6 +114,16 @@ class Client(object):
 
     def replace(self, key, value, expire_time=0):
         return self.__store('replace', key, value, expire_time) == 'STORED'
+
+    def cas(self, key, value, expire_time, cas_unique):
+        reply = self.__store('cas', key, value, expire_time, cas_unique)
+        if reply == 'STORED':
+            return True
+        elif reply == 'EXISTS':
+            return False
+        else:
+            assert reply == 'NOT_STORED', 'Invalid reply'
+            raise KeyNotFoundError()
 
     def incr(self, key, increment):
         return self.__arithmetic('incr', key, increment)
@@ -112,9 +138,9 @@ class Client(object):
         self.__raise_if_errors(response)
         return self.__expect(response, ['DELETED', 'NOT_FOUND']) == 'DELETED'
 
-    def __retrieve(self, command, key):
-        assert command in ['get'],  'unsupported command: %s' % (command)
-        command_str = "%(command)s %(key)s\r\n" % locals()
+    def __retrieve(self, command, keys):
+        assert command in ['get', 'gets'],  'unsupported command: ' + command
+        command_str = command + ' ' + ' '.join(keys) + '\r\n'
         self.__send(command_str)
         response = self.__receive_line()
         self.__raise_if_errors(response)
@@ -123,26 +149,33 @@ class Client(object):
             num_found += 1
             response = response.split(' ')
             ret_key, ret_flags, ret_length = response[1], int(response[2]), int(response[3])
+            if command == 'gets':
+                ret_cas = int(response[4])
+            else:
+                ret_cas = None
             data = self.__receive(ret_length)
             self.__expect(self.__receive_line(), '') # remove "\r\n" from receive buffer
             response = self.__receive_line()
-            yield (ret_key, self.__deserialize(ret_flags, data))
+            yield (ret_key, self.__deserialize(ret_flags, data), ret_cas)
         self.__expect(response, 'END')
-        if num_found == 0:
-            yield (key, None)
-        
-    def __store(self, command, key, value, expire_time):
-        assert command in ['set', 'add', 'replace'], 'unsupported command: %s' % (command)
+
+    def __store(self, command, key, value, expire_time, cas_unique=None):
+        assert command in ['set', 'add', 'replace', 'cas'], 'unsupported command: ' + command
         flags, data = self.__serialize(value)
         data_length = len(data)
-        command_str = '%(command)s %(key)s %(flags)d %(expire_time)d %(data_length)d\r\n%(data)s\r\n' % locals()
+        command_str = '%(command)s %(key)s %(flags)d %(expire_time)d %(data_length)d'
+        if command == 'cas':
+            command_str += ' %(cas_unique)d'
+        command_str += '\r\n%(data)s\r\n'
+        command_str %= locals()
+        # communicate
         self.__send(command_str)
         response = self.__receive_line()
         self.__raise_if_errors(response)
         return self.__expect(response, ['STORED', 'NOT_STORED', 'EXISTS'])
 
     def __arithmetic(self, command, key, value):
-        assert command in ['incr', 'decr'], 'unsupported command: %s' % (command)
+        assert command in ['incr', 'decr'], 'unsupported command: ' + command
         command_str = "%(command) %(key)s %(value)d\r\n" % locals()
         self.__send(command_str)
         response = self.__receive_line()

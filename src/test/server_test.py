@@ -17,6 +17,7 @@ def CHECK(condition):
     if not condition:
         raise TestFailedError()
 
+
 def random_string(minlen, maxlen):
     assert minlen > 1, 'minlen is too small'
     assert minlen <= maxlen, 'invalid lengths range'
@@ -28,6 +29,8 @@ def smoke_test(mc):
     "Test basic functionality"
     key1 = random_string(10, 50)
     value1 = random_string(100, 400)
+    # replace, add, get, delete
+    CHECK( mc.replace(key1, value1) == False )
     CHECK( mc.add(key1, value1) == True )
     CHECK( mc.add(key1, value1) == False )
     CHECK( mc.get(key1) == value1 )
@@ -35,7 +38,18 @@ def smoke_test(mc):
     CHECK( mc.replace(key1, value1) == True )
     CHECK( mc.get(key1) == value1 )
     CHECK( mc.delete(key1) == True )
-
+    # set, cas
+    key2 = random_string(10, 50)
+    value2 = random_string(100, 400)
+    mc.set(key2, value2)
+    CHECK( mc.get(key2) == value2 )
+    k2_ret_value, k2_cas = mc.gets(key2)
+    CHECK( k2_ret_value == value2 )
+    value2 = random_string(100, 400)
+    CHECK( mc.cas(key2, value2, 0, k2_cas) == True )
+    CHECK( mc.get(key2) == value2 )
+    CHECK( mc.cas(key2, value2, 0, k2_cas) == False )
+    # multikey get, gets
 
 
 def fuzzy_test(mc):
