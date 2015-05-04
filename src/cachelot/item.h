@@ -51,16 +51,16 @@ namespace cachelot {
             typedef uint16 opaque_flags_type;
             typedef ExpirationClock clock;
             typedef clock::time_point expiration_time_point;
-            typedef uint64 cas_value_type;
+            typedef uint64 version_type;
             static constexpr size_t max_key_length = 250; // ! key size is limited to uint8
         private:
             // Important! declaration order affects item size
+            version_type m_version; // version of this item
             const hash_type m_hash; // hash value
             uint32 m_value_length; // length of value [0..MAX_VALUE_LENGTH]
             expiration_time_point m_expiration_time; // when it expires
             opaque_flags_type m_opaque_flags; // user defined item flags
             const uint8 m_key_length; // length of key [1..MAX_KEY_LENGTH]
-            bool m_ignore_cas; // does item have a CAS value
 
         private:
             /// private destructor
@@ -73,7 +73,7 @@ namespace cachelot {
             Item & operator= (Item &&) = delete;
         public:
             /// constructor
-            explicit Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration_time, cas_value_type cas_value) noexcept;
+            explicit Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration_time, const version_type ver) noexcept;
 
             /// Destroy existing Item
             static void Destroy(Item * item) noexcept;
@@ -90,8 +90,11 @@ namespace cachelot {
             /// user defined flags
             opaque_flags_type opaque_flags() const noexcept { return m_opaque_flags; }
 
-            /// unique ID used in CAS operation
-            cas_value_type cas_value() const noexcept;
+            /// retrieve version of this item
+            version_type version() const noexcept { return m_version; }
+
+            /// mark this item as a new version of item `i`
+            void new_version_of(const Item * i) noexcept { m_version = i->version() + 1; }
 
             /// check whether Item is expired
             bool is_expired() const noexcept { return m_expiration_time <= clock::now(); }
@@ -109,26 +112,22 @@ namespace cachelot {
             bool prepend(const bytes data);
 
             /// Calculate total size in bytes required to store provided fields
-            static size_t CalcSizeRequired(const bytes the_key, const uint32 value_length, const cas_value_type cas_value) noexcept;
+            static size_t CalcSizeRequired(const bytes the_key, const uint32 value_length) noexcept;
 
         private:
             // Item must be properly initialized to call following functions
             static size_t KeyOffset(const Item * i) noexcept;
             static size_t ValueOffset(const Item * i) noexcept;
-            static size_t CasValueOffset(const Item * i) noexcept;
-            static constexpr size_t AlignedCasValueSize(const size_t total_size) noexcept;
-            // return range of memory occupied by this Item
-            bytes my_memory() const noexcept;
         };
 
 
-        inline Item::Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration, cas_value_type the_cas) noexcept
-                : m_hash(the_hash)
+        inline Item::Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration, const version_type ver) noexcept
+                : m_version(ver)
+                , m_hash(the_hash)
                 , m_value_length(value_length)
                 , m_expiration_time(expiration)
                 , m_opaque_flags(the_flags)
-                , m_key_length(the_key.length())
-                , m_ignore_cas(the_cas == cas_value_type()) {
+                , m_key_length(the_key.length()) {
             debug_assert(unaligned_bytes(this, alignof(Item) == 0));
             debug_assert(the_key.length() <= max_key_length);
             debug_assert(value_length <= settings.cache.max_value_size);
@@ -152,20 +151,6 @@ namespace cachelot {
         }
 
 
-        inline Item::cas_value_type Item::cas_value() const noexcept {
-            if (m_ignore_cas) {
-                return cas_value_type();
-            } else {
-                auto cas_begin = reinterpret_cast<const char *>(this) + CasValueOffset(this);
-                // ensure that pointer is (somehow) valid
-                debug_assert( my_memory().contains(bytes(cas_begin, sizeof(cas_value_type))) );
-                // ensure proper alignment
-                debug_assert(unaligned_bytes(cas_begin, alignof(cas_value_type)) == 0);
-                return *reinterpret_cast<const cas_value_type *>(cas_begin);
-            }
-        }
-
-
         inline void Item::assign_value(bytes the_value) noexcept {
             debug_assert(m_value_length == the_value.length());
             auto this_ = reinterpret_cast<uint8 *>(this);
@@ -184,38 +169,17 @@ namespace cachelot {
         }
 
 
-        inline size_t Item::CasValueOffset(const Item * i) noexcept {
-            size_t value_end = ValueOffset(i) + i->m_value_length;
-            debug_assert(not i->m_ignore_cas);
-            return value_end + unaligned_bytes(value_end, alignof(cas_value_type));
-        }
-
-
-        inline size_t Item::CalcSizeRequired(const bytes the_key, const uint32 value_length, const cas_value_type cas_value) noexcept {
+        inline size_t Item::CalcSizeRequired(const bytes the_key, const uint32 value_length) noexcept {
             debug_assert(the_key.length() > 0);
             debug_assert(the_key.length() <= max_key_length);
             debug_assert(value_length <= settings.cache.max_value_size);
             size_t item_size = sizeof(Item);
             item_size += the_key.length();
             item_size += value_length;
-            const bool ignore_cas = (cas_value == cas_value_type());
-            if (ignore_cas) {
-                return item_size;
-            } else {
-                size_t cas_alignment = unaligned_bytes(item_size, alignof(cas_value_type));
-                return item_size + cas_alignment + sizeof(cas_value_type);
-            }
+            return item_size;
         }
 
-
-        inline bytes Item::my_memory() const noexcept {
-            auto this_ = reinterpret_cast<const char *>(this);
-            const size_t my_size = sizeof(Item) + m_key_length + m_value_length +
-                            static_cast<uint>(m_ignore_cas) * sizeof(cas_value_type);
-            return bytes(this_, my_size);
-        }
-
-    } // namepsace cache 
+    } // namepsace cache
 
 } // namespace cachelot
 

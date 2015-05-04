@@ -32,7 +32,7 @@ def smoke_test(mc):
     # replace, add, get, delete
     CHECK( mc.replace(key1, value1) == False )
     CHECK( mc.add(key1, value1) == True )
-    CHECK( mc.add(key1, value1) == False )
+    CHECK( mc.add(key1, value1) == False )  # second add shall fail
     CHECK( mc.get(key1) == value1 )
     value1 = random_string(100, 400)
     CHECK( mc.replace(key1, value1) == True )
@@ -47,8 +47,20 @@ def smoke_test(mc):
     CHECK( k2_ret_value == value2 )
     value2 = random_string(100, 400)
     CHECK( mc.cas(key2, value2, 0, k2_cas) == True )
+    CHECK( mc.cas(key2, value2, 0, k2_cas) == False )  # second cas shall fail
     CHECK( mc.get(key2) == value2 )
-    CHECK( mc.cas(key2, value2, 0, k2_cas) == False )
+    # cas with replace
+    k2_ret_value, k2_cas = mc.gets(key2)
+    value2 = random_string(100, 400)
+    mc.replace(key2, value2)
+    CHECK( mc.cas(key2, value2, 0, k2_cas) == False )  # cas after replace shall fail
+    CHECK( mc.get(key2) == value2 )
+    # cas with set
+    k2_ret_value, k2_cas = mc.gets(key2)
+    value2 = random_string(100, 400)
+    mc.set(key2, value2)
+    CHECK( mc.cas(key2, value2, 0, k2_cas) == False )  # cas after set shall fail
+    CHECK( mc.get(key2) == value2 )
     # multikey get, gets
 
 

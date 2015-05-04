@@ -84,7 +84,7 @@ namespace cachelot {
         void send_response(const cache::Response res) noexcept;
 
         /// add single item to the send buffer
-        void push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value, bool send_cas) noexcept;
+        void push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value, bool send_cas) noexcept;
 
         ostream_type serialize() noexcept { return ostream_type(this->send_buffer()); }
 
@@ -154,7 +154,7 @@ namespace cachelot {
 
 
     template <class Sock>
-    void text_protocol_handler<Sock>::push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value, bool send_cas) noexcept {
+    void text_protocol_handler<Sock>::push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value, bool send_cas) noexcept {
         const auto value_length = static_cast<unsigned>(value.length());
         static const bytes VALUE = bytes::from_literal("VALUE ");
         serialize() << VALUE << key << ' ' << flags << ' ' << value_length;
@@ -276,7 +276,7 @@ namespace cachelot {
             tie(key, args_buf) = args_buf.split(SPACE);
             validate_key(key);
             cache.do_get(key, calc_hash(key),
-                         [=](error_code cache_error, bool found, bytes value, cache::opaque_flags_type flags, cache::cas_value_type cas_value) {
+                         [=](error_code cache_error, bool found, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value) {
                              // TODO: What if error?
                              if (not cache_error && found) { push_item(key, value, flags, cas_value, send_cas); }
                          });
@@ -305,10 +305,10 @@ namespace cachelot {
                 auto errc = make_protocol_error(error::value_length);
                 throw system_error(errc);
             }
-            cache::cas_value_type cas_unique = 0;
+            cache::version_type cas_unique = 0;
             if (cmd == cache::CAS) {
                 tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
-                cas_unique = str_to_int<cache::cas_value_type>(parsed.begin(), parsed.length());
+                cas_unique = str_to_int<cache::version_type>(parsed.begin(), parsed.length());
             }
             bool noreply = maybe_noreply(arguments_buf);
             if (not arguments_buf.empty()) {

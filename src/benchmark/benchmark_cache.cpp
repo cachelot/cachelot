@@ -71,7 +71,7 @@ public:
     void get(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         m_cache.do_get(k, calc_hash(k),
-                    [=](error_code error, bool found, bytes, cache::opaque_flags_type, cache::cas_value_type) {
+                    [=](error_code error, bool found, bytes, cache::opaque_flags_type, cache::version_type) {
                         __stats__.num_get += 1;
                         if (not error) {
                             auto & counter = found ? __stats__.num_cache_hit : __stats__.num_cache_miss;

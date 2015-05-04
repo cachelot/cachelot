@@ -56,7 +56,7 @@ namespace cachelot {
         typedef Item::opaque_flags_type opaque_flags_type;
 
         /// Value type of CAS operation
-        typedef Item::cas_value_type cas_value_type;
+        typedef Item::version_type version_type;
 
         /// Maximum key length in bytes
         static constexpr auto max_key_length = Item::max_key_length;
@@ -136,7 +136,7 @@ namespace cachelot {
              *
              * Callback must have following signature:
              * @code
-             *    void on_get(error_code error, bool found, bytes value, opaque_flags_type flags, cas_value_type cas_value)
+             *    void on_get(error_code error, bool found, bytes value, opaque_flags_type flags, version_type version)
              * @endcode
              * @warning Key/value pointers may not be valid outside of callback.
              */
@@ -227,7 +227,7 @@ namespace cachelot {
             /**
              * Create new Item using memalloc
              */
-            tuple<error_code, ItemPtr> item_new(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept;
+            tuple<error_code, ItemPtr> item_new(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds expires, version_type ver) noexcept;
 
             /**
              * Free existing Item and return memory to the memalloc
@@ -291,9 +291,9 @@ namespace cachelot {
                 auto item = at.value();
                 debug_assert(item->key() == key);
                 debug_assert(item->hash() == hash);
-                on_get(error::success, true, item->value(), item->opaque_flags(), item->cas_value());
+                on_get(error::success, true, item->value(), item->opaque_flags(), item->version());
             } else {
-                on_get(error::success, false, bytes(), opaque_flags_type(), cas_value_type());
+                on_get(error::success, false, bytes(), opaque_flags_type(), version_type());
             }
         }
 
@@ -324,11 +324,11 @@ namespace cachelot {
             try {
                 bool found; iterator at;
                 tie(found, at) = retrieve_item(item->key(), item->hash());
-                if (found) {
-                    m_dict.remove(at);
-                    item_free(at.value());
+                if (not found) {
+                    m_dict.insert(at, item->key(), item->hash(), item);
+                } else {
+                    replace_item_at(at, item);
                 }
-                m_dict.insert(at, item->key(), item->hash(), item);
                 return make_tuple(error::success, STORED);
             } catch (const std::bad_alloc &) {
                 return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
@@ -369,7 +369,7 @@ namespace cachelot {
             try {
                 tie(found, at) = retrieve_item(item->key(), item->hash());
                 if (found) {
-                    if (item->cas_value() == at.value()->cas_value()) {
+                    if (item->version() == at.value()->version()) {
                         replace_item_at(at, item);
                         return make_tuple(error::success, STORED);
                     } else {
@@ -416,9 +416,9 @@ namespace cachelot {
         }
 
 
-        inline tuple<error_code, ItemPtr> Cache::item_new(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds expires, cas_value_type cas_value) noexcept {
+        inline tuple<error_code, ItemPtr> Cache::item_new(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds expires, const version_type ver) noexcept {
             void * memory;
-            const size_t size_required = Item::CalcSizeRequired(key, value_length, cas_value);
+            const size_t size_required = Item::CalcSizeRequired(key, value_length);
             static const auto on_delete = [=](void * ptr) -> void {
                 auto i = reinterpret_cast<Item *>(ptr);
                 debug_only(bool deleted = ) this->m_dict.del(i->key(), i->hash());
@@ -426,7 +426,7 @@ namespace cachelot {
             };
             memory = m_allocator.alloc_or_evict(size_required, settings.cache.has_evictions, on_delete);
             if (memory != nullptr) {
-                auto item = new (memory) Item(key, hash, value_length, flags, time_from(expires), cas_value);
+                auto item = new (memory) Item(key, hash, value_length, flags, time_from(expires), ver);
                 return make_tuple(error::success, item);
             } else {
                 return make_tuple(error::out_of_memory, nullptr);
@@ -440,8 +440,10 @@ namespace cachelot {
 
 
         inline void Cache::replace_item_at(const iterator at, ItemPtr new_item) noexcept {
-            debug_assert(at.value()->hash() == new_item->hash() && at.value()->key() == new_item->key());
-            item_free(at.value());
+            auto old_item = at.value();
+            debug_assert(old_item->hash() == new_item->hash() && old_item->key() == new_item->key());
+            new_item->new_version_of(old_item);
+            item_free(old_item);
             m_dict.remove(at); // remove will not touch freed object
             m_dict.insert(at, new_item->key(), new_item->hash(), new_item);
         }
