@@ -89,7 +89,7 @@ All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
 
 ## License ##
 Cachelot is free and open source. 
-Distributed under the terms of [Simplified BSD License](http://cachelot.io/LICENSE.txt)
+Distributed under the terms of [Simplified BSD License](http://cachelot.io/license.txt)
 
 ## Credits ##
  * [boost C++ libraries](http://www.boost.org)
