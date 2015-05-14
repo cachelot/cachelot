@@ -65,16 +65,16 @@ BOOST_AUTO_TEST_CASE(test_str_to_int) {
     BOOST_CHECK_EQUAL(str_to_int<unsigned long long>(s.c_str(), s.size()), ullnum);
     // check failure scenario
     s = num_to_str<unsigned long long>(std::numeric_limits<unsigned long long>::max());
-    BOOST_CHECK_THROW(str_to_int<long>(s.c_str(), s.size()), std::range_error);
-    BOOST_CHECK_THROW(str_to_int<unsigned int>(s.c_str(), s.size()), std::range_error);
+    BOOST_CHECK_THROW(str_to_int<long>(s.c_str(), s.size()), std::overflow_error);
+    BOOST_CHECK_THROW(str_to_int<unsigned int>(s.c_str(), s.size()), std::overflow_error);
     s = "2837468273468273468273468276348276348617623571564236714523";
-    BOOST_CHECK_THROW(str_to_int<long long>(s.c_str(), s.size()), std::range_error);
-    BOOST_CHECK_THROW(str_to_int<unsigned long long>(s.c_str(), s.size()), std::range_error);
+    BOOST_CHECK_THROW(str_to_int<long long>(s.c_str(), s.size()), std::overflow_error);
+    BOOST_CHECK_THROW(str_to_int<unsigned long long>(s.c_str(), s.size()), std::overflow_error);
     s = "Nan";
     BOOST_CHECK_THROW(str_to_int<int>(s.c_str(), s.size()), std::invalid_argument);
     s = "-1";
-    BOOST_CHECK_THROW(str_to_int<unsigned int>(s.c_str(), s.size()), std::range_error);
-    BOOST_CHECK_THROW(str_to_int<unsigned long long>(s.c_str(), s.size()), std::range_error);
+    BOOST_CHECK_THROW(str_to_int<unsigned int>(s.c_str(), s.size()), std::overflow_error);
+    BOOST_CHECK_THROW(str_to_int<unsigned long long>(s.c_str(), s.size()), std::overflow_error);
     s = "-";
     BOOST_CHECK_THROW(str_to_int<unsigned int>(s.c_str(), s.size()), std::invalid_argument);
     BOOST_CHECK_THROW(str_to_int<unsigned long long>(s.c_str(), s.size()), std::invalid_argument);

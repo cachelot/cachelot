@@ -167,9 +167,28 @@ namespace cachelot {
     /// Covert ineger value to string and write it into provided output iterator
     /// @note caller is responsible for output buffer and its size
     template <typename IntType, typename OutputIterator>
-    inline size_t int_to_str(IntType value, OutputIterator dest) noexcept {
+    inline size_t int_to_str(IntType number, OutputIterator dest) noexcept {
         static_assert(std::is_integral<IntType>::value, "Non-integer type");
-        return internal::int_to_str_impl::convert<IntType, OutputIterator>(value, dest);
+        return internal::int_to_str_impl::convert<IntType, OutputIterator>(number, dest);
+    }
+
+
+    /// Determine length of ASCII string number representation
+    template <typename UIntT,
+              class = typename std::enable_if<std::is_unsigned<UIntT>::value>::type>
+    inline size_t uint_ascii_length(UIntT number) noexcept {
+        if (number == 0) {
+            return 1;
+        }
+        return static_cast<size_t>(log10(number)) + 1;
+    }
+
+    template <typename IntT,
+              class = typename std::enable_if<std::is_signed<IntT>::value>::type>
+    inline size_t int_ascii_length(IntT number) noexcept {
+        const size_t minus_sign_len = (number < 0) ? 1 : 0;
+        auto unsigned_number = static_cast<typename internal::numeric<IntT>::unsigned_>(abs(number));
+        return minus_sign_len + uint_ascii_length(unsigned_number);
     }
 
     namespace internal {
@@ -185,7 +204,7 @@ namespace cachelot {
                 return result;
             } else {
                 if (errno == ERANGE) {
-                    throw std::range_error("integer value is too big");
+                    throw std::overflow_error("integer value is too big");
                 } else {
                     throw std::invalid_argument("invalid integer value");
                 }
@@ -205,7 +224,7 @@ namespace cachelot {
                 if (number >= std::numeric_limits<IntType>::min() && number <= std::numeric_limits<IntType>::max()) {
                     return static_cast<IntType>(number);
                 } else {
-                    throw std::range_error("integer value is out of range");
+                    throw std::overflow_error("integer value is out of range");
                 }
             }
         };
@@ -224,12 +243,12 @@ namespace cachelot {
                 while (ch < (str + length) && std::isspace(*ch)) { ch += 1; } // eat white space
                 debug_assert(ch < (str + length)); // std::invalid_argument would be thrown otherwise
                 if (*ch == '-') {
-                    throw std::range_error("integer value is out of range");
+                    throw std::overflow_error("integer value is out of range");
                 }
                 if (number <= std::numeric_limits<UIntType>::max()) {
                     return static_cast<UIntType>(number);
                 } else {
-                    throw std::range_error("integer value is out of range");
+                    throw std::overflow_error("integer value is out of range");
                 }
             }
         };
