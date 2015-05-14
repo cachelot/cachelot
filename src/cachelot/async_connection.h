@@ -100,7 +100,7 @@ namespace cachelot {
                 [=](const error_code error, const size_t bytes_received) {
                     bytes receive_result;
                     if (not error) {
-                        m_rcv_buf.confirm(bytes_received);
+                        m_rcv_buf.complete_write(bytes_received);
                         receive_result = m_rcv_buf.try_read_until(terminator);
                         if (receive_result) {
                             on_complete(error, receive_result);
@@ -117,18 +117,18 @@ namespace cachelot {
     template <class Sock, class Conn> template <typename Callback>
     inline void async_connection<Sock, Conn>::async_receive_n(const size_t n, Callback on_complete) noexcept {
         debug_assert(n > 0);
-        if (m_rcv_buf.unread() >= n) {
+        if (m_rcv_buf.non_read() >= n) {
             // we already have requested data in buffer after previous read
-            on_complete(error::success, m_rcv_buf.read(n));
+            on_complete(error::success, m_rcv_buf.complete_read(n));
         } else {
-            size_t bytes_to_receive = n - m_rcv_buf.unread();
+            size_t bytes_to_receive = n - m_rcv_buf.non_read();
             asio::async_read(m_socket, asio::buffer(m_rcv_buf.begin_write(bytes_to_receive), bytes_to_receive), transfer_exactly(bytes_to_receive),
                 [=](const error_code error, const size_t bytes_received) noexcept {
                     bytes receive_result;
                     if (!error) {
                         debug_assert(bytes_received == bytes_to_receive);
-                        m_rcv_buf.confirm(bytes_received);
-                        receive_result = m_rcv_buf.read(n);
+                        m_rcv_buf.complete_write(bytes_received);
+                        receive_result = m_rcv_buf.complete_read(n);
                     }
                     on_complete(error, receive_result);
                 });
@@ -138,11 +138,11 @@ namespace cachelot {
     template <class Sock, class Conn> template <typename Callback>
     inline void async_connection<Sock, Conn>::async_send_all(Callback on_complete) noexcept {
         // start asynchronous sending
-        asio::async_write(m_socket, asio::buffer(m_snd_buf.begin_read(), m_snd_buf.unread()), transfer_all(),
+        asio::async_write(m_socket, asio::buffer(m_snd_buf.begin_read(), m_snd_buf.non_read()), transfer_all(),
             [=](error_code error, size_t bytes_sent) {
                 if (not error) {
-                    debug_assert(m_snd_buf.unread() == bytes_sent);
-                    m_snd_buf.read(bytes_sent);
+                    debug_assert(m_snd_buf.non_read() == bytes_sent);
+                    m_snd_buf.complete_read(bytes_sent);
                 }
                 on_complete(error);
             });

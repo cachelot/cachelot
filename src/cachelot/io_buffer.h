@@ -32,12 +32,13 @@ namespace cachelot {
      * read and write operation consist of two phases:
      *
      * read:
-     *  - get all unread data with unread() call
-     *  - mark N bytes as read by calling read()
+     *  - get size in bytes of non_read data with non_read()
+     *  - get pointer to the beginning of unread data with begin_read()
+     *  - mark N bytes as read by calling complete_read()
      *
      * write:
      *  - get write pointer in buffer by calling begin_write() and
-     *  - mark N bytes as filled by calling confirm()
+     *  - mark N bytes as filled by calling complete_write()
      */
     class io_buffer {
         typedef std::unique_ptr<char[]> underlying_array_type;
@@ -58,8 +59,8 @@ namespace cachelot {
         /// number of written bytes
         size_t size() const noexcept { return m_write_pos; }
 
-        /// nuber of unread bytes
-        size_t unread() const noexcept {
+        /// nuber of non-read bytes
+        size_t non_read() const noexcept {
             debug_assert(m_write_pos >= m_read_pos);
             return m_write_pos - m_read_pos;
         }
@@ -70,13 +71,13 @@ namespace cachelot {
             return m_data.get() + m_read_pos;
         }
 
-        /// mark `n` more bytes as read
-        bytes read(const size_t n) noexcept {
-            debug_assert((m_read_pos + n) <= m_write_pos);
-            bytes result(m_data.get() + m_read_pos, n);
-            m_read_pos += n;
+        /// mark `num_bytes` as read
+        bytes complete_read(const size_t num_bytes) noexcept {
+            debug_assert((m_read_pos + num_bytes) <= m_write_pos);
+            bytes result(m_data.get() + m_read_pos, num_bytes);
+            m_read_pos += num_bytes;
             if (m_read_pos == m_write_pos) {
-                discard();
+                discard_all();
             }
             return result;
         }
@@ -84,13 +85,13 @@ namespace cachelot {
         /// search for `terminator` and return bytes ending on `terminator` on success or empty bytes otherwise
         bytes try_read_until(const bytes terminator) noexcept {
             debug_assert(terminator); debug_assert(m_read_pos <= m_write_pos);
-            bytes search_range(m_data.get() + m_read_pos, unread());
+            bytes search_range(m_data.get() + m_read_pos, non_read());
             const bytes found = search_range.search(terminator);
             if (found) {
                 bytes result(search_range.begin(), found.end());
                 m_read_pos += result.length();
                 if (m_read_pos == m_write_pos) {
-                    discard();
+                    discard_all();
                 }
                 return result;
             }
@@ -105,7 +106,7 @@ namespace cachelot {
         }
 
         /// mark `num_bytes` as written
-        void confirm(const size_t num_bytes) {
+        void complete_write(const size_t num_bytes) {
             debug_assert(m_write_pos + num_bytes <= m_capacity);
             m_write_pos += num_bytes;
         }
@@ -113,8 +114,11 @@ namespace cachelot {
         /// number of unfilled bytes in buffer
         size_t available() const noexcept { return m_capacity - m_write_pos; }
 
+        /// forget all written data
+        void discard_written() noexcept { m_write_pos = m_read_pos; }
+
         /// reset read and write pos
-        void discard() noexcept { m_read_pos = 0; m_write_pos = 0; }
+        void discard_all() noexcept { m_read_pos = 0; m_write_pos = 0; }
 
     private:
         size_t capacity_advice(size_t at_least) const noexcept {
@@ -136,10 +140,11 @@ namespace cachelot {
         void ensure_capacity(const size_t at_least) {
             if (at_least > available()) {
                 const size_t new_capacity = capacity_advice(at_least);
-                if (new_capacity - size() < at_least) {
+                if (new_capacity - size() >= at_least) {
+                    grow_to(new_capacity);
+                } else {
                     throw std::length_error("maximal IO buffer capacity exceeded");
                 }
-                grow_to(new_capacity);
             }
         }
 

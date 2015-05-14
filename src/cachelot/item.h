@@ -87,6 +87,9 @@ namespace cachelot {
             /// return bytes sequence occupied by value
             bytes value() const noexcept;
 
+            /// return write-enabled to the value and its length
+            tuple<char *, size_t> mutable_value() noexcept;
+
             /// user defined flags
             opaque_flags_type opaque_flags() const noexcept { return m_opaque_flags; }
 
@@ -95,6 +98,9 @@ namespace cachelot {
 
             /// mark this item as a new version of item `i`
             void new_version_of(const Item * i) noexcept { m_version = i->version() + 1; }
+
+            /// retrieve expiration time of this item
+            expiration_time_point expiration_time() const noexcept { return m_expiration_time; }
 
             /// check whether Item is expired
             bool is_expired() const noexcept { return m_expiration_time <= clock::now(); }
@@ -145,9 +151,15 @@ namespace cachelot {
 
 
         inline bytes Item::value() const noexcept {
-            const char * value_begin = reinterpret_cast<const char *>(this) + ValueOffset(this);
+            auto value_begin = reinterpret_cast<const char *>(this) + ValueOffset(this);
             bytes v(value_begin, value_begin + m_value_length);
             return v;
+        }
+
+
+        inline tuple<char *, size_t> Item::mutable_value() noexcept {
+            auto value_begin = reinterpret_cast<char *>(this) + ValueOffset(this);
+            return make_tuple(value_begin, (size_t)m_value_length);
         }
 
 

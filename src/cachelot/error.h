@@ -23,6 +23,8 @@ namespace cachelot {
     #define APPLICATION_ERROR_ENUM(x) \
         x(unknown_error, "Unknown error") \
         x(out_of_memory, "Out of memory") \
+        x(invalid_argument, "Invalid argument") \
+        x(number_overflow, "Numeric value is out of range") \
         x(not_implemented, "Not implemented")
 
     /// system error handling

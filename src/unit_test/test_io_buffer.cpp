@@ -14,17 +14,17 @@ BOOST_AUTO_TEST_CASE(test_io_buffer_basic) {
     static const char pattern[] = "Test string";
     char * ptr = buf.begin_write(sizeof(pattern));
     std::sprintf(ptr, pattern);
-    buf.confirm(sizeof(pattern));
-    BOOST_CHECK_EQUAL(buf.unread(), sizeof(pattern));
+    buf.complete_write(sizeof(pattern));
+    BOOST_CHECK_EQUAL(buf.non_read(), sizeof(pattern));
     bytes read = buf.try_read_until(bytes::from_literal("\0"));
     BOOST_CHECK_EQUAL(read.length(), sizeof(pattern));
     BOOST_CHECK(std::memcmp(read.begin(), pattern, sizeof(pattern) - 1) == 0);
     BOOST_CHECK_THROW(buf.begin_write(17), std::length_error);
-    buf.discard();
-    BOOST_CHECK_EQUAL(buf.unread(), 0);
+    buf.discard_all();
+    BOOST_CHECK_EQUAL(buf.non_read(), 0);
     ptr = buf.begin_write(16);
     std::memset(ptr, 'X', 16);
-    buf.confirm(16);
+    buf.complete_write(16);
     read = buf.try_read_until(bytes::from_literal("XXXXXXXXXXXXXXXX"));
     BOOST_CHECK_EQUAL(read.length(), 16);
 }

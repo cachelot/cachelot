@@ -210,7 +210,6 @@ namespace cachelot {
         /// debug only block health check (against memory corruptions)
         void test_check() const noexcept {
                             // check self
-            debug_assert(   this != nullptr                                                                         ); // Yep! It is
             debug_assert(   meta.dbg_marker == DBG_MARKER                                                           );
             debug_assert(   meta.size >= min_size || is_border()                                                    );
             debug_assert(   meta.left_adjacent_offset > 0 || is_left_border()                                       );

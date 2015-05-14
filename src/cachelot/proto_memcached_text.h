@@ -81,10 +81,10 @@ namespace cachelot {
         void send_unknown_command_error() noexcept;
 
         /// send standard response to the client
-        void send_response(const cache::Response res) noexcept;
+        void send_response(const cache::Response res);
 
         /// add single item to the send buffer
-        void push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value, bool send_cas) noexcept;
+        void push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value, bool send_cas);
 
         ostream_type serialize() noexcept { return ostream_type(this->send_buffer()); }
 
@@ -122,39 +122,48 @@ namespace cachelot {
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::send_error(const error_code error) noexcept {
-        auto error_message = bytes(error.message().c_str(), error.message().size());
-        if (error.category() == get_protocol_error_category()) {
-            serialize() << CLIENT_ERROR << ' ' << error_message;
-        } else {
-            serialize() << SERVER_ERROR << ' ' << error_message;
-        }
-        flush();
+        try {
+            auto error_message = bytes(error.message().c_str(), error.message().size());
+            this->send_buffer().discard_written();
+            if (error.category() == get_protocol_error_category()) {
+                serialize() << CLIENT_ERROR << ' ' << error_message;
+            } else {
+                serialize() << SERVER_ERROR << ' ' << error_message;
+            }
+            flush();
+        } catch(const std::exception &) {}
     }
 
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::send_server_error(const char * message) noexcept {
-        serialize() << SERVER_ERROR << ' ' << bytes(message, std::strlen(message));
-        flush();
+        try {
+            this->send_buffer().discard_written();
+            serialize() << SERVER_ERROR << ' ' << bytes(message, std::strlen(message));
+            flush();
+        } catch(const std::exception &) {}
     }
 
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::send_unknown_command_error() noexcept {
-        serialize() << ERROR;
-        flush();
+        try {
+            this->send_buffer().discard_written();
+            serialize() << ERROR;
+            flush();
+        } catch(const std::exception &) {}
     }
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::send_response(const cache::Response res) noexcept {
+    inline void text_protocol_handler<Sock>::send_response(const cache::Response res) {
         serialize() << AsciiResponse(res) << CRLF;
         flush();
     }
 
 
     template <class Sock>
-    void text_protocol_handler<Sock>::push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value, bool send_cas) noexcept {
+    void text_protocol_handler<Sock>::push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value, bool send_cas) {
         const auto value_length = static_cast<unsigned>(value.length());
         static const bytes VALUE = bytes::from_literal("VALUE ");
         serialize() << VALUE << key << ' ' << flags << ' ' << value_length;
@@ -277,13 +286,24 @@ namespace cachelot {
             validate_key(key);
             cache.do_get(key, calc_hash(key),
                          [=](error_code cache_error, bool found, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value) {
-                             // TODO: What if error?
-                             if (not cache_error && found) { push_item(key, value, flags, cas_value, send_cas); }
+                             try {
+                                 if (not cache_error && found) {
+                                     push_item(key, value, flags, cas_value, send_cas);
+                                 } else if (cache_error) {
+                                     send_error(cache_error);
+                                     suicide();
+                                 }
+                             } catch (const std::exception & exc) {
+                                 send_server_error(exc.what());
+                                 suicide();
+                             }
                          });
-        } while (args_buf);
-        static const bytes END = bytes::from_literal("END");
-        serialize() << END << CRLF;
-        flush();
+        } while (args_buf && not m_killed);
+        if (not m_killed) {
+            static const bytes END = bytes::from_literal("END");
+            serialize() << END << CRLF;
+            flush();
+        }
     }
 
 
@@ -316,7 +336,8 @@ namespace cachelot {
             }
             // create new Item
             error_code alloc_error; cache::Item * new_item;
-            tie(alloc_error, new_item) = cache.item_new(key, calc_hash(key), datalen, flags, expires_after, cas_unique);
+            auto expiration = (expires_after == cache::seconds(0)) ? cache::expiration_time_point::max() : cache::clock::now() + expires_after;
+            tie(alloc_error, new_item) = cache.create_item(key, calc_hash(key), datalen, flags, expiration, cas_unique);
             if (alloc_error) {
                 send_error(alloc_error);
                 receive_command();
@@ -351,7 +372,7 @@ namespace cachelot {
 
             return;
 
-        } catch (const std::range_error & ) {
+        } catch (const std::overflow_error & ) {
             send_error(make_protocol_error(error::integer_range));
         } catch (const std::invalid_argument & ) {
             send_error(make_protocol_error(error::integer_conv));
@@ -371,7 +392,6 @@ namespace cachelot {
         } else {
             send_error(cache_error);
         }
-
     }
 
 

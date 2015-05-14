@@ -26,6 +26,9 @@
 #ifndef CACHELOT_ERROR_H_INCLUDED
 #  include <cachelot/error.h>
 #endif
+#ifndef CACHELOT_STRING_CONV_H_INCLUDED
+#  include <cachelot/string_conv.h>
+#endif
 #ifndef CACHELOT_SETTINGS_H_INCLUDED
 #  include <cachelot/settings.h>
 #endif
@@ -150,6 +153,7 @@ namespace cachelot {
              * @return `tuple<error_code, Response>`
              *  - error: indicates that Item has *not* stored because of an error (the most likely out of memory)
              *  - Response: one of a possible cache responses
+             * TODO: responses
              */
 
 
@@ -194,7 +198,7 @@ namespace cachelot {
              * @copydoc doxygen_store_command
              */
             tuple<error_code, Response> do_append(ItemPtr item) noexcept;
-
+            
             /**
              * `prepend` - write additional data 'before' existing item data
              *
@@ -204,30 +208,34 @@ namespace cachelot {
 
             /**
              * `del` - delete existing item
-             *
-             * @tparam Callback - callback will be called when request is completed
-             * Callback must have following signature:
-             * @code
-             *    void on_del(error_code error, bool deleted)
-             * @endcode
              */
             tuple<error_code, Response> do_del(const bytes key, const hash_type hash) noexcept;
 
             /**
-             * `touch` - prolong item lifetime
-             *
-             * @tparam Callback - callback will be called when request is completed
-             * Callback must have following signature:
-             * @code
-             *    void on_touch(error_code error, bool touched)
-             * @endcode
+             * `touch` - validate item and prolong its lifetime
              */
             tuple<error_code, Response> do_touch(const bytes key, const hash_type hash, seconds expires) noexcept;
+            
+            
+            /**
+             * `incr` or `decr` value by `delta`
+             * On arithmetic operations value is treaten as an decimal ASCII encoded unsigned 64-bit integer
+             * Decrement operation handle underflow and set value to zero if `delta` is greater than item value
+             * Owerflow in `incr` command is hardware-dependent integer overflow
+             */
+            tuple<error_code, Response, uint64> do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta) noexcept;
+
 
             /**
              * Create new Item using memalloc
              */
-            tuple<error_code, ItemPtr> item_new(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds expires, version_type ver) noexcept;
+            tuple<error_code, ItemPtr> create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type ver) noexcept;
+
+            /**
+             * Allocate new Item as a new version of existing
+             */
+            tuple<error_code, ItemPtr> create_item_version(ItemPtr existing_item, uint32 new_item_value_length) noexcept;
+
 
             /**
              * Free existing Item and return memory to the memalloc
@@ -416,7 +424,62 @@ namespace cachelot {
         }
 
 
-        inline tuple<error_code, ItemPtr> Cache::item_new(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds expires, const version_type ver) noexcept {
+        inline tuple<error_code, Response, uint64> Cache::do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta) noexcept {
+            try {
+                bool found; iterator at;
+                tie(found, at) = retrieve_item(key, hash);
+                if (not found) {
+                    return make_tuple(error::success, NOT_FOUND, 0ull);
+                }
+                // retrieve item value stored as an ASCII string
+                auto item = at.value();
+                char * old_str_value; size_t old_str_value_len;
+                tie(old_str_value, old_str_value_len) = item->mutable_value();
+                // convert string to int
+                auto old_value = str_to_int<uint64>(old_str_value, old_str_value_len);
+                // process arithmetic command
+                uint64 new_value = 0;
+                if (cmd == INCR) {
+                    new_value = old_value + delta;
+                } else if (cmd == DECR) {
+                    new_value = (old_value >= delta) ? old_value - delta : 0;
+                } else {
+                    debug_assert(false && "Unknown command");
+                }
+                // store new value as an ASCII string
+                char * new_str_value;
+                auto new_str_value_length = uint_ascii_length(new_value);
+                if (old_str_value_len > new_str_value_length) {
+                    // re-assign value inplace
+                    new_str_value = old_str_value;
+                } else {
+                    // create new item to hold value including zero terminator
+                    error_code error; ItemPtr new_item;
+                    tie(error, new_item) = create_item_version(item, new_str_value_length + 1);
+                    if (error) {
+                        throw system_error(error);
+                    }
+                    size_t __;
+                    tie(new_str_value, __) = new_item->mutable_value();
+                    replace_item_at(at, new_item);
+                }
+                debug_only(auto verify_value_length = ) int_to_str(new_value, new_str_value);
+                debug_assert(verify_value_length == new_str_value_length);
+                new_str_value[new_str_value_length] = '\0';
+                return make_tuple(error::success, STORED, new_value);
+            } catch(const system_error & e) {
+                return make_tuple(e.code(), NOT_A_RESPONSE, 0ull);
+            } catch (const std::invalid_argument &) {
+                return make_tuple(error::invalid_argument, NOT_A_RESPONSE, 0ull);
+            } catch (const std::overflow_error &) {
+                return make_tuple(error::number_overflow, NOT_A_RESPONSE, 0ull);
+            } catch(const std::bad_alloc &) {
+                return make_tuple(error::out_of_memory, NOT_A_RESPONSE, 0ull);
+            }
+        }
+
+        
+        inline tuple<error_code, ItemPtr> Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, const version_type ver) noexcept {
             void * memory;
             const size_t size_required = Item::CalcSizeRequired(key, value_length);
             static const auto on_delete = [=](void * ptr) -> void {
@@ -426,11 +489,19 @@ namespace cachelot {
             };
             memory = m_allocator.alloc_or_evict(size_required, settings.cache.has_evictions, on_delete);
             if (memory != nullptr) {
-                auto item = new (memory) Item(key, hash, value_length, flags, time_from(expires), ver);
+                auto item = new (memory) Item(key, hash, value_length, flags, expiration, ver);
                 return make_tuple(error::success, item);
             } else {
                 return make_tuple(error::out_of_memory, nullptr);
             }
+        }
+
+
+        inline tuple<error_code, ItemPtr> Cache::create_item_version(ItemPtr existing_item, uint32 new_value_length) noexcept {
+            debug_assert(existing_item);
+            error_code error; ItemPtr new_item; auto i = existing_item;
+            tie(error, new_item) = create_item(i->key(), i->hash(), new_value_length, i->opaque_flags(), i->expiration_time(), i->version() + 1);
+            return make_tuple(error, new_item);
         }
 
 

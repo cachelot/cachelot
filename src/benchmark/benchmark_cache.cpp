@@ -45,7 +45,7 @@ typedef std::tuple<string, string> kv_type;
 typedef std::vector<kv_type> array_type;
 typedef array_type::const_iterator iterator;
 
-constexpr auto forever = cache::seconds(0);
+const auto forever = cache::expiration_time_point::max();
 
 class CacheWrapper {
 public:
@@ -55,7 +55,7 @@ public:
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
         error_code error; cache::ItemPtr item;
-        tie(error, item) = m_cache.item_new(k, calc_hash(k), v.length(), /*flags*/0, forever, /*CAS*/0);
+        tie(error, item) = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, forever, /*CAS*/0);
         if (not error) {
             item->assign_value(v);
             cache::Response cache_reply;

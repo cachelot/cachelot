@@ -61,7 +61,7 @@ namespace cachelot {
     inline void do_serialize_bytes(io_buffer & buf, const bytes value) {
         auto dest = buf.begin_write(value.length());
         std::memmove(dest, value.begin(), value.length());
-        buf.confirm(value.length());
+        buf.complete_write(value.length());
     }
 
     template<>
@@ -78,7 +78,7 @@ namespace cachelot {
     inline void do_serialize_integer_text(io_buffer & buf, const IntType x) {
         auto dest = buf.begin_write(internal::numeric<IntType>::max_str_length);
         size_t written = int_to_str(x, dest);
-        buf.confirm(written);
+        buf.complete_write(written);
     }
 
     #define __do_serialize_integer_text_macro(IntType) \
@@ -100,7 +100,7 @@ namespace cachelot {
     inline void do_serialize<text_serialization_tag, char>(io_buffer & buf, const char value) {
         auto dest = buf.begin_write(1);
         *dest = value;
-        buf.confirm(1);
+        buf.complete_write(1);
     }
 
 } // namespace cachelot
