@@ -8,6 +8,11 @@
 //  see LICENSE file
 
 
+#ifndef CACHELOT_ERROR_H_INCLUDED
+#  include <cachelot/error.h>
+#endif
+
+
 /// @ingroup common
 /// @{
 
@@ -195,7 +200,7 @@ namespace cachelot {
 
         // Wrapper on std::strto(u)ll to validate convertion result
         template <typename BigIntType, typename UnderlyingFun>
-        inline BigIntType checked_str_to_bigint(const char * str, const size_t length, UnderlyingFun convert_fn) {
+        inline BigIntType checked_str_to_bigint(const char * str, const size_t length, UnderlyingFun convert_fn, error_code & out_error) noexcept {
             errno = 0;
             char * end_of_convertion;
             const int base = 10;
@@ -204,10 +209,11 @@ namespace cachelot {
                 return result;
             } else {
                 if (errno == ERANGE) {
-                    throw std::overflow_error("integer value is too big");
+                    out_error = error::number_overflow;
                 } else {
-                    throw std::invalid_argument("invalid integer value");
+                    out_error = error::invalid_argument;
                 }
+                return std::numeric_limits<BigIntType>::max();
             }
         }
 
@@ -215,40 +221,54 @@ namespace cachelot {
 
         // `strtoint` specialization to convert ASCII string to signed integer
         template <typename IntType> struct strtoint<IntType, true> {
-            static IntType convert(const char * str, const size_t length) {
+            static IntType convert(const char * str, const size_t length, error_code & out_error) noexcept {
                 static_assert(std::is_signed<IntType>::value, "IntType must be signed integer");
+                constexpr auto NOT_RESULT = std::numeric_limits<IntType>::max();
                 if (length == 0 || str == nullptr) {
-                    throw std::invalid_argument("empty string");
+                    out_error = error::invalid_argument;
+                    return NOT_RESULT;
                 }
-                auto number = checked_str_to_bigint<long long>(str, length, std::strtoll);
+                auto number = checked_str_to_bigint<long long>(str, length, std::strtoll, out_error);
+                if (out_error) {
+                    return NOT_RESULT;
+                }
                 if (number >= std::numeric_limits<IntType>::min() && number <= std::numeric_limits<IntType>::max()) {
                     return static_cast<IntType>(number);
                 } else {
-                    throw std::overflow_error("integer value is out of range");
+                    out_error = error::number_overflow;
+                    return NOT_RESULT;
                 }
             }
         };
 
         // `strtoint` specialization to convert ASCII string to unsigned integer
         template <typename UIntType> struct strtoint<UIntType, false> {
-            static UIntType convert(const char * str, const size_t length) {
+            static UIntType convert(const char * str, const size_t length, error_code & out_error) noexcept {
                 static_assert(std::is_unsigned<UIntType>::value, "IntType must be unsigned integer");
+                constexpr auto NOT_RESULT = std::numeric_limits<UIntType>::max();
                 if (length == 0 || str == nullptr) {
-                    throw std::invalid_argument("empty string");
+                    out_error = error::invalid_argument;
+                    return NOT_RESULT;
                 }
-                auto number = checked_str_to_bigint<unsigned long long>(str, length, std::strtoull);
+                auto number = checked_str_to_bigint<unsigned long long>(str, length, std::strtoull, out_error);
+                if (out_error) {
+                    return NOT_RESULT;
+                }
                 // strtoull treats -1 as ULLONG_MAX (see here for details https://groups.google.com/forum/#!topic/comp.std.c/KOVzuLFen6Q)
                 // so we must ensure that string doesn't start with '-'
                 const char * ch = str;
                 while (ch < (str + length) && std::isspace(*ch)) { ch += 1; } // eat white space
-                debug_assert(ch < (str + length)); // std::invalid_argument would be thrown otherwise
+                debug_assert(ch < (str + length));
                 if (*ch == '-') {
-                    throw std::overflow_error("integer value is out of range");
+                    out_error = error::number_overflow;
+                    return NOT_RESULT;
                 }
+
                 if (number <= std::numeric_limits<UIntType>::max()) {
                     return static_cast<UIntType>(number);
                 } else {
-                    throw std::overflow_error("integer value is out of range");
+                    out_error = error::number_overflow;
+                    return NOT_RESULT;
                 }
             }
         };
@@ -258,13 +278,27 @@ namespace cachelot {
     /// convert C string `str` of given `length` into `Integer` type
     /// @note function may read `str` ahead of `length` (it reads until first non-digit character)
     template <typename Integer>
+    inline Integer str_to_int(const char * str, const size_t length, error_code & out_error) noexcept {
+        static_assert(std::is_integral<Integer>::value, "Non-integer type");
+        return internal::strtoint<Integer, std::is_signed<Integer>::value>::convert(str, length, out_error);
+    }
+
+    /// @copydoc str_to_int()
+    /// may throw `system_error`
+    template <typename Integer>
     inline Integer str_to_int(const char * str, const size_t length) {
         static_assert(std::is_integral<Integer>::value, "Non-integer type");
-        return internal::strtoint<Integer, std::is_signed<Integer>::value>::convert(str, length);
+        error_code err_code;
+        auto result = internal::strtoint<Integer, std::is_signed<Integer>::value>::convert(str, length, err_code);
+        if (not err_code) {
+            return result;
+        } else {
+            throw system_error(err_code);
+        }
     }
-    
+
     /// @}
-    
+
 
 
 } // namespace cachelot

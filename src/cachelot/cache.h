@@ -469,10 +469,6 @@ namespace cachelot {
                 return make_tuple(error::success, STORED, new_value);
             } catch(const system_error & e) {
                 return make_tuple(e.code(), NOT_A_RESPONSE, 0ull);
-            } catch (const std::invalid_argument &) {
-                return make_tuple(error::invalid_argument, NOT_A_RESPONSE, 0ull);
-            } catch (const std::overflow_error &) {
-                return make_tuple(error::number_overflow, NOT_A_RESPONSE, 0ull);
             } catch(const std::bad_alloc &) {
                 return make_tuple(error::out_of_memory, NOT_A_RESPONSE, 0ull);
             }

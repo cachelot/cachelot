@@ -6,6 +6,14 @@
 namespace {
 
 using namespace cachelot;
+    
+#define CHECK_SYSTEM_ERROR(expr, error) \
+    try { \
+        expr; \
+        BOOST_CHECK(false && "Exception expected"); \
+    } catch (const system_error & exc) { \
+        BOOST_CHECK_EQUAL(exc.code(), error); \
+    }
 
 BOOST_AUTO_TEST_SUITE(test_string_conv)
 
@@ -65,19 +73,19 @@ BOOST_AUTO_TEST_CASE(test_str_to_int) {
     BOOST_CHECK_EQUAL(str_to_int<unsigned long long>(s.c_str(), s.size()), ullnum);
     // check failure scenario
     s = num_to_str<unsigned long long>(std::numeric_limits<unsigned long long>::max());
-    BOOST_CHECK_THROW(str_to_int<long>(s.c_str(), s.size()), std::overflow_error);
-    BOOST_CHECK_THROW(str_to_int<unsigned int>(s.c_str(), s.size()), std::overflow_error);
+    CHECK_SYSTEM_ERROR(str_to_int<long>(s.c_str(), s.size()), error::number_overflow);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned int>(s.c_str(), s.size()), error::number_overflow);
     s = "2837468273468273468273468276348276348617623571564236714523";
-    BOOST_CHECK_THROW(str_to_int<long long>(s.c_str(), s.size()), std::overflow_error);
-    BOOST_CHECK_THROW(str_to_int<unsigned long long>(s.c_str(), s.size()), std::overflow_error);
+    CHECK_SYSTEM_ERROR(str_to_int<long long>(s.c_str(), s.size()), error::number_overflow);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.c_str(), s.size()), error::number_overflow);
     s = "Nan";
-    BOOST_CHECK_THROW(str_to_int<int>(s.c_str(), s.size()), std::invalid_argument);
+    CHECK_SYSTEM_ERROR(str_to_int<int>(s.c_str(), s.size()), error::invalid_argument);
     s = "-1";
-    BOOST_CHECK_THROW(str_to_int<unsigned int>(s.c_str(), s.size()), std::overflow_error);
-    BOOST_CHECK_THROW(str_to_int<unsigned long long>(s.c_str(), s.size()), std::overflow_error);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned int>(s.c_str(), s.size()), error::number_overflow);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.c_str(), s.size()), error::number_overflow);
     s = "-";
-    BOOST_CHECK_THROW(str_to_int<unsigned int>(s.c_str(), s.size()), std::invalid_argument);
-    BOOST_CHECK_THROW(str_to_int<unsigned long long>(s.c_str(), s.size()), std::invalid_argument);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned int>(s.c_str(), s.size()), error::invalid_argument);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.c_str(), s.size()), error::invalid_argument);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
