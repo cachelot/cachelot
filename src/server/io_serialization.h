@@ -9,7 +9,7 @@
 
 
 #ifndef CACHELOT_IO_BUFFER_H_INCLUDED
-#  include <cachelot/io_buffer.h>
+#  include <server/io_buffer.h>
 #endif
 #ifndef CACHELOT_STRING_CONV_H_INCLUDED
 #  include <cachelot/string_conv.h>

@@ -15,7 +15,7 @@
 #  include <cachelot/error.h>
 #endif
 #ifndef CACHELOT_IO_BUFFER_H_INCLUDED
-#  include <cachelot/io_buffer.h>
+#  include <server/io_buffer.h>
 #endif
 
 // Disable warnings in boost::asio

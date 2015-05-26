@@ -1,8 +1,8 @@
 #include <cachelot/common.h>
-#include <cachelot/proto_memcached_servers.h>
+#include <server/memcached/servers.h>
 #include <cachelot/cache.h>
-#include <cachelot/settings.h>
-#include <cachelot/stats.h>
+#include <server/settings.h>
+#include <server/stats.h>
 
 #include <iostream>
 #include <boost/program_options.hpp>
@@ -95,7 +95,7 @@ int main(int argc, char * argv[]) {
             return EXIT_FAILURE;
         }
         // Cache Service
-        std::unique_ptr<cache::Cache> the_cache(new cache::Cache());
+        std::unique_ptr<cache::Cache> the_cache(new cache::Cache(settings.cache.memory_limit, settings.cache.initial_hash_table_size, settings.cache.has_evictions));
         // Signal handlers
         setup_signals();
 

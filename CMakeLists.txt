@@ -112,25 +112,15 @@ include_directories (${INCLUDE_DIRECTORIES} ${Boost_INCLUDE_DIRS})
 #       Targets
 ###########################################################################
 message (STATUS "Cachelot setup ...")
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CACHELOT_BUILD}")
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CACHELOT_BUILD}")
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CACHELOT_BUILD}")
 include_directories (src)
+# - - - cachelot library - - - - - - - 
 add_subdirectory (src/cachelot)
-get_directory_property(CACHELOT_SOURCES DIRECTORY src/cachelot DEFINITION CACHELOT_SOURCES)
-list (APPEND CACHELOT_SOURCES src/cachelot/main.cpp) # add main.cpp containig main() function
-add_executable (cachelot ${CACHELOT_SOURCES})
-set (CACHELOT_LINK_LIBRARIES ${Boost_SYSTEM_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY})
-# - target link libraries setup
-target_link_libraries (cachelot ${CACHELOT_LINK_LIBRARIES})
-list (LENGTH PLATFORM_SPECIFIC_DEBUG_LIBRARIES NUM_PLATFORM_SPECIFIC_DEBUG_LIBRARIES)
-if (${NUM_PLATFORM_SPECIFIC_DEBUG_LIBRARIES})
-  target_link_libraries (cachelot debug ${PLATFORM_SPECIFIC_DEBUG_LIBRARIES})
-  message(STATUS "Platform specific debug libraries: " ${PLATFORM_SPECIFIC_DEBUG_LIBRARIES})
-endif ()
-
-set (CACHELOT_BUILD "")
-string (TOLOWER "${CMAKE_BUILD_TYPE}" CACHELOT_BUILD)
-set_target_properties (cachelot PROPERTIES RUNTIME_OUTPUT_DIRECTORY bin/${CACHELOT_BUILD})
-
-# - - - Unit tests - - - - - - - - - -
+# - - - cachelotd server - - - - - - - 
+add_subdirectory (src/server)
+# - - - unit tests - - - - - - - - - -
 add_subdirectory (src/unit_test)
 # - - - Benchmarks - - - - - - - - - -
 add_subdirectory (src/benchmark)

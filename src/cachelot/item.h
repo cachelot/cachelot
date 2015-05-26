@@ -17,9 +17,6 @@
 #ifndef CACHELOT_EXPIRATION_CLOCK_H_INCLUDED
 #  include <cachelot/expiration_clock.h> // expiration time
 #endif
-#ifndef CACHELOT_SETTINGS_H_INCLUDED
-#  include <cachelot/settings.h>
-#endif
 
 /// @ingroup cache
 /// @{
@@ -53,6 +50,7 @@ namespace cachelot {
             typedef clock::time_point expiration_time_point;
             typedef uint64 version_type;
             static constexpr size_t max_key_length = 250; // ! key size is limited to uint8
+            static constexpr size_t max_value_length = std::numeric_limits<uint32>::max(); // ! key size is limited to uint8
         private:
             // Important! declaration order affects item size
             version_type m_version; // version of this item
@@ -73,7 +71,7 @@ namespace cachelot {
             Item & operator= (Item &&) = delete;
         public:
             /// constructor
-            explicit Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration_time, const version_type ver) noexcept;
+            explicit Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration_time, version_type the_version) noexcept;
 
             /// Destroy existing Item
             static void Destroy(Item * item) noexcept;
@@ -127,8 +125,8 @@ namespace cachelot {
         };
 
 
-        inline Item::Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration, const version_type ver) noexcept
-                : m_version(ver)
+        inline Item::Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration, version_type the_version) noexcept
+                : m_version(the_version)
                 , m_hash(the_hash)
                 , m_value_length(value_length)
                 , m_expiration_time(expiration)
@@ -136,7 +134,7 @@ namespace cachelot {
                 , m_key_length(the_key.length()) {
             debug_assert(unaligned_bytes(this, alignof(Item) == 0));
             debug_assert(the_key.length() <= max_key_length);
-            debug_assert(value_length <= settings.cache.max_value_size);
+            debug_assert(value_length <= max_value_length);
             auto this_ = reinterpret_cast<uint8 *>(this);
             std::memcpy(this_ + KeyOffset(this), the_key.begin(), the_key.length());
         }
@@ -184,7 +182,6 @@ namespace cachelot {
         inline size_t Item::CalcSizeRequired(const bytes the_key, const uint32 value_length) noexcept {
             debug_assert(the_key.length() > 0);
             debug_assert(the_key.length() <= max_key_length);
-            debug_assert(value_length <= settings.cache.max_value_size);
             size_t item_size = sizeof(Item);
             item_size += the_key.length();
             item_size += value_length;

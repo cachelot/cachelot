@@ -8,7 +8,7 @@
 //
 
 #ifndef CACHELOT_NETWORK_H_INCLUDED
-#  include <cachelot/network.h>
+#  include <server/network.h>
 #endif
 
 /**

@@ -12,19 +12,19 @@
 #  include <cachelot/error.h>
 #endif
 #ifndef CACHELOT_NET_ASYNC_CONNECTION_H_INCLUDED
-#  include <cachelot/async_connection.h>
+#  include <server/async_connection.h>
 #endif
 #ifndef CACHELOT_IO_BUFFER_H_INCLUDED
-#  include <cachelot/io_buffer.h>
+#  include <server/io_buffer.h>
 #endif
 #ifndef CACHELOT_IO_SERIALIZATION_H_INCLUDED
-#  include <cachelot/io_serialization.h>
+#  include <server/io_serialization.h>
 #endif
 #ifndef CACHELOT_CACHE_H_INCLUDED
 #  include <cachelot/cache.h>
 #endif
 #ifndef CACHELOT_SETTINGS_H_INCLUDED
-#  include <cachelot/settings.h>
+#  include <server/settings.h>
 #endif
 
 

@@ -8,9 +8,9 @@
 //  see LICENSE file
 
 
-#include <cachelot/tcp_server.h>
-#include <cachelot/unix_socket_server.h>
-#include <cachelot/proto_memcached_text.h>
+#include <server/tcp_server.h>
+#include <server/unix_socket_server.h>
+#include <server/memcached/proto_text.h>
 
 /**
  * @ingroup memcached

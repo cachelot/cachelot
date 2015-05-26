@@ -2,8 +2,7 @@
 #include <cachelot/cache.h>
 #include <cachelot/random.h>
 #include <cachelot/hash_fnv1a.h>
-#include <cachelot/settings.h>
-#include <cachelot/stats.h>
+#include <server/stats.h>
 
 #include <iostream>
 #include <iomanip>
@@ -49,7 +48,7 @@ const auto forever = cache::expiration_time_point::max();
 
 class CacheWrapper {
 public:
-    CacheWrapper() : m_cache() {}
+    CacheWrapper() : m_cache(cache_memory, hash_initial, true) {}
 
     void set(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
@@ -85,7 +84,7 @@ public:
     void del(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         error_code error; cache::Response cache_reply;
-        tie(error, cache_reply) = m_cache.do_del(k, calc_hash(k));
+        tie(error, cache_reply) = m_cache.do_delete(k, calc_hash(k));
         __stats__.num_del += 1;
         if (not error) {
             auto & counter = (cache_reply == cache::DELETED) ? __stats__.num_cache_hit : __stats__.num_cache_miss;
@@ -131,9 +130,6 @@ static void warmup() {
 auto chance = random_int<size_t>(1, 100);
 
 int main(int /*argc*/, char * /*argv*/[]) {
-    // setup cache
-    settings.cache.memory_limit = cache_memory;
-    settings.cache.initial_hash_table_size = hash_initial;
     csh.reset(new CacheWrapper());
     generate_test_data();
     warmup();

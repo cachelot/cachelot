@@ -8,7 +8,7 @@
 //  see LICENSE file
 
 
-#include <cachelot/proto_memcached.h>
+#include <server/memcached/memcached.h>
 
 /**
  * @ingroup memcached
@@ -348,12 +348,12 @@ namespace cachelot {
             super::async_receive_n(datalen + CRLF.length(),
                 [=](const error_code net_error, const bytes data) noexcept {
                     if (net_error) {
-                        cache.item_free(new_item);
+                        cache.destroy_item(new_item);
                         on_error(net_error);
                         return;
                     }
                     if (not data.endswith(CRLF)) {
-                        cache.item_free(new_item);
+                        cache.destroy_item(new_item);
                         send_error(make_protocol_error(error::value_crlf_expected));
                         suicide();
                         return;
@@ -364,7 +364,7 @@ namespace cachelot {
                     if (not cache_error) {
                         if (not noreply) { send_response(response); }
                     } else {
-                        cache.item_free(new_item);
+                        cache.destroy_item(new_item);
                         send_error(cache_error);
                     }
                     receive_command();
@@ -386,7 +386,7 @@ namespace cachelot {
         bytes key = args_buf;
         validate_key(key);
         error_code cache_error; cache::Response response;
-        tie(cache_error, response) = cache.do_del(key, calc_hash(key));
+        tie(cache_error, response) = cache.do_delete(key, calc_hash(key));
         if (not cache_error) {
             send_response(response);
         } else {

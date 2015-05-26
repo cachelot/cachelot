@@ -1,5 +1,5 @@
 #include <cachelot/common.h>
-#include <cachelot/settings.h>
+#include <server/settings.h>
 
 namespace cachelot {
 

@@ -33,7 +33,7 @@ namespace cachelot {
     *    initial contiguous memory volume 'arena' must be pre-allocated by user)
     *  - contrary to standard malloc implementations allocated memory is aligned to sizeof(void *) bytes boundary (not 16)
     *
-    * @see @ref memalloc (memalloc.inl) for implementation details
+    * @see @ref memalloc (memalloc-impl.h) for implementation details
     */
     class memalloc {
         class block;
@@ -108,6 +108,6 @@ namespace cachelot {
 
 /// @}
 
-#include <cachelot/memalloc.inl>
+#include <cachelot/memalloc-impl.h>
 
 #endif // CACHELOT_MEMALLOC_H_INCLUDED

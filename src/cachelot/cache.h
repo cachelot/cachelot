@@ -29,9 +29,6 @@
 #ifndef CACHELOT_STRING_CONV_H_INCLUDED
 #  include <cachelot/string_conv.h>
 #endif
-#ifndef CACHELOT_SETTINGS_H_INCLUDED
-#  include <cachelot/settings.h>
-#endif
 
 /// @defgroup cache Cache implementation
 /// @{
@@ -126,10 +123,11 @@ namespace cachelot {
             /**
              * constructor
              *
-             * @param memory_size - amount of memory available for storage use
+             * @param memory_limit - amount of memory available for storage use
              * @param initial_dict_size - number of reserved items in dictionary
+             * @param enable_evictions - evict existing items in order to store new ones
              */
-            explicit Cache();
+            explicit Cache(size_t memory_limit, size_t initial_dict_size, bool enable_evictions);
 
 
             /**
@@ -207,9 +205,9 @@ namespace cachelot {
             tuple<error_code, Response> do_prepend(ItemPtr item) noexcept;
 
             /**
-             * `del` - delete existing item
+             * `delete` - delete existing item
              */
-            tuple<error_code, Response> do_del(const bytes key, const hash_type hash) noexcept;
+            tuple<error_code, Response> do_delete(const bytes key, const hash_type hash) noexcept;
 
             /**
              * `touch` - validate item and prolong its lifetime
@@ -229,18 +227,12 @@ namespace cachelot {
             /**
              * Create new Item using memalloc
              */
-            tuple<error_code, ItemPtr> create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type ver) noexcept;
-
-            /**
-             * Allocate new Item as a new version of existing
-             */
-            tuple<error_code, ItemPtr> create_item_version(ItemPtr existing_item, uint32 new_item_value_length) noexcept;
-
+            tuple<error_code, ItemPtr> create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type version) noexcept;
 
             /**
              * Free existing Item and return memory to the memalloc
              */
-            void item_free(ItemPtr item) noexcept;
+            void destroy_item(ItemPtr item) noexcept;
 
         private:
             /**
@@ -267,13 +259,15 @@ namespace cachelot {
             std::unique_ptr<uint8[]> memory_arena;
             memalloc m_allocator;
             dict_type m_dict;
+            const bool m_evictions_enabled;
         };
 
 
-        inline Cache::Cache()
-            : memory_arena(new uint8[settings.cache.memory_limit])
-            , m_allocator(raw_pointer(memory_arena), settings.cache.memory_limit)
-            , m_dict(settings.cache.initial_hash_table_size) {
+        inline Cache::Cache(size_t memory_limit, size_t initial_dict_size, bool enable_evictions)
+            : memory_arena(new uint8[memory_limit])
+            , m_allocator(raw_pointer(memory_arena), memory_limit)
+            , m_dict(initial_dict_size)
+            , m_evictions_enabled(enable_evictions) {
         }
 
 
@@ -283,7 +277,7 @@ namespace cachelot {
             if (found && at.value()->is_expired()) {
                 ItemPtr item = at.value();
                 m_dict.remove(at);
-                item_free(item);
+                destroy_item(item);
                 found = false;
             }
             return make_tuple(found, at);
@@ -402,13 +396,13 @@ namespace cachelot {
         }
 
 
-        inline tuple<error_code, Response> Cache::do_del(const bytes key, const hash_type hash) noexcept {
+        inline tuple<error_code, Response> Cache::do_delete(const bytes key, const hash_type hash) noexcept {
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
                 ItemPtr item = at.value();
                 m_dict.remove(at);
-                item_free(item);
+                destroy_item(item);
             }
             return make_tuple(error::success, found ? DELETED : NOT_FOUND);
         }
@@ -432,10 +426,11 @@ namespace cachelot {
                     return make_tuple(error::success, NOT_FOUND, 0ull);
                 }
                 // retrieve item value stored as an ASCII string
-                auto item = at.value();
+                auto old_item = at.value();
                 char * old_str_value; size_t old_str_value_len;
-                tie(old_str_value, old_str_value_len) = item->mutable_value();
+                tie(old_str_value, old_str_value_len) = old_item->mutable_value();
                 // convert string to int
+                // !!!!!!!!!!!!!!!!!!!!!!! TODO: It will read ahead of value boundaries !!!!!!!!!!!!!!!!!!!!!!!!!!
                 auto old_value = str_to_int<uint64>(old_str_value, old_str_value_len);
                 // process arithmetic command
                 uint64 new_value = 0;
@@ -455,7 +450,7 @@ namespace cachelot {
                 } else {
                     // create new item to hold value including zero terminator
                     error_code error; ItemPtr new_item;
-                    tie(error, new_item) = create_item_version(item, new_str_value_length + 1);
+                    tie(error, new_item) = create_item(old_item->key(), old_item->hash(), new_str_value_length + 1, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
                     if (error) {
                         throw system_error(error);
                     }
@@ -475,7 +470,7 @@ namespace cachelot {
         }
 
         
-        inline tuple<error_code, ItemPtr> Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, const version_type ver) noexcept {
+        inline tuple<error_code, ItemPtr> Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type version) noexcept {
             void * memory;
             const size_t size_required = Item::CalcSizeRequired(key, value_length);
             static const auto on_delete = [=](void * ptr) -> void {
@@ -483,9 +478,9 @@ namespace cachelot {
                 debug_only(bool deleted = ) this->m_dict.del(i->key(), i->hash());
                 debug_assert(deleted);
             };
-            memory = m_allocator.alloc_or_evict(size_required, settings.cache.has_evictions, on_delete);
+            memory = m_allocator.alloc_or_evict(size_required, m_evictions_enabled, on_delete);
             if (memory != nullptr) {
-                auto item = new (memory) Item(key, hash, value_length, flags, expiration, ver);
+                auto item = new (memory) Item(key, hash, value_length, flags, expiration, version);
                 return make_tuple(error::success, item);
             } else {
                 return make_tuple(error::out_of_memory, nullptr);
@@ -493,15 +488,7 @@ namespace cachelot {
         }
 
 
-        inline tuple<error_code, ItemPtr> Cache::create_item_version(ItemPtr existing_item, uint32 new_value_length) noexcept {
-            debug_assert(existing_item);
-            error_code error; ItemPtr new_item; auto i = existing_item;
-            tie(error, new_item) = create_item(i->key(), i->hash(), new_value_length, i->opaque_flags(), i->expiration_time(), i->version() + 1);
-            return make_tuple(error, new_item);
-        }
-
-
-        inline void Cache::item_free(ItemPtr item) noexcept {
+        inline void Cache::destroy_item(ItemPtr item) noexcept {
             m_allocator.free(item);
         }
 
@@ -510,8 +497,8 @@ namespace cachelot {
             auto old_item = at.value();
             debug_assert(old_item->hash() == new_item->hash() && old_item->key() == new_item->key());
             new_item->new_version_of(old_item);
-            item_free(old_item);
-            m_dict.remove(at); // remove will not touch freed object
+            destroy_item(old_item);
+            m_dict.remove(at);
             m_dict.insert(at, new_item->key(), new_item->hash(), new_item);
         }
 

@@ -14,15 +14,18 @@ All this allows you to store and access three million items per second (dependin
 # What is Cachelot Distributed Cache Server #
 Think of [Memcached](http://memcached.org) (Cachelot server is Memcached-compatible) but while the former aims to serve hundreds of simultaneous connections, achieving maximum bandwidth, the latter serves tens of them, achieving minimal latency.
 
-Cachelot is single-threaded, so you can run it while consuming fewer resources (getting cheaper VPS hosts can lead to huge savings). It also stores less metadata per Item, and thus better utilizes precious RAM.
+Cachelot is single-threaded, so you can run it while consuming fewer resources (getting cheaper VPS hosts can lead to the huge savings); it also stores less metadata per Item, and thus better utilizes precious RAM.
 
-And yet, single Cachelot instance is faster than Memcached while serving a certain number of connections. Never the less, you're free to scale up horizontally by running more instances.
+And yet, single Cachelot instance is [faster than Memcached](http://cachelot.io/index.html#benchmarks) while serving a certain number of connections. Never the less, you're free to scale up horizontally by running more instances.
 
 * * *
 
+### Attention ###
+Cachelot is in early-alpha stage, don't use it in production systems
+
 ## How To Build ##
-Cachelot has been proven to work on Linux, Mac OS and BSD Family.
-Windows build is Upcoming.
+Cachelot has been proven to work on Linux, MacOS and BSD Family.
+Windows build is upcoming.
 
 ### Prerequisites ###
 
@@ -67,12 +70,12 @@ Build with IDE or by running make in root project directory. All binaries (main 
      - `RelWithDebInfo` - release build with debug information enabled
      - `AddressSanitizer` - special build to run under [Address Sanitizer](https://code.google.com/p/address-sanitizer/) (compiler support and libasan required)
 
-Build with IDE or by running `make` in root project directory.
+Build with IDE or by running `make` in the root project directory.
 
 ### Run tests or benchmarks ###
 All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
 
-### Visit web site for more information ###
+### Visit the web site for more information ###
 [www.cachelot.io](http://www.cachelot.io/)
 
 * * *
@@ -80,7 +83,7 @@ All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
 ## Upcoming Features ##
  Cachelot is still 'work-in-progress' project
 
- * Some Memcached commands not implemented yet (`cas`, `touch`, `append`, `prepend`, `stats`)
+ * Some Memcached commands not implemented yet (~~`cas`~~, `touch`, `append`, `prepend`, `stats`)
  * Windows build is broken
  * There is no UDP and binary protocol support
  * Cachelot library doesn't have proper build packaging and has no multi-threaded interface
@@ -95,5 +98,5 @@ Distributed under the terms of [Simplified BSD License](http://cachelot.io/licen
  * [boost C++ libraries](http://www.boost.org)
  * [TLSF](http://www.gii.upv.es/tlsf/)
  * [C++ String Toolkit Library](http://www.partow.net/programming/strtk/index.html)
- * Thanks to all open source community
+ * Thanks to all the open source community
 
