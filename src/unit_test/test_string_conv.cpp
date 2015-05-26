@@ -44,6 +44,13 @@ BOOST_AUTO_TEST_CASE(test_int_to_str) {
     check_int_to_string(std::numeric_limits<int32>::max());
 }
 
+BOOST_AUTO_TEST_CASE(test_num_ascii_length) {
+    BOOST_CHECK_EQUAL(int_ascii_length(0), 1);
+    BOOST_CHECK_EQUAL(int_ascii_length(-1234567890), 11);
+    BOOST_CHECK_EQUAL(uint_ascii_length(0u), 1);
+    BOOST_CHECK_EQUAL(uint_ascii_length(1234567890u), 10);
+}
+
 template <typename NumType>
 string num_to_str(NumType number) {
     std::stringstream stream;
