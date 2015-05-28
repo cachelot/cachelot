@@ -85,8 +85,8 @@ namespace cachelot {
             /// return bytes sequence occupied by value
             bytes value() const noexcept;
 
-            /// return write-enabled to the value and its length
-            tuple<char *, size_t> mutable_value() noexcept;
+            /// assign value to the item
+            void assign_value(bytes the_value) noexcept;
 
             /// user defined flags
             opaque_flags_type opaque_flags() const noexcept { return m_opaque_flags; }
@@ -105,9 +105,6 @@ namespace cachelot {
 
             /// update item's expiration time
             void touch(expiration_time_point expiration_time) noexcept { m_expiration_time = expiration_time; }
-
-            /// assign value to the item
-            void assign_value(bytes the_value) noexcept;
 
             /// try to append item's value with given `data`
             bool append(const bytes data);
@@ -155,16 +152,11 @@ namespace cachelot {
         }
 
 
-        inline tuple<char *, size_t> Item::mutable_value() noexcept {
-            auto value_begin = reinterpret_cast<char *>(this) + ValueOffset(this);
-            return make_tuple(value_begin, (size_t)m_value_length);
-        }
-
-
         inline void Item::assign_value(bytes the_value) noexcept {
-            debug_assert(m_value_length == the_value.length());
+            debug_assert(the_value.length() <= m_value_length);
             auto this_ = reinterpret_cast<uint8 *>(this);
             std::memcpy(this_ + ValueOffset(this), the_value.begin(), the_value.length());
+            m_value_length = static_cast<decltype(m_value_length)>(the_value.length());
         }
 
 

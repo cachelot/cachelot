@@ -23,14 +23,14 @@ namespace cachelot {
 
     namespace internal {
         template <typename IntType> struct numeric;
-        template <> struct numeric<int8> { typedef uint8 unsigned_; static const size_t max_str_length = 4; };
-        template <> struct numeric<int16> { typedef uint16 unsigned_; static const size_t max_str_length = 6; };
-        template <> struct numeric<int32> { typedef uint32 unsigned_; static const size_t max_str_length = 11; };
-        template <> struct numeric<int64> { typedef uint64 unsigned_; static const size_t max_str_length = 20; };
-        template <> struct numeric<uint8> { typedef uint8 unsigned_; static const size_t max_str_length = 3; };
-        template <> struct numeric<uint16> { typedef uint16 unsigned_; static const size_t max_str_length = 5; };
-        template <> struct numeric<uint32> { typedef uint32 unsigned_; static const size_t max_str_length = 10; };
-        template <> struct numeric<uint64> { typedef uint64 unsigned_; static const size_t max_str_length = 20; };
+        template <> struct numeric<int8> { typedef uint8 unsigned_; static constexpr size_t max_str_length = 4; };
+        template <> struct numeric<int16> { typedef uint16 unsigned_; static constexpr size_t max_str_length = 6; };
+        template <> struct numeric<int32> { typedef uint32 unsigned_; static constexpr size_t max_str_length = 11; };
+        template <> struct numeric<int64> { typedef uint64 unsigned_; static constexpr size_t max_str_length = 20; };
+        template <> struct numeric<uint8> { typedef uint8 unsigned_; static constexpr size_t max_str_length = 3; };
+        template <> struct numeric<uint16> { typedef uint16 unsigned_; static constexpr size_t max_str_length = 5; };
+        template <> struct numeric<uint32> { typedef uint32 unsigned_; static constexpr size_t max_str_length = 10; };
+        template <> struct numeric<uint64> { typedef uint64 unsigned_; static constexpr size_t max_str_length = 20; };
 
         template <typename IntType, bool Signed = std::is_signed<IntType>::value> struct is_negative;
         template <typename IntType> struct is_negative<IntType, false> {
@@ -198,104 +198,226 @@ namespace cachelot {
 
     namespace internal {
 
-        // Wrapper on std::strto(u)ll to validate convertion result
-        template <typename BigIntType, typename UnderlyingFun>
-        inline BigIntType checked_str_to_bigint(const char * str, const size_t length, UnderlyingFun convert_fn, error_code & out_error) noexcept {
-            errno = 0;
-            char * end_of_convertion;
-            const int base = 10;
-            auto result = convert_fn(str, &end_of_convertion, base);
-            if (errno == 0 && end_of_convertion == str + length) {
-                return result;
-            } else {
-                if (errno == ERANGE) {
-                    out_error = error::number_overflow;
-                } else {
-                    out_error = error::invalid_argument;
-                }
-                return std::numeric_limits<BigIntType>::max();
-            }
-        }
-
-        template <typename IntType, bool Signed> struct strtoint;
-
-        // `strtoint` specialization to convert ASCII string to signed integer
-        template <typename IntType> struct strtoint<IntType, true> {
-            static IntType convert(const char * str, const size_t length, error_code & out_error) noexcept {
-                static_assert(std::is_signed<IntType>::value, "IntType must be signed integer");
-                constexpr auto NOT_RESULT = std::numeric_limits<IntType>::max();
-                if (length == 0 || str == nullptr) {
-                    out_error = error::invalid_argument;
-                    return NOT_RESULT;
-                }
-                auto number = checked_str_to_bigint<long long>(str, length, std::strtoll, out_error);
-                if (out_error) {
-                    return NOT_RESULT;
-                }
-                if (number >= std::numeric_limits<IntType>::min() && number <= std::numeric_limits<IntType>::max()) {
-                    return static_cast<IntType>(number);
-                } else {
-                    out_error = error::number_overflow;
-                    return NOT_RESULT;
-                }
+        // Compile-time recursive class to unroll the loop
+        template <class ConstIterator, size_t NumUncoverted>
+        struct str_to_big_unsigned_impl {
+            static constexpr uint64 convert(uint64 current, ConstIterator iter, size_t length) noexcept {
+                return str_to_big_unsigned_impl<ConstIterator, NumUncoverted - 1>::convert(current * 10 + (*iter - '0'), iter + 1, length);
             }
         };
 
-        // `strtoint` specialization to convert ASCII string to unsigned integer
-        template <typename UIntType> struct strtoint<UIntType, false> {
-            static UIntType convert(const char * str, const size_t length, error_code & out_error) noexcept {
-                static_assert(std::is_unsigned<UIntType>::value, "IntType must be unsigned integer");
-                constexpr auto NOT_RESULT = std::numeric_limits<UIntType>::max();
-                if (length == 0 || str == nullptr) {
-                    out_error = error::invalid_argument;
-                    return NOT_RESULT;
-                }
-                auto number = checked_str_to_bigint<unsigned long long>(str, length, std::strtoull, out_error);
-                if (out_error) {
-                    return NOT_RESULT;
-                }
-                // strtoull treats -1 as ULLONG_MAX (see here for details https://groups.google.com/forum/#!topic/comp.std.c/KOVzuLFen6Q)
-                // so we must ensure that string doesn't start with '-'
-                const char * ch = str;
-                while (ch < (str + length) && std::isspace(*ch)) { ch += 1; } // eat white space
-                debug_assert(ch < (str + length));
-                if (*ch == '-') {
-                    out_error = error::number_overflow;
-                    return NOT_RESULT;
-                }
+        // Partial specialization terminates recursion
+        template <class ConstIterator>
+        struct str_to_big_unsigned_impl<ConstIterator, 1> {
+            static constexpr uint64 convert(uint64 current, ConstIterator iter, size_t /*length*/) noexcept {
+                return current * 10 + (*iter - '0');
+            }
+        };
 
-                if (number <= std::numeric_limits<UIntType>::max()) {
-                    return static_cast<UIntType>(number);
-                } else {
-                    out_error = error::number_overflow;
-                    return NOT_RESULT;
+
+        // Convert ASCII encoded decimal string to unsigned 64-bit integer
+        template <class ConstIterator>
+        inline uint64 str_to_big_unsigned(ConstIterator str, ConstIterator end, error_code & out_error) noexcept {
+            // returned on error
+            static constexpr uint64 NO_RESULT = std::numeric_limits<uint64>::max();
+
+            const auto length = end - str;
+
+            // shortcut
+            if (length == 1 && *str == '0') {
+                return 0u;
+            }
+
+            // check that all chars are digits
+            for (auto iter = str; iter < end; ++iter) {
+                if (not std::isdigit(*iter)) {
+                    out_error = error::numeric_convert;
+                    return NO_RESULT;
                 }
             }
+
+            switch (length) {
+                case 20: // in ASCII max uint64 number length is 20
+                    // check against the biggest uint64 number - 18446744073709551615
+                    if (str[ 0] > '1' ||
+                        str[ 1] > '8' ||
+                        str[ 2] > '4' ||
+                        str[ 3] > '4' ||
+                        str[ 4] > '6' ||
+                        str[ 5] > '7' ||
+                        str[ 6] > '4' ||
+                        str[ 7] > '4' ||
+                        str[ 8] > '0' ||
+                        str[ 9] > '7' ||
+                        str[10] > '3' ||
+                        str[11] > '7' ||
+                        str[12] > '0' ||
+                        str[13] > '9' ||
+                        str[14] > '5' ||
+                        str[15] > '5' ||
+                        str[16] > '1' ||
+                        str[17] > '6' ||
+                        str[18] > '1' ||
+                        str[19] > '5' ) {
+                        out_error = error::numeric_overflow;
+                        return NO_RESULT;
+                    }
+                    return str_to_big_unsigned_impl<ConstIterator, 20>::convert(0, str, length);
+                case 19:
+                    return str_to_big_unsigned_impl<ConstIterator, 19>::convert(0, str, length);
+                case 18:
+                    return str_to_big_unsigned_impl<ConstIterator, 18>::convert(0, str, length);
+                case 17:
+                    return str_to_big_unsigned_impl<ConstIterator, 17>::convert(0, str, length);
+                case 16:
+                    return str_to_big_unsigned_impl<ConstIterator, 16>::convert(0, str, length);
+                case 15:
+                    return str_to_big_unsigned_impl<ConstIterator, 15>::convert(0, str, length);
+                case 14:
+                    return str_to_big_unsigned_impl<ConstIterator, 14>::convert(0, str, length);
+                case 13:
+                    return str_to_big_unsigned_impl<ConstIterator, 13>::convert(0, str, length);
+                case 12:
+                    return str_to_big_unsigned_impl<ConstIterator, 12>::convert(0, str, length);
+                case 11:
+                    return str_to_big_unsigned_impl<ConstIterator, 11>::convert(0, str, length);
+                case 10:
+                    return str_to_big_unsigned_impl<ConstIterator, 10>::convert(0, str, length);
+                case 9:
+                    return str_to_big_unsigned_impl<ConstIterator, 9>::convert(0, str, length);
+                case 8:
+                    return str_to_big_unsigned_impl<ConstIterator, 8>::convert(0, str, length);
+                case 7:
+                    return str_to_big_unsigned_impl<ConstIterator, 7>::convert(0, str, length);
+                case 6:
+                    return str_to_big_unsigned_impl<ConstIterator, 6>::convert(0, str, length);
+                case 5:
+                    return str_to_big_unsigned_impl<ConstIterator, 5>::convert(0, str, length);
+                case 4:
+                    return str_to_big_unsigned_impl<ConstIterator, 4>::convert(0, str, length);
+                case 3:
+                    return str_to_big_unsigned_impl<ConstIterator, 3>::convert(0, str, length);
+                case 2:
+                    return str_to_big_unsigned_impl<ConstIterator, 2>::convert(0, str, length);
+                case 1:
+                    return str_to_big_unsigned_impl<ConstIterator, 1>::convert(0, str, length);
+                case 0:
+                    out_error = error::numeric_convert;
+                    return NO_RESULT;
+                default:
+                    out_error = error::numeric_overflow;
+                    return NO_RESULT;
+            }
+        }
+
+        // Convert ASCII encoded decimal string to unsigned 64-bit integer
+        template <class ConstIterator>
+        inline int64 str_to_big_signed(ConstIterator str, ConstIterator end, error_code & out_error) noexcept {
+            // returned on error
+            static constexpr int64 NO_RESULT = std::numeric_limits<int64>::max();
+
+            int64 sign;
+            if (*str != '-') {
+                sign = 1;
+            } else {
+                sign = -1;
+                str += 1;
+            }
+            uint64 unsigned_value = str_to_big_unsigned<ConstIterator>(str, end, out_error);
+            if (out_error) {
+                return NO_RESULT;
+            }
+            static const auto int64_boundary = static_cast<uint64>(std::numeric_limits<int64>::max() + 1);
+            if (unsigned_value < int64_boundary) {
+                return unsigned_value * sign;
+            }
+            if (unsigned_value == int64_boundary && sign == -1) {
+                return -unsigned_value;
+            }
+            out_error = error::numeric_overflow;
+            return NO_RESULT;
+        }
+
+
+        template <typename UnsignedT, class ConstIterator,
+                  class = typename std::enable_if<std::is_unsigned<UnsignedT>::value>::type>
+        UnsignedT str_to_unsigned(ConstIterator str, ConstIterator end, error_code & out_error) noexcept {
+            // returned on error
+            static constexpr auto NO_RESULT = std::numeric_limits<UnsignedT>::max();
+
+            auto u64_value = str_to_big_unsigned<ConstIterator>(str, end, out_error);
+            if (not out_error) {
+                if (u64_value <= std::numeric_limits<UnsignedT>::max()) {
+                    return static_cast<UnsignedT>(u64_value);
+                } else {
+                    out_error = error::numeric_overflow;
+                    return NO_RESULT;
+                }
+            } else {
+                return NO_RESULT;
+            }
+        }
+
+        template <typename SignedT, class ConstIterator,
+        class = typename std::enable_if<std::is_signed<SignedT>::value>::type>
+        SignedT str_to_signed(ConstIterator str, ConstIterator end, error_code & out_error) noexcept {
+            // returned on error
+            static constexpr auto NO_RESULT = std::numeric_limits<SignedT>::max();
+
+            auto s64_value = str_to_big_signed<ConstIterator>(str, end, out_error);
+            if (not out_error) {
+                if (std::numeric_limits<SignedT>::min() <= s64_value && s64_value <= std::numeric_limits<SignedT>::max()) {
+                    return static_cast<SignedT>(s64_value);
+                } else {
+                    out_error = error::numeric_overflow;
+                    return NO_RESULT;
+                }
+            } else {
+                return NO_RESULT;
+            }
+        }
+
+
+        template <typename IntegerT, class ConstIterator, bool IsSigned>
+        struct choose_str_to_int;
+
+        template <typename IntegerT, class ConstIterator>
+        struct choose_str_to_int<IntegerT, ConstIterator, false> {
+            static IntegerT convert(ConstIterator str, ConstIterator end, error_code & out_error) noexcept { return str_to_unsigned<IntegerT>(str, end, out_error); }
+        };
+
+        template <typename IntegerT, class ConstIterator>
+        struct choose_str_to_int<IntegerT, ConstIterator, true> {
+            static IntegerT convert(ConstIterator str, ConstIterator end, error_code & out_error) noexcept { return str_to_signed<IntegerT>(str, end, out_error); }
         };
 
     } // namespace internal
 
-    /// convert C string `str` of given `length` into `Integer` type
-    /// @note function may read `str` ahead of `length` (it reads until first non-digit character)
-    template <typename Integer>
-    inline Integer str_to_int(const char * str, const size_t length, error_code & out_error) noexcept {
-        static_assert(std::is_integral<Integer>::value, "Non-integer type");
-        return internal::strtoint<Integer, std::is_signed<Integer>::value>::convert(str, length, out_error);
+
+    /// convert decimal number from ASCII string to the native integer type
+    template <typename Integer, class ConstIterator>
+    inline Integer str_to_int(ConstIterator str, ConstIterator end, error_code & out_error) noexcept {
+        return internal::choose_str_to_int<Integer, ConstIterator, std::is_signed<Integer>::value>::convert(str, end, out_error);
     }
+
 
     /// @copydoc str_to_int()
     /// may throw `system_error`
-    template <typename Integer>
-    inline Integer str_to_int(const char * str, const size_t length) {
+    template <typename Integer, class ConstIterator>
+    inline Integer str_to_int(ConstIterator str, ConstIterator end) {
         static_assert(std::is_integral<Integer>::value, "Non-integer type");
         error_code err_code;
-        auto result = internal::strtoint<Integer, std::is_signed<Integer>::value>::convert(str, length, err_code);
+        auto result = internal::choose_str_to_int<Integer, ConstIterator, std::is_signed<Integer>::value>::convert(str, end, err_code);
         if (not err_code) {
             return result;
         } else {
             throw system_error(err_code);
         }
     }
+    
+
+    /// On-stack buffer to hold the ASCII string representing integer number
+    typedef char AsciiIntegerBuffer[internal::numeric<int64>::max_str_length];
 
     /// @}
 

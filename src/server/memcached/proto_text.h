@@ -309,76 +309,65 @@ namespace cachelot {
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_storage_command(cache::Command cmd, bytes arguments_buf) {
-        try {
-            // command arguments
-            bytes key;
-            tie(key, arguments_buf) = arguments_buf.split(SPACE);
-            validate_key(key);
-            bytes parsed;
-            tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
-            cache::opaque_flags_type flags = str_to_int<cache::opaque_flags_type>(parsed.begin(), parsed.length()); // TODO: flags must feed 16bit
-            tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
-            auto expires_after = cache::seconds(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.length()));
-            tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
-            uint32 datalen = str_to_int<uint32>(parsed.begin(), parsed.length());
-            if (datalen > settings.cache.max_value_size) {
-                auto errc = make_protocol_error(error::value_length);
-                throw system_error(errc);
-            }
-            cache::version_type cas_unique = 0;
-            if (cmd == cache::CAS) {
-                tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
-                cas_unique = str_to_int<cache::version_type>(parsed.begin(), parsed.length());
-            }
-            bool noreply = maybe_noreply(arguments_buf);
-            if (not arguments_buf.empty()) {
-                throw system_error(make_protocol_error(error::crlf_expected));
-            }
-            // create new Item
-            error_code alloc_error; cache::Item * new_item;
-            auto expiration = (expires_after == cache::seconds(0)) ? cache::expiration_time_point::max() : cache::clock::now() + expires_after;
-            tie(alloc_error, new_item) = cache.create_item(key, calc_hash(key), datalen, flags, expiration, cas_unique);
-            if (alloc_error) {
-                send_error(alloc_error);
-                receive_command();
-                return;
-            }
-
-            // read value
-            super::async_receive_n(datalen + CRLF.length(),
-                [=](const error_code net_error, const bytes data) noexcept {
-                    if (net_error) {
-                        cache.destroy_item(new_item);
-                        on_error(net_error);
-                        return;
-                    }
-                    if (not data.endswith(CRLF)) {
-                        cache.destroy_item(new_item);
-                        send_error(make_protocol_error(error::value_crlf_expected));
-                        suicide();
-                        return;
-                    }
-                    new_item->assign_value(data.rtrim_n(CRLF.length()));
-                    error_code cache_error; cache::Response response;
-                    tie(cache_error, response) = cache.do_storage(cmd, new_item);
-                    if (not cache_error) {
-                        if (not noreply) { send_response(response); }
-                    } else {
-                        cache.destroy_item(new_item);
-                        send_error(cache_error);
-                    }
-                    receive_command();
-                });
-
-            return;
-
-        } catch (const std::overflow_error & ) {
-            send_error(make_protocol_error(error::integer_range));
-        } catch (const std::invalid_argument & ) {
-            send_error(make_protocol_error(error::integer_conv));
+        // command arguments
+        bytes key;
+        tie(key, arguments_buf) = arguments_buf.split(SPACE);
+        validate_key(key);
+        bytes parsed;
+        tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
+        cache::opaque_flags_type flags = str_to_int<cache::opaque_flags_type>(parsed.begin(), parsed.end());
+        tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
+        auto expires_after = cache::seconds(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.end()));
+        tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
+        uint32 datalen = str_to_int<uint32>(parsed.begin(), parsed.end());
+        if (datalen > settings.cache.max_value_size) {
+            auto errc = make_protocol_error(error::value_length);
+            throw system_error(errc);
         }
-        // if we reach here...
-        suicide();
+        cache::version_type cas_unique = 0;
+        if (cmd == cache::CAS) {
+            tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
+            cas_unique = str_to_int<cache::version_type>(parsed.begin(), parsed.end());
+        }
+        bool noreply = maybe_noreply(arguments_buf);
+        if (not arguments_buf.empty()) {
+            throw system_error(make_protocol_error(error::crlf_expected));
+        }
+        // create new Item
+        error_code alloc_error; cache::Item * new_item;
+        auto expiration = (expires_after == cache::seconds(0)) ? cache::expiration_time_point::max() : cache::clock::now() + expires_after;
+        tie(alloc_error, new_item) = cache.create_item(key, calc_hash(key), datalen, flags, expiration, cas_unique);
+        if (alloc_error) {
+            send_error(alloc_error);
+            receive_command();
+            return;
+        }
+
+        // read value
+        super::async_receive_n(datalen + CRLF.length(),
+            [=](const error_code net_error, const bytes data) noexcept {
+                if (net_error) {
+                    cache.destroy_item(new_item);
+                    on_error(net_error);
+                    return;
+                }
+                if (not data.endswith(CRLF)) {
+                    cache.destroy_item(new_item);
+                    send_error(make_protocol_error(error::value_crlf_expected));
+                    suicide();
+                    return;
+                }
+                new_item->assign_value(data.rtrim_n(CRLF.length()));
+                error_code cache_error; cache::Response response;
+                tie(cache_error, response) = cache.do_storage(cmd, new_item);
+                if (not cache_error) {
+                    if (not noreply) { send_response(response); }
+                } else {
+                    cache.destroy_item(new_item);
+                    send_error(cache_error);
+                }
+                receive_command();
+            });
     }
 
     template <class Sock>
@@ -397,9 +386,36 @@ namespace cachelot {
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_arithmetic_command(cache::Command cmd, bytes args_buf) {
-        (void) cmd; (void) args_buf;
-        // TODO: Implementation
-        send_error(::cachelot::error::not_implemented);
+        debug_assert(cmd == cache::INCR || cmd == cache::DECR);
+        bytes key;
+        tie(key, args_buf) = args_buf.split(SPACE);
+        validate_key(key);
+        bytes parsed;
+        tie(parsed, args_buf) = args_buf.split(SPACE);
+        auto delta = str_to_int<uint64>(parsed.begin(), parsed.end());
+        bool noreply = maybe_noreply(args_buf);
+        cache::Response response; uint64 new_value;
+        error_code error;
+        tie(error, response, new_value) = cache.do_arithmetic(cmd, key, calc_hash(key), delta);
+        if (noreply) {
+            return;
+        }
+        if (not error) {
+            switch (response) {
+            case cache::STORED:
+                serialize() << new_value << CRLF;
+                flush();
+                return;
+            case cache::NOT_FOUND:
+                send_response(cache::NOT_FOUND);
+                return;
+            default:
+                debug_assert(false && "unexpected response");
+            }
+        } else {
+            send_error(error);
+            return;
+        }
     }
 
 

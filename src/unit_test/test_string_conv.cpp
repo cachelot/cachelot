@@ -59,40 +59,87 @@ string num_to_str(NumType number) {
 }
 
 BOOST_AUTO_TEST_CASE(test_str_to_int) {
-    long lnum = 0;
-    string s = num_to_str(lnum);
-    BOOST_CHECK_EQUAL(str_to_int<long>(s.c_str(), s.size()), lnum);
-    BOOST_CHECK_EQUAL(str_to_int<unsigned long>(s.c_str(), s.size()), lnum);
-    lnum = std::numeric_limits<long>::max();
-    s = num_to_str(lnum);
-    BOOST_CHECK_EQUAL(str_to_int<long>(s.c_str(), s.size()), lnum);
-    lnum = std::numeric_limits<long>::min();
-    s = num_to_str(lnum);
-    BOOST_CHECK_EQUAL(str_to_int<long>(s.c_str(), s.size()), lnum);
-    lnum = -3;
-    s = num_to_str(lnum);
-    BOOST_CHECK_EQUAL(str_to_int<long>(s.c_str(), s.size()), lnum);
-    unsigned long ulnum = std::numeric_limits<unsigned long>::max();
-    s = num_to_str(ulnum);
-    BOOST_CHECK_EQUAL(str_to_int<unsigned long>(s.c_str(), s.size()), ulnum);
-    unsigned long long ullnum = std::numeric_limits<unsigned long long>::max();
+    // int 32-bit
+    int inum = 0;
+    string s = num_to_str(inum);
+    BOOST_CHECK_EQUAL(str_to_int<int>(s.begin(), s.end()), inum);
+    BOOST_CHECK_EQUAL(str_to_int<unsigned int>(s.begin(), s.end()), inum);
+    inum = std::numeric_limits<int>::max();
+    s = num_to_str(inum);
+    BOOST_CHECK_EQUAL(str_to_int<int>(s.begin(), s.end()), inum);
+    inum = std::numeric_limits<int>::min();
+    s = num_to_str(inum);
+    BOOST_CHECK_EQUAL(str_to_int<int>(s.begin(), s.end()), inum);
+    inum = -3;
+    s = num_to_str(inum);
+    BOOST_CHECK_EQUAL(str_to_int<int>(s.begin(), s.end()), inum);
+    auto uinum = std::numeric_limits<unsigned int>::max();
+    s = num_to_str(uinum);
+    BOOST_CHECK_EQUAL(str_to_int<unsigned int>(s.begin(), s.end()), uinum);
+    s = "-0";
+    BOOST_CHECK_EQUAL(str_to_int<int>(s.begin(), s.end()), 0);
+
+    // signed int 64-bit
+    auto llnum = std::numeric_limits<long long>::max();
+    s = num_to_str(llnum);
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), llnum);
+    llnum = std::numeric_limits<long long>::min();
+    s = num_to_str(llnum);
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), llnum);
+    s = "00000000000";
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), 0);
+    s = "-00000000000";
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), 0);
+    s = "-000000000001";
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), -1);
+    s = "0000000000010";
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), 10);
+    s = "10000000001";
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), 10000000001);
+    s = "-0";
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), 0);
+    llnum = std::numeric_limits<long long>::min() + 1;
+    s = num_to_str(llnum);
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), llnum);
+    llnum = std::numeric_limits<long long>::max() - 1;
+    s = num_to_str(llnum);
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), llnum);
+
+    // unsigned int 64-bit
+    auto ullnum = std::numeric_limits<unsigned long long>::max();
     s = num_to_str(ullnum);
-    BOOST_CHECK_EQUAL(str_to_int<unsigned long long>(s.c_str(), s.size()), ullnum);
-    // check failure scenario
+    BOOST_CHECK_EQUAL(str_to_int<unsigned long long>(s.begin(), s.end()), ullnum);
+    ullnum = std::numeric_limits<unsigned long long>::max() - 1;
+    s = num_to_str(ullnum);
+    BOOST_CHECK_EQUAL(str_to_int<unsigned long long>(s.begin(), s.end()), ullnum);
+
+    // overflow errors
     s = num_to_str<unsigned long long>(std::numeric_limits<unsigned long long>::max());
-    CHECK_SYSTEM_ERROR(str_to_int<long>(s.c_str(), s.size()), error::number_overflow);
-    CHECK_SYSTEM_ERROR(str_to_int<unsigned int>(s.c_str(), s.size()), error::number_overflow);
+    CHECK_SYSTEM_ERROR(str_to_int<long>(s.begin(), s.end()), error::numeric_overflow);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned int>(s.begin(), s.end()), error::numeric_overflow);
     s = "2837468273468273468273468276348276348617623571564236714523";
-    CHECK_SYSTEM_ERROR(str_to_int<long long>(s.c_str(), s.size()), error::number_overflow);
-    CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.c_str(), s.size()), error::number_overflow);
-    s = "Nan";
-    CHECK_SYSTEM_ERROR(str_to_int<int>(s.c_str(), s.size()), error::invalid_argument);
+    CHECK_SYSTEM_ERROR(str_to_int<long long>(s.begin(), s.end()), error::numeric_overflow);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.begin(), s.end()), error::numeric_overflow);
+    CHECK_SYSTEM_ERROR(str_to_int<char>(s.begin(), s.end()), error::numeric_overflow);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned char>(s.begin(), s.end()), error::numeric_overflow);
+    s = "18446744073709551616";
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.begin(), s.end()), error::numeric_overflow);
+    s = "28446744073709551615";
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.begin(), s.end()), error::numeric_overflow);
+    s = num_to_str<long long>(static_cast<long long>(std::numeric_limits<int>::max()) + 1);
+    CHECK_SYSTEM_ERROR(str_to_int<int>(s.begin(), s.end()), error::numeric_overflow);
+    s = num_to_str<long long>(static_cast<long long>(std::numeric_limits<int>::min()) - 1);
+    CHECK_SYSTEM_ERROR(str_to_int<int>(s.begin(), s.end()), error::numeric_overflow);
+
+    // convertion errors
+    s = "00Nan";
+    CHECK_SYSTEM_ERROR(str_to_int<int>(s.begin(), s.end()), error::numeric_convert);
     s = "-1";
-    CHECK_SYSTEM_ERROR(str_to_int<unsigned int>(s.c_str(), s.size()), error::number_overflow);
-    CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.c_str(), s.size()), error::number_overflow);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned int>(s.begin(), s.end()), error::numeric_convert);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.begin(), s.end()), error::numeric_convert);
     s = "-";
-    CHECK_SYSTEM_ERROR(str_to_int<unsigned int>(s.c_str(), s.size()), error::invalid_argument);
-    CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.c_str(), s.size()), error::invalid_argument);
+    CHECK_SYSTEM_ERROR(str_to_int<int>(s.begin(), s.end()), error::numeric_convert);
+    CHECK_SYSTEM_ERROR(str_to_int<unsigned int>(s.begin(), s.end()), error::numeric_convert);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

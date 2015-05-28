@@ -427,41 +427,36 @@ namespace cachelot {
                 }
                 // retrieve item value stored as an ASCII string
                 auto old_item = at.value();
-                char * old_str_value; size_t old_str_value_len;
-                tie(old_str_value, old_str_value_len) = old_item->mutable_value();
-                // convert string to int
-                // !!!!!!!!!!!!!!!!!!!!!!! TODO: It will read ahead of value boundaries !!!!!!!!!!!!!!!!!!!!!!!!!!
-                auto old_value = str_to_int<uint64>(old_str_value, old_str_value_len);
+                auto old_ascii_value = at.value()->value();
+                auto old_int_value = str_to_int<uint64>(old_ascii_value.begin(), old_ascii_value.end());
                 // process arithmetic command
-                uint64 new_value = 0;
+                uint64 new_int_value = 0;
                 if (cmd == INCR) {
-                    new_value = old_value + delta;
+                    new_int_value = old_int_value + delta;
                 } else if (cmd == DECR) {
-                    new_value = (old_value >= delta) ? old_value - delta : 0;
+                    new_int_value = (old_int_value >= delta) ? old_int_value - delta : 0;
                 } else {
                     debug_assert(false && "Unknown command");
                 }
+                std::cout << "was: " << old_int_value << " delta: " << delta << " new: " << new_int_value << std::endl;
                 // store new value as an ASCII string
-                char * new_str_value;
-                auto new_str_value_length = uint_ascii_length(new_value);
-                if (old_str_value_len > new_str_value_length) {
+                AsciiIntegerBuffer new_ascii_value;
+                const auto new_ascii_value_length = int_to_str(new_int_value, new_ascii_value);
+                if (new_ascii_value_length <= old_ascii_value.length()) {
                     // re-assign value inplace
-                    new_str_value = old_str_value;
+                    at.value()->assign_value(bytes(new_ascii_value, new_ascii_value_length));
+                    at.value()->new_version_of(at.value()); // increase version
                 } else {
                     // create new item to hold value including zero terminator
                     error_code error; ItemPtr new_item;
-                    tie(error, new_item) = create_item(old_item->key(), old_item->hash(), new_str_value_length + 1, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
+                    tie(error, new_item) = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
                     if (error) {
                         throw system_error(error);
                     }
-                    size_t __;
-                    tie(new_str_value, __) = new_item->mutable_value();
+                    new_item->assign_value(bytes(new_ascii_value, new_ascii_value_length));
                     replace_item_at(at, new_item);
                 }
-                debug_only(auto verify_value_length = ) int_to_str(new_value, new_str_value);
-                debug_assert(verify_value_length == new_str_value_length);
-                new_str_value[new_str_value_length] = '\0';
-                return make_tuple(error::success, STORED, new_value);
+                return make_tuple(error::success, STORED, new_int_value);
             } catch(const system_error & e) {
                 return make_tuple(e.code(), NOT_A_RESPONSE, 0ull);
             } catch(const std::bad_alloc &) {

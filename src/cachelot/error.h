@@ -20,11 +20,11 @@ namespace cachelot {
 
     // Application level errors defined here
     // Note: all error codes declared in `error` namespace, so use as `error::unknown_error`
-    #define APPLICATION_ERROR_ENUM(x) \
+    #define CACHELOT_ERROR_ENUM(x) \
         x(unknown_error, "Unknown error") \
         x(out_of_memory, "Out of memory") \
-        x(invalid_argument, "Invalid argument") \
-        x(number_overflow, "Numeric value is out of range") \
+        x(numeric_convert, "Numeric conversion error") \
+        x(numeric_overflow, "Numeric value is out of range") \
         x(not_implemented, "Not implemented")
 
     /// system error handling
@@ -39,41 +39,41 @@ namespace cachelot {
         extern const error_code success;
 
         /// App-specific errors
-        enum application_error_code {
+        enum cachelot_error_code {
             // unwrap macro
-            #define APPLICATION_ERROR_ENUM_CODE(code, _) code,
-            APPLICATION_ERROR_ENUM(APPLICATION_ERROR_ENUM_CODE)
-            #undef APPLICATION_ERROR_ENUM_CODE
+            #define CACHELOT_ERROR_ENUM_CODE(code, _) code,
+            CACHELOT_ERROR_ENUM(CACHELOT_ERROR_ENUM_CODE)
+            #undef CACHELOT_ERROR_ENUM_CODE
         };
 
         namespace internal {
 
-            class application_error_category : public error_category {
+            class cachelot_error_category : public error_category {
             public:
-                application_error_category() = default;
+                cachelot_error_category() = default;
 
                 virtual const char * name() const noexcept override { return "Application error"; }
 
                 virtual string message(int value) const override {
                     // unwrap macro
-                    #define APPLICATION_ERROR_ENUM_CODE_MSG(code, msg) case code: return msg;
-                    switch (static_cast<application_error_code>(value)) {
-                        APPLICATION_ERROR_ENUM(APPLICATION_ERROR_ENUM_CODE_MSG)
+                    #define CACHELOT_ERROR_ENUM_CODE_MSG(code, msg) case code: return msg;
+                    switch (static_cast<cachelot_error_code>(value)) {
+                        CACHELOT_ERROR_ENUM(CACHELOT_ERROR_ENUM_CODE_MSG)
                         default: return "Invalid error code";
                     }
-                    #undef APPLICATION_ERROR_ENUM_CODE_MSG
+                    #undef CACHELOT_ERROR_ENUM_CODE_MSG
                 }
             };
 
         } // namespace internal
 
-        inline const error_category & get_application_error_category() noexcept {
-            static internal::application_error_category category_instance;
+        inline const error_category & get_cachelot_error_category() noexcept {
+            static const internal::cachelot_error_category category_instance {};
             return category_instance;
         }
 
-        inline error_code make_error_code(application_error_code ec) noexcept {
-            return error_code(static_cast<int>(ec), get_application_error_category());
+        inline error_code make_error_code(cachelot_error_code ec) noexcept {
+            return error_code(static_cast<int>(ec), get_cachelot_error_category());
         }
 
     } // namespace error
@@ -84,7 +84,7 @@ namespace cachelot {
 
 namespace boost { namespace system {
     // register error_code type
-    template <> struct is_error_code_enum<cachelot::error::application_error_code> {
+    template <> struct is_error_code_enum<cachelot::error::cachelot_error_code> {
         static const bool value = true;
     };
 } } // namespace boost::system

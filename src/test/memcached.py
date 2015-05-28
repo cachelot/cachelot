@@ -176,7 +176,7 @@ class Client(object):
 
     def __arithmetic(self, command, key, value):
         assert command in ['incr', 'decr'], 'unsupported command: ' + command
-        command_str = "%(command) %(key)s %(value)d\r\n" % locals()
+        command_str = "%(command)s %(key)s %(value)d\r\n" % locals()
         self.__send(command_str)
         response = self.__receive_line()
         self.__raise_if_errors(response)
