@@ -327,7 +327,7 @@ namespace cachelot {
             if (out_error) {
                 return NO_RESULT;
             }
-            static const auto int64_boundary = static_cast<uint64>(std::numeric_limits<int64>::max() + 1);
+            static const auto int64_boundary = static_cast<uint64>(std::numeric_limits<int64>::max()) + 1;
             if (unsigned_value < int64_boundary) {
                 return unsigned_value * sign;
             }

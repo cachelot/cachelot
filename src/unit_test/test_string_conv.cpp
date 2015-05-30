@@ -86,6 +86,12 @@ BOOST_AUTO_TEST_CASE(test_str_to_int) {
     llnum = std::numeric_limits<long long>::min();
     s = num_to_str(llnum);
     BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), llnum);
+    llnum = std::numeric_limits<long long>::min() + 1;
+    s = num_to_str(llnum);
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), llnum);
+    llnum = std::numeric_limits<long long>::max() - 1;
+    s = num_to_str(llnum);
+    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), llnum);
     s = "00000000000";
     BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), 0);
     s = "-00000000000";
@@ -98,12 +104,6 @@ BOOST_AUTO_TEST_CASE(test_str_to_int) {
     BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), 10000000001);
     s = "-0";
     BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), 0);
-    llnum = std::numeric_limits<long long>::min() + 1;
-    s = num_to_str(llnum);
-    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), llnum);
-    llnum = std::numeric_limits<long long>::max() - 1;
-    s = num_to_str(llnum);
-    BOOST_CHECK_EQUAL(str_to_int<long long>(s.begin(), s.end()), llnum);
 
     // unsigned int 64-bit
     auto ullnum = std::numeric_limits<unsigned long long>::max();
@@ -122,14 +122,18 @@ BOOST_AUTO_TEST_CASE(test_str_to_int) {
     CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.begin(), s.end()), error::numeric_overflow);
     CHECK_SYSTEM_ERROR(str_to_int<char>(s.begin(), s.end()), error::numeric_overflow);
     CHECK_SYSTEM_ERROR(str_to_int<unsigned char>(s.begin(), s.end()), error::numeric_overflow);
-    s = "18446744073709551616";
+    s = "18446744073709551616"; // max + 1
     CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.begin(), s.end()), error::numeric_overflow);
-    s = "28446744073709551615";
+    s = "28446744073709551615"; // max + 10000000000000000000
     CHECK_SYSTEM_ERROR(str_to_int<unsigned long long>(s.begin(), s.end()), error::numeric_overflow);
     s = num_to_str<long long>(static_cast<long long>(std::numeric_limits<int>::max()) + 1);
     CHECK_SYSTEM_ERROR(str_to_int<int>(s.begin(), s.end()), error::numeric_overflow);
     s = num_to_str<long long>(static_cast<long long>(std::numeric_limits<int>::min()) - 1);
     CHECK_SYSTEM_ERROR(str_to_int<int>(s.begin(), s.end()), error::numeric_overflow);
+    s = "-9223372036854775809"; // min - 1
+    CHECK_SYSTEM_ERROR(str_to_int<long long>(s.begin(), s.end()), error::numeric_overflow);
+    s = "9223372036854775808"; // max + 1
+    CHECK_SYSTEM_ERROR(str_to_int<long long>(s.begin(), s.end()), error::numeric_overflow);
 
     // convertion errors
     s = "00Nan";

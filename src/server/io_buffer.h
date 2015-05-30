@@ -106,7 +106,7 @@ namespace cachelot {
         }
 
         /// mark `num_bytes` as written
-        void complete_write(const size_t num_bytes) {
+        void complete_write(const size_t num_bytes) noexcept {
             debug_assert(m_write_pos + num_bytes <= m_capacity);
             m_write_pos += num_bytes;
         }

@@ -64,7 +64,6 @@ namespace cachelot {
         /// iterator (not STL compliant)
         class iterator {
         // TODO: iterator interface is totally ugly!!!!
-        // TODO: assign const Value new_value will cause memory corruption for the key
         public:
             iterator() noexcept
                 : m_table(nullptr)
@@ -288,7 +287,8 @@ namespace cachelot {
         }
 
         void rehash_some() noexcept {
-            const size_type batch_size = std::min<size_type>(512, m_secondary_tbl->size());
+            static constexpr size_type min_batch_size = 512;
+            const size_type batch_size = std::min<size_type>(min_batch_size, m_secondary_tbl->size());
             size_type elements_moved = 0;
             while (elements_moved < batch_size) {
                 while (m_secondary_tbl->empty_at(m_expand_pos)) {
