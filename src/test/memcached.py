@@ -138,6 +138,13 @@ class Client(object):
         self.__raise_if_errors(response)
         return self.__expect(response, ['DELETED', 'NOT_FOUND']) == 'DELETED'
 
+    def touch(self, key, seconds):
+        command_str = "touch %(key)s %(seconds)d\r\n" % locals()
+        self.__send(command_str)
+        response = self.__receive_line()
+        self.__raise_if_errors(response)
+        return self.__expect(response, ['TOUCHED', 'NOT_FOUND']) == 'TOUCHED'
+
     def __retrieve(self, command, keys):
         assert command in ['get', 'gets'],  'unsupported command: ' + command
         command_str = command + ' ' + ' '.join(keys) + '\r\n'

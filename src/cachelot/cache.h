@@ -274,11 +274,16 @@ namespace cachelot {
         inline tuple<bool, Cache::dict_type::iterator> Cache::retrieve_item(const bytes key, const hash_type hash, bool readonly) {
             bool found; iterator at;
             tie(found, at) = m_dict.entry_for(key, hash, readonly);
-            if (found && at.value()->is_expired()) {
+            if (found) {
                 ItemPtr item = at.value();
-                m_dict.remove(at);
-                destroy_item(item);
-                found = false;
+                // validate item
+                if (not item->is_expired()) {
+                    m_allocator.touch(item);
+                } else {
+                    m_dict.remove(at);
+                    destroy_item(item);
+                    found = false;
+                }
             }
             return make_tuple(found, at);
         }
@@ -412,7 +417,9 @@ namespace cachelot {
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
-                at.value()->touch(time_from(expires));
+                auto item = at.value();
+                m_allocator.touch(item); // mark item as recent in LRU list
+                item->touch(time_from(expires)); // update lifetime
             }
             return make_tuple(error::success, found ? TOUCHED : NOT_FOUND);
         }
@@ -438,7 +445,6 @@ namespace cachelot {
                 } else {
                     debug_assert(false && "Unknown command");
                 }
-                std::cout << "was: " << old_int_value << " delta: " << delta << " new: " << new_int_value << std::endl;
                 // store new value as an ASCII string
                 AsciiIntegerBuffer new_ascii_value;
                 const auto new_ascii_value_length = int_to_str(new_int_value, new_ascii_value);

@@ -390,6 +390,7 @@ namespace cachelot {
             debug_assert(islinked(blk));
             debug_only(blk->test_check());
             unlink(&blk->link);
+            debug_assert(not islinked(blk));
         }
 
         /// check whether `blk` is linked into some list
@@ -809,6 +810,18 @@ namespace cachelot {
         }
 
 
+        /// re-link given `block` to the head. In used blocks list it increases chances to survive eviction
+        void relink_front(block * blk) noexcept {
+            debug_only(blk->test_check());
+            position pos = insert_position_from_size(blk->size());
+            debug_assert(not blk->is_border());
+            memalloc::block_list & size_class = table[pos.absolute()];
+            debug_assert(size_class.has(blk));
+            block_list::unlink(blk);
+            size_class.push_front(blk);
+        }
+
+
         void test_bit_index_integrity_check() const noexcept {
             for (size_t pow = 0; pow < const_::num_powers_of_2_plus_zero_cell; ++pow) {
                 if (second_level_bit_index[pow] > 0) {
@@ -970,6 +983,16 @@ namespace cachelot {
     }
 
 
+    inline void memalloc::touch(void * ptr) noexcept {
+        debug_assert(valid_addr(ptr));
+        block * blk = block::from_user_ptr(ptr);
+        // ensure we're not touching the dead
+        debug_assert(blk->is_used());
+        // re-link to the head to increase chances to survive
+        used_blocks->relink_front(blk);
+    }
+
+
     template <typename ForeachFreed>
     inline void * memalloc::alloc_or_evict(const size_t size, bool evict_if_necessary, ForeachFreed on_free_block) noexcept {
         stats.mem.num_malloc += 1;
@@ -1085,6 +1108,7 @@ namespace cachelot {
 
 
     inline void * memalloc::try_realloc_inplace(void * ptr, const size_t new_size) noexcept {
+        debug_assert(valid_addr(ptr));
         debug_only(free_blocks->test_bit_index_integrity_check());
         debug_only(used_blocks->test_bit_index_integrity_check());
         stats.mem.num_realloc += 1;
@@ -1121,15 +1145,13 @@ namespace cachelot {
 
 
     inline void memalloc::free(void * ptr) noexcept {
+        debug_assert(valid_addr(ptr));
         debug_only(free_blocks->test_bit_index_integrity_check());
         debug_only(used_blocks->test_bit_index_integrity_check());
         stats.mem.num_free += 1;
-        debug_assert(valid_addr(ptr));
         block * blk = block::from_user_ptr(ptr);
-        debug_assert(block_list::islinked(blk));
         // remove from the used_block group_by_size table
         block_list::unlink(blk);
-        debug_assert(not block_list::islinked(blk));
         // merge and put into free list
         unuse(blk);
     }

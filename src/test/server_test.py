@@ -8,8 +8,9 @@ import logging
 import random
 import string
 import memcached
+import time
 
-log = logging.Logger('Cachelot Test')
+log = logging.getLogger('Test cachelotd')
 
 
 class TestFailedError(Exception):
@@ -48,7 +49,7 @@ def random_value():
 
 
 def basic_storage_test(mc):
-    "Test set/get/add/delete/replace commands"
+    log.info("set/get/add/delete/replace commands")
     key1 = random_key()
     value1 = random_value()
     # replace, add, get, delete
@@ -60,10 +61,11 @@ def basic_storage_test(mc):
     CHECK_EQ( mc.replace(key1, value1), True )
     CHECK_EQ( mc.get(key1), value1 )
     CHECK_EQ( mc.delete(key1), True )
+    log.info("success")
    
 
 def basic_cas_test(mc):
-    "Test cas (compare and swap) command"
+    log.info("cas (compare and swap) command")
     # simple cas
     k = random_key()
     v = random_value()
@@ -87,10 +89,11 @@ def basic_cas_test(mc):
     mc.set(k, v)
     CHECK_EQ( mc.cas(k, v, 0, ver), False )  # cas after set shall fail
     CHECK_EQ( mc.get(k), v )
+    log.info("success")
 
 
 def basic_batch_op_test(mc):
-    "Test multi-get and batch set operations"
+    log.info("multi-get and batch set operations")
     test_dict = {}
     for i in range(20):
         k = random_key()
@@ -99,16 +102,29 @@ def basic_batch_op_test(mc):
         test_dict[k] = v
     for k, v in mc.get_multi(test_dict.keys()):
         CHECK_EQ( test_dict[k], v )
+    log.info("success")
 
 
 def basic_expiration_test(mc):
-    "Test object expiration and touch command"
-    pass
+    log.info("object expiration and touch command")
+    k = random_key()
+    v = random_value()
+    mc.set(k, v, 1)
+    time.sleep(1)
+    CHECK_EQ( mc.get(k), None )
+    mc.set(k, v, 3)
+    time.sleep(1)
+    mc.touch(k, 5)
+    time.sleep(2)
+    CHECK_EQ( mc.get(k), v)
+    time.sleep(4)
+    CHECK_EQ( mc.get(k), None)
+    log.info("success")
 
 
 def basic_arithmetic_test(mc):
-    "Test incr/decr commands"
-    key1 = "key1"
+    log.info("incr/decr commands")
+    key1 = random_key()
     mc.set(key1, "00000000000000")
     CHECK_EQ( mc.incr(key1, 1), 1 )
     CHECK_EQ( mc.decr(key1, 1), 0 )
@@ -119,16 +135,17 @@ def basic_arithmetic_test(mc):
     CHECK_EQ( mc.decr(key1, 4294967295), 0 )
     CHECK_EXC( lambda: mc.incr("non-existing-key", 1), memcached.KeyNotFoundError )
     CHECK_EXC( lambda: mc.decr("non-existing-key", 1), memcached.KeyNotFoundError )
+    log.info("success")
 
 
 def run_smoke_test(mc):
-    "Test basic functionality"
-    for run_no in range(100):
-        #basic_storage_test(mc)
-        #basic_cas_test(mc)
-        #basic_batch_op_test(mc)
-        #basic_expiration_test(mc)
-        basic_arithmetic_test(mc)
+    log.info("Test basic functionality")
+    basic_storage_test(mc)
+    basic_cas_test(mc)
+    basic_batch_op_test(mc)
+    basic_expiration_test(mc)
+    basic_arithmetic_test(mc)
+    log.info("all basic functionality tests passed")
 
 
 def run_fuzzy_test(mc):

@@ -80,13 +80,16 @@ namespace cachelot {
         /// inform client that command is unknown
         void send_unknown_command_error() noexcept;
 
-        /// send standard response to the client
-        void send_response(const cache::Response res);
+        /// send cache `response` to the client
+        void send_response(const cache::Response response);
+
+        /// reply to the client either with an `error` or with the `response`
+        void reply_to_client(const error_code error, const cache::Response response, bool noreply);
 
         /// add single item to the send buffer
         void push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value, bool send_cas);
 
-        ostream_type serialize() noexcept { return ostream_type(this->send_buffer()); }
+        ostream_type serialize() noexcept { return ostream_type(super::send_buffer()); }
 
         cache::Command parse_command_name(const bytes command);
         void handle_retrieval_command(cache::Command cmd, bytes args_buf);
@@ -124,31 +127,32 @@ namespace cachelot {
     inline void text_protocol_handler<Sock>::send_error(const error_code error) noexcept {
         try {
             auto error_message = bytes(error.message().c_str(), error.message().size());
-            this->send_buffer().discard_written();
             if (error.category() == get_protocol_error_category()) {
                 serialize() << CLIENT_ERROR << ' ' << error_message;
             } else {
                 serialize() << SERVER_ERROR << ' ' << error_message;
             }
             flush();
-        } catch(const std::exception &) {}
+        } catch(const std::exception &) {
+            suicide();
+        }
     }
 
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::send_server_error(const char * message) noexcept {
         try {
-            this->send_buffer().discard_written();
             serialize() << SERVER_ERROR << ' ' << bytes(message, std::strlen(message));
             flush();
-        } catch(const std::exception &) {}
+        } catch(const std::exception &) {
+            suicide();
+        }
     }
 
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::send_unknown_command_error() noexcept {
         try {
-            this->send_buffer().discard_written();
             serialize() << ERROR;
             flush();
         } catch(const std::exception &) {}
@@ -156,9 +160,19 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::send_response(const cache::Response res) {
-        serialize() << AsciiResponse(res) << CRLF;
+    void text_protocol_handler<Sock>::send_response(const cache::Response response) {
+        serialize() << AsciiResponse(response) << CRLF;
         flush();
+    }
+
+
+    template <class Sock>
+    void text_protocol_handler<Sock>::reply_to_client(const error_code error, const cache::Response response, bool noreply) {
+        if (not error) {
+            if (not noreply) { send_response(response); }
+        } else {
+            send_error(error);
+        }
     }
 
 
@@ -205,10 +219,8 @@ namespace cachelot {
                 case cache::SERVICE_COMMAND:
                     handle_service_command(cmd, command_args);
                 case cache::QUIT_COMMAND:
-                    super::close();
                     suicide();
                     return;
-                case cache::UNDEFINED_COMMAND:
                 default:
                     send_unknown_command_error();
                     suicide();
@@ -285,15 +297,16 @@ namespace cachelot {
             tie(key, args_buf) = args_buf.split(SPACE);
             validate_key(key);
             cache.do_get(key, calc_hash(key),
-                         [=](error_code cache_error, bool found, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value) {
+                         [=](error_code cache_error, bool found, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value) noexcept {
                              try {
                                  if (not cache_error && found) {
                                      push_item(key, value, flags, cas_value, send_cas);
+                                     return;
                                  } else if (cache_error) {
-                                     send_error(cache_error);
-                                     suicide();
+                                     throw system_error(cache_error);
                                  }
                              } catch (const std::exception & exc) {
+                                 super::send_buffer().discard_written();
                                  send_server_error(exc.what());
                                  suicide();
                              }
@@ -338,6 +351,7 @@ namespace cachelot {
         auto expiration = (expires_after == cache::seconds(0)) ? cache::expiration_time_point::max() : cache::clock::now() + expires_after;
         tie(alloc_error, new_item) = cache.create_item(key, calc_hash(key), datalen, flags, expiration, cas_unique);
         if (alloc_error) {
+            // TODO: discard receive buffer!!!
             send_error(alloc_error);
             receive_command();
             return;
@@ -360,27 +374,24 @@ namespace cachelot {
                 new_item->assign_value(data.rtrim_n(CRLF.length()));
                 error_code cache_error; cache::Response response;
                 tie(cache_error, response) = cache.do_storage(cmd, new_item);
-                if (not cache_error) {
-                    if (not noreply) { send_response(response); }
-                } else {
+                if (cache_error) {
                     cache.destroy_item(new_item);
-                    send_error(cache_error);
                 }
+                reply_to_client(cache_error, response, noreply);
                 receive_command();
             });
     }
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_delete_command(cache::Command /*cmd*/, bytes args_buf) {
-        bytes key = args_buf;
+        bytes key;
+        tie(key, args_buf) = args_buf.split(SPACE);
         validate_key(key);
+        bool noreply = maybe_noreply(args_buf);
+        // access cache
         error_code cache_error; cache::Response response;
         tie(cache_error, response) = cache.do_delete(key, calc_hash(key));
-        if (not cache_error) {
-            send_response(response);
-        } else {
-            send_error(cache_error);
-        }
+        reply_to_client(cache_error, response, noreply);
     }
 
 
@@ -394,23 +405,19 @@ namespace cachelot {
         tie(parsed, args_buf) = args_buf.split(SPACE);
         auto delta = str_to_int<uint64>(parsed.begin(), parsed.end());
         bool noreply = maybe_noreply(args_buf);
-        cache::Response response; uint64 new_value;
-        error_code error;
+        // access cache
+        error_code error; cache::Response response; uint64 new_value;
         tie(error, response, new_value) = cache.do_arithmetic(cmd, key, calc_hash(key), delta);
         if (noreply) {
             return;
         }
         if (not error) {
-            switch (response) {
-            case cache::STORED:
+            if  (response == cache::STORED) {
                 serialize() << new_value << CRLF;
                 flush();
-                return;
-            case cache::NOT_FOUND:
-                send_response(cache::NOT_FOUND);
-                return;
-            default:
-                debug_assert(false && "unexpected response");
+            } else {
+                debug_assert(response == cache::NOT_FOUND);
+                send_response(response);
             }
         } else {
             send_error(error);
@@ -421,9 +428,19 @@ namespace cachelot {
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_touch_command(cache::Command cmd, bytes args_buf) {
-        (void) cmd; (void) args_buf;
-        // TODO: Implementation
-        send_error(::cachelot::error::not_implemented);
+        debug_assert(cmd = cache::TOUCH);
+        // parse
+        bytes key;
+        tie(key, args_buf) = args_buf.split(SPACE);
+        validate_key(key);
+        bytes parsed;
+        tie(parsed, args_buf) = args_buf.split(SPACE);
+        cache::seconds keep_alive_duration(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.end()));
+        bool noreply = maybe_noreply(args_buf);
+        // access cache
+        error_code error; cache::Response response;
+        tie(error, response) = cache.do_touch(key, calc_hash(key), keep_alive_duration);
+        reply_to_client(error, response, noreply);
     }
 
 
@@ -470,10 +487,10 @@ namespace cachelot {
     template <class Sock>
     inline void text_protocol_handler<Sock>::suicide() noexcept {
         // 'suicide' can be called several times from background operation handlers
-        // we must ensure that it'll be only one attempt to delete this object
+        // it must be re-entrable
         if (! m_killed) {
-            super::close();
             m_killed = true;
+            super::close();
             super::post([=](){ delete this; });
         }
     }
