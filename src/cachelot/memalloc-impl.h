@@ -965,8 +965,6 @@ namespace cachelot {
             free_blocks->put_block(leftover);
         }
         used_blocks->put_block(blk);
-        stats.mem.total_requested_mem += requested_size;
-        stats.mem.total_served_mem += blk->size();
         return block::checkout(blk);
     }
 
@@ -983,6 +981,14 @@ namespace cachelot {
     }
 
 
+    inline size_t memalloc::reveal_actual_size(void * ptr) const noexcept {
+        debug_assert(valid_addr(ptr));
+        block * blk = block::from_user_ptr(ptr);
+        debug_assert(blk->is_used());
+        return blk->size();
+    }
+
+
     inline void memalloc::touch(void * ptr) noexcept {
         debug_assert(valid_addr(ptr));
         block * blk = block::from_user_ptr(ptr);
@@ -995,7 +1001,21 @@ namespace cachelot {
 
     template <typename ForeachFreed>
     inline void * memalloc::alloc_or_evict(const size_t size, bool evict_if_necessary, ForeachFreed on_free_block) noexcept {
-        stats.mem.num_malloc += 1;
+        STAT_INCR(mem.num_malloc, 1);
+        STAT_INCR(mem.total_requested, size);
+        auto memory = alloc_or_evict_impl<ForeachFreed>(size, evict_if_necessary, on_free_block);
+        if (memory != nullptr) {
+            STAT_INCR(mem.total_served, reveal_actual_size(memory));
+        } else {
+            STAT_INCR(mem.num_alloc_errors, 1);
+            STAT_INCR(mem.total_unserved, size);
+        }
+        return memory;
+    }
+
+
+    template <typename ForeachFreed>
+    inline void * memalloc::alloc_or_evict_impl(const size_t size, bool evict_if_necessary, ForeachFreed on_free_block) noexcept {
         debug_assert(size <= block::max_size);
         debug_assert(size > 0);
         const uint32 nsize = size > block::min_size ? static_cast<uint32>(size) : block::min_size;
@@ -1008,7 +1028,7 @@ namespace cachelot {
             block * found_blk;
             tie(found_blk, found_blk_pos) = free_blocks->try_get_block(nsize);
             if (found_blk != nullptr) {
-                stats.mem.num_free_table_hits += 1;
+                STAT_INCR(mem.num_free_table_hits, 1);
                 return checkout(found_blk, size);
             }
         }
@@ -1018,12 +1038,12 @@ namespace cachelot {
             if (huge_block != nullptr) {
                 debug_assert(not block_list::islinked(huge_block));
                 if (huge_block->size() >= nsize) {
-                    stats.mem.num_free_table_weak_hits += 1;
+                    STAT_INCR(mem.num_free_table_weak_hits, 1);
                     return checkout(huge_block, size);
                 } else {
                     huge_block = merge_unused(huge_block);
                     if (huge_block->size() >= nsize) {
-                        stats.mem.num_free_table_weak_hits += 1;
+                        STAT_INCR(mem.num_free_table_merges, 1);
                         return checkout(huge_block, size);
                     } else {
                         free_blocks->put_block(huge_block);
@@ -1043,7 +1063,7 @@ namespace cachelot {
                 debug_assert(used_blk->size() >= nsize);
                 on_free_block(used_blk->memory());
                 block::unuse(used_blk);
-                stats.mem.num_used_table_hits += 1;
+                STAT_INCR(mem.num_used_table_hits, 1);
                 return checkout(used_blk, size);
             }
         }
@@ -1055,7 +1075,7 @@ namespace cachelot {
                 debug_assert(used_blk->size() >= nsize);
                 on_free_block(used_blk->memory());
                 block::unuse(used_blk);
-                stats.mem.num_used_table_weak_hits += 1;
+                STAT_INCR(mem.num_used_table_weak_hits, 1);
                 return checkout(used_blk, size);
             }
         }
@@ -1067,7 +1087,7 @@ namespace cachelot {
                 on_free_block(big_used_blk->memory());
                 block::unuse(big_used_blk);
                 big_used_blk = merge_unused(big_used_blk);
-                // TODO: This particular merge breaks O(1) complexity
+                // TODO: This particular merge breaks O(1) allocation complexity
                 while (big_used_blk->size() < nsize) {
                     uint32 available_left = big_used_blk->left_adjacent()->size();
                     uint32 available_right = big_used_blk->right_adjacent()->size();
@@ -1080,7 +1100,7 @@ namespace cachelot {
                         }
                         block_list::unlink(right);
                         big_used_blk = block::merge(big_used_blk, right);
-                        stats.mem.num_used_table_merges += 1;
+                        STAT_INCR(mem.num_used_table_merges, 1);
                     } else {
                         block * left = big_used_blk->left_adjacent();
                         if (left->is_used()) {
@@ -1089,7 +1109,7 @@ namespace cachelot {
                         }
                         block_list::unlink(left);
                         big_used_blk = block::merge(left, big_used_blk);
-                        stats.mem.num_used_table_merges += 1;
+                        STAT_INCR(mem.num_used_table_merges, 1);
                     }
                 }
                 if (big_used_blk->size() >= nsize) {
@@ -1100,46 +1120,56 @@ namespace cachelot {
             }
         }
         }
-        stats.mem.total_requested_mem -= size;
-        stats.mem.total_unserved_mem += size;
-        stats.mem.num_errors += 1;
         return nullptr;
     }
 
 
-    inline void * memalloc::try_realloc_inplace(void * ptr, const size_t new_size) noexcept {
+    inline void * memalloc::realloc_inplace(void * ptr, const size_t new_size) noexcept {
         debug_assert(valid_addr(ptr));
         debug_only(free_blocks->test_bit_index_integrity_check());
         debug_only(used_blocks->test_bit_index_integrity_check());
-        stats.mem.num_realloc += 1;
         debug_assert(valid_addr(ptr));
         debug_assert(new_size <= block::max_size);
         debug_assert(new_size > 0);
+
+        STAT_INCR(mem.num_realloc, 1);
         block * blk = block::from_user_ptr(ptr);
 
+        // shrink the block
         if (blk->size() >= new_size) {
-            return ptr;
-        }
-
-        // check if we have free space on the right
-        uint32 available_on_the_right = 0;
-        auto right = blk->right_adjacent();
-        while (right->is_free() && available_on_the_right + blk->size() < new_size) {
-            available_on_the_right += right->size_with_meta();
-            right = right->right_adjacent();
-        }
-        if (available_on_the_right + blk->size() >= new_size) {
-            block::unuse(blk);
             block_list::unlink(blk);
-            while (blk->size() < new_size) {
-                debug_assert(blk->right_adjacent()->is_free());
-                block_list::unlink(blk->right_adjacent());
-                blk = block::merge(blk, blk->right_adjacent());
-            }
-            debug_assert(blk->size() >= new_size);
+            block::unuse(blk);
             return checkout(blk, new_size);
         }
-        stats.mem.total_unserved_mem += new_size;
+
+        // extend the block
+
+        uint32 available = blk->size();
+        // maybe neighbors are free
+        {
+            auto right = blk->right_adjacent();
+            while (available < new_size && right->is_free()) {
+                available += right->size();
+                right = right->right_adjacent();
+            }
+        }
+        {
+            auto left = blk->left_adjacent();
+            while (available < new_size && left->is_free()) {
+                available += left->size();
+                left = left->left_adjacent();
+            }
+        }
+        if (available >= new_size) {
+            const auto old_memory = blk->memory();
+            block_list::unlink(blk);
+            block::unuse(blk);
+            blk = merge_unused(blk);
+            debug_assert(blk->size() >= new_size);
+            if (blk->memory() != old_memory) {
+            }
+        }
+        STAT_INCR(mem.num_realloc_errors, 1);
         return nullptr;
     }
 
@@ -1148,7 +1178,7 @@ namespace cachelot {
         debug_assert(valid_addr(ptr));
         debug_only(free_blocks->test_bit_index_integrity_check());
         debug_only(used_blocks->test_bit_index_integrity_check());
-        stats.mem.num_free += 1;
+        STAT_INCR(mem.num_free, 1);
         block * blk = block::from_user_ptr(ptr);
         // remove from the used_block group_by_size table
         block_list::unlink(blk);

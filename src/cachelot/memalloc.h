@@ -61,13 +61,13 @@ namespace cachelot {
                               ForeachFreed on_free_block = [](void *) -> void {}) noexcept;
 
         /// try to extend previously allocated memory up to `new_size`, return `nullptr` on fail
-        void * try_realloc_inplace(void * ptr, const size_t new_size) noexcept;
+        void * realloc_inplace(void * ptr, const size_t new_size) noexcept;
 
         /// free previously allocated `ptr`
         void free(void * ptr) noexcept;
 
         /// return size of previously allocate memory including technical alignment bytes
-        size_t _reveal_actual_size(void * ptr) const noexcept;
+        size_t reveal_actual_size(void * ptr) const noexcept;
 
         /// touch previously allocated item to increase it's chance to avoid eviction
         void touch(void * ptr) noexcept;
@@ -88,6 +88,10 @@ namespace cachelot {
         // disallow copying
         memalloc(const memalloc &) = delete;
         memalloc & operator=(const memalloc &) = delete;
+
+        template <typename ForeachFreed>
+        void * alloc_or_evict_impl(const size_t size, bool evict_if_necessary = false,
+                                   ForeachFreed on_free_block = [](void *) -> void {}) noexcept;
 
     private:
         // global arena boundaries

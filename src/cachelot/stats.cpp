@@ -4,7 +4,7 @@
 #include <iostream>
 #include <iomanip>
 
-#define __STAT(group, name) stats.group.name
+#define __STAT(group, name) __stats__.group.name
 #define STAT(group, name) __STAT(group, name)
 
 namespace cachelot {
@@ -15,7 +15,7 @@ namespace cachelot {
 #undef MEM_STAT_PRINT
     }
 
-    struct stats stats;
+    struct stats __stats__;
 
 } // namespace cachelot
 

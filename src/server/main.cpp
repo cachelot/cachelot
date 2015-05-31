@@ -2,7 +2,7 @@
 #include <server/memcached/servers.h>
 #include <cachelot/cache.h>
 #include <server/settings.h>
-#include <server/stats.h>
+#include <cachelot/stats.h>
 
 #include <iostream>
 #include <boost/program_options.hpp>
