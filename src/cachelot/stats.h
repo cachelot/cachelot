@@ -31,36 +31,45 @@ namespace cachelot {
         X(uint64, num_used_table_hits, 0, "Number of times when memory allocated from the corresponding cell of used blocks table") \
         X(uint64, num_used_table_weak_hits, 0, "Number of times when memory allocated from the bigger cell of used blocks table")  \
         X(uint64, num_used_table_merges, 0, "Number of times when used blocks have merged into one to satisfy new allocation") \
-        X(uint64, limit_maxbytes, 0, "Maximum amount of memory to use for the storage")
+        X(uint64, limit_maxbytes, 0, "Maximum amount of memory to use for the storage") \
+        X(uint64, evictions, 0, "Description of the stat")
 
     #define CACHE_STATS(X) \
         X(uint64, cmd_get, 0, "Number of 'get' commands")           \
         X(uint64, get_hits, 0, "Times when 'get' hit the cache")    \
         X(uint64, get_misses, 0, "Times when 'get' miss the cache") \
         X(uint64, cmd_set, 0, "Number of 'set' commands")           \
+        X(uint64, set_new, 0, "Number of 'set' commands")           \
+        X(uint64, set_existing, 0, "Number of 'set' commands")      \
         X(uint64, cmd_add, 0, "Number of 'add' commands")           \
+        X(uint64, add_stored, 0, "Number of 'add' commands")        \
+        X(uint64, add_not_stored, 0, "Number of 'add' commands")    \
         X(uint64, cmd_replace, 0, "Number of 'replace' commands")   \
-        X(uint64, cmd_delete, 0, "Number of 'delete' commands")     \
-        X(uint64, delete_hits, 0, "Description of the stat")      \
-        X(uint64, delete_misses, 0, "Description of the stat")      \
+        X(uint64, replace_stored, 0, "Number of 'add' commands")    \
+        X(uint64, replace_not_stored, 0, "Number of 'add' commands")\
         X(uint64, cmd_cas, 0, "Number of 'cas' commands")           \
         X(uint64, cas_misses, 0, "Description of the stat")         \
         X(uint64, cas_hits, 0, "Description of the stat")           \
         X(uint64, cas_badval, 0, "Description of the stat")         \
+        X(uint64, cmd_delete, 0, "Number of 'delete' commands")     \
+        X(uint64, delete_hits, 0, "Description of the stat")        \
+        X(uint64, delete_misses, 0, "Description of the stat")      \
         X(uint64, cmd_touch, 0, "Description of the stat")          \
         X(uint64, touch_hits, 0, "Description of the stat")         \
         X(uint64, touch_misses, 0, "Description of the stat")       \
+        X(uint64, cmd_incr, 0, "Description of the stat")           \
         X(uint64, incr_hits, 0, "Description of the stat")          \
         X(uint64, incr_misses, 0, "Description of the stat")        \
+        X(uint64, cmd_decr, 0, "Description of the stat")           \
         X(uint64, decr_hits, 0, "Description of the stat")          \
-        X(uint64, decr_misses, 0, "Description of the stat")        \
+        X(uint64, decr_misses, 0, "Description of the stat")
+
+    #define CACHE_MORE_STATS(X) \
         X(uint64, hash_power_level, 0, "Description of the stat")   \
-        X(uint64, hash_bytes, 0, "Description of the stat")         \
         X(uint64, hash_is_expanding, 0, "Description of the stat")  \
         X(uint64, curr_items, 0, "Description of the stat")         \
         X(uint64, total_items, 0, "Description of the stat")        \
         X(uint64, evicted_unfetched, 0, "Description of the stat")  \
-        X(uint64, evictions, 0, "Description of the stat")          \
         X(uint64, reclaimed, 0, "Description of the stat")
 
     struct stats {
@@ -84,6 +93,7 @@ namespace cachelot {
 
     #define STAT_INCR(stat_name, delta) do { __GET_STAT(stat_name) += delta; } while(false)
     #define STAT_DECR(stat_name, delta) do { __GET_STAT(stat_name) = (__GET_STAT(stat_name) >= delta) ? __GET_STAT(stat_name) - delta : 0; } while(false)
+    #define STAT_SET(stat_name, value) do { __GET_STAT(stat_name) = value; } while(false)
 
 
 } // namespace cachelot

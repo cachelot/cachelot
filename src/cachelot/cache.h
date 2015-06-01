@@ -29,6 +29,9 @@
 #ifndef CACHELOT_STRING_CONV_H_INCLUDED
 #  include <cachelot/string_conv.h>
 #endif
+#ifndef CACHELOT_STATS_H_INCLUDED
+#  include <cachelot/stats.h>
+#endif
 
 /// @defgroup cache Cache implementation
 /// @{
@@ -291,15 +294,18 @@ namespace cachelot {
 
         template <typename Callback>
         inline void Cache::do_get(const bytes key, const hash_type hash, Callback on_get) noexcept {
+            STAT_INCR(cache.cmd_get, 1);
             // try to retrieve existing item
             bool found; iterator at; bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
+                STAT_INCR(cache.get_hits, 1);
                 auto item = at.value();
                 debug_assert(item->key() == key);
                 debug_assert(item->hash() == hash);
                 on_get(error::success, true, item->value(), item->opaque_flags(), item->version());
             } else {
+                STAT_INCR(cache.get_misses, 1);
                 on_get(error::success, false, bytes(), opaque_flags_type(), version_type());
             }
         }
@@ -329,11 +335,14 @@ namespace cachelot {
 
         inline tuple<error_code, Response> Cache::do_set(ItemPtr item) noexcept {
             try {
+                STAT_INCR(cache.cmd_set, 1);
                 bool found; iterator at;
                 tie(found, at) = retrieve_item(item->key(), item->hash());
                 if (not found) {
+                    STAT_INCR(cache.set_new, 1);
                     m_dict.insert(at, item->key(), item->hash(), item);
                 } else {
+                    STAT_INCR(cache.set_existing, 1);
                     replace_item_at(at, item);
                 }
                 return make_tuple(error::success, STORED);
@@ -346,11 +355,16 @@ namespace cachelot {
         inline tuple<error_code, Response> Cache::do_add(ItemPtr item) noexcept {
             bool found; iterator at;
             try {
+                STAT_INCR(cache.cmd_add, 1);
                 tie(found, at) = retrieve_item(item->key(), item->hash());
                 if (not found) {
                     m_dict.insert(at, item->key(), item->hash(), item);
+                    STAT_INCR(cache.add_stored, 1);
+                    return make_tuple(error::success, STORED);
+                } else {
+                    STAT_INCR(cache.add_not_stored, 1);
+                    return make_tuple(error::success, NOT_STORED);
                 }
-                return make_tuple(error::success, not found ? STORED : NOT_STORED);
             } catch (const std::bad_alloc &) {
                 return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
             }
@@ -360,11 +374,16 @@ namespace cachelot {
         inline tuple<error_code, Response> Cache::do_replace(ItemPtr item) noexcept {
             bool found; iterator at;
             try {
+                STAT_INCR(cache.cmd_replace, 1);
                 tie(found, at) = retrieve_item(item->key(), item->hash());
                 if (found) {
                     replace_item_at(at, item);
+                    STAT_INCR(cache.replace_stored, 1);
+                    return make_tuple(error::success, STORED);
+                } else {
+                    STAT_INCR(cache.replace_not_stored, 1);
+                    return make_tuple(error::success, NOT_STORED);
                 }
-                return make_tuple(error::success, found ? STORED : NOT_STORED);
             } catch (const std::bad_alloc &) {
                 return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
             }
@@ -374,15 +393,19 @@ namespace cachelot {
         inline tuple<error_code, Response> Cache::do_cas(ItemPtr item) noexcept {
             bool found; iterator at;
             try {
+                STAT_INCR(cache.cmd_cas, 1);
                 tie(found, at) = retrieve_item(item->key(), item->hash());
                 if (found) {
                     if (item->version() == at.value()->version()) {
                         replace_item_at(at, item);
+                        STAT_INCR(cache.cas_hits, 1);
                         return make_tuple(error::success, STORED);
                     } else {
+                        STAT_INCR(cache.cas_badval, 1);
                         return make_tuple(error::success, EXISTS);
                     }
                 } else {
+                    STAT_INCR(cache.cas_misses, 1);
                     return make_tuple(error::success, NOT_FOUND);
                 }
             } catch (const std::bad_alloc &) {
@@ -402,26 +425,37 @@ namespace cachelot {
 
 
         inline tuple<error_code, Response> Cache::do_delete(const bytes key, const hash_type hash) noexcept {
+            STAT_INCR(cache.cmd_delete, 1);
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
                 ItemPtr item = at.value();
                 m_dict.remove(at);
                 destroy_item(item);
+                STAT_INCR(cache.delete_hits, 1);
+                return make_tuple(error::success, DELETED);
+            } else {
+                STAT_INCR(cache.delete_misses, 1);
+                return make_tuple(error::success, NOT_FOUND);
             }
-            return make_tuple(error::success, found ? DELETED : NOT_FOUND);
+
         }
 
 
         inline tuple<error_code, Response> Cache::do_touch(const bytes key, const hash_type hash, seconds expires) noexcept {
+            STAT_INCR(cache.cmd_touch, 1);
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
                 auto item = at.value();
                 m_allocator.touch(item); // mark item as recent in LRU list
                 item->touch(time_from(expires)); // update lifetime
+                STAT_INCR(cache.touch_hits, 1);
+                return make_tuple(error::success, TOUCHED);
+            } else {
+                STAT_INCR(cache.touch_misses, 1);
+                return make_tuple(error::success, NOT_FOUND);
             }
-            return make_tuple(error::success, found ? TOUCHED : NOT_FOUND);
         }
 
 
@@ -440,10 +474,9 @@ namespace cachelot {
                 uint64 new_int_value = 0;
                 if (cmd == INCR) {
                     new_int_value = old_int_value + delta;
-                } else if (cmd == DECR) {
-                    new_int_value = (old_int_value >= delta) ? old_int_value - delta : 0;
                 } else {
-                    debug_assert(false && "Unknown command");
+                    debug_assert(cmd == DECR);
+                    new_int_value = (old_int_value >= delta) ? old_int_value - delta : 0;
                 }
                 // store new value as an ASCII string
                 AsciiIntegerBuffer new_ascii_value;
@@ -474,7 +507,7 @@ namespace cachelot {
         inline tuple<error_code, ItemPtr> Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type version) noexcept {
             void * memory;
             const size_t size_required = Item::CalcSizeRequired(key, value_length);
-            static const auto on_delete = [=](void * ptr) -> void {
+            static const auto on_delete = [=](void * ptr) noexcept -> void {
                 auto i = reinterpret_cast<Item *>(ptr);
                 debug_only(bool deleted = ) this->m_dict.del(i->key(), i->hash());
                 debug_assert(deleted);

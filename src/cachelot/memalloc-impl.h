@@ -854,6 +854,7 @@ namespace cachelot {
 //////// memalloc //////////////////////////////////////
 
     inline memalloc::memalloc(void * arena, const size_t arena_size) noexcept {
+        STAT_SET(mem.limit_maxbytes, arena_size);
         debug_only(const size_t min_arena_size = sizeof(group_by_size) * 2 + sizeof(block) * 2 + 4096);
         debug_assert(arena_size >= min_arena_size);
         // pointer to currently non-used memory
@@ -1003,7 +1004,11 @@ namespace cachelot {
     inline void * memalloc::alloc_or_evict(const size_t size, bool evict_if_necessary, ForeachFreed on_free_block) noexcept {
         STAT_INCR(mem.num_malloc, 1);
         STAT_INCR(mem.total_requested, size);
-        auto memory = alloc_or_evict_impl<ForeachFreed>(size, evict_if_necessary, on_free_block);
+        auto free_block_incr_evictions = [=](void * ptr) noexcept {
+            STAT_INCR(mem.evictions, 1);
+            on_free_block(ptr);
+        };
+        auto memory = alloc_or_evict_impl<decltype(free_block_incr_evictions)>(size, evict_if_necessary, free_block_incr_evictions);
         if (memory != nullptr) {
             STAT_INCR(mem.total_served, reveal_actual_size(memory));
         } else {
