@@ -22,6 +22,7 @@ namespace cachelot {
     using namespace cachelot::net;
 
     constexpr bytes CRLF = bytes::from_literal("\r\n");
+    constexpr bytes END = bytes::from_literal("END");
     constexpr char SPACE = ' ';
 
     template <class SocketType>
@@ -71,6 +72,11 @@ namespace cachelot {
         /// error handler
         void on_error(const error_code error) noexcept;
 
+        /// inform client about an error
+        /// @p err_type - Type of the error: client or server
+        /// @p err_msg - Human readable error message
+        void send_error(bytes err_type, bytes err_msg) noexcept;
+
         /// inform client about an error, type of error is determined from the error category
         void send_error(const error_code error) noexcept;
 
@@ -83,12 +89,13 @@ namespace cachelot {
         /// send cache `response` to the client
         void send_response(const cache::Response response);
 
-        /// reply to the client either with an `error` or with the `response`
+        /// reply to the client either with an `error` or with the `response` if `noreply` is not set
         void reply_to_client(const error_code error, const cache::Response response, bool noreply);
 
         /// add single item to the send buffer
         void push_item(const bytes key, bytes value, cache::opaque_flags_type flags, cache::version_type cas_value, bool send_cas);
 
+        /// return text serialization stream
         ostream_type serialize() noexcept { return ostream_type(super::send_buffer()); }
 
         cache::Command parse_command_name(const bytes command);
@@ -97,7 +104,7 @@ namespace cachelot {
         void handle_delete_command(cache::Command cmd, bytes args_buf);
         void handle_arithmetic_command(cache::Command cmd, bytes args_buf);
         void handle_touch_command(cache::Command cmd, bytes args_buf);
-        void handle_service_command(cache::Command cmd, bytes args_buf);
+        void handle_statistics_command(cache::Command cmd, bytes args_buf);
 
         void validate_key(const bytes key);
         bool maybe_noreply(const bytes buffer);
@@ -124,14 +131,10 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::send_error(const error_code error) noexcept {
+    inline void text_protocol_handler<Sock>::send_error(bytes err_type, bytes err_msg) noexcept {
         try {
-            auto error_message = bytes(error.message().c_str(), error.message().size());
-            if (error.category() == get_protocol_error_category()) {
-                serialize() << CLIENT_ERROR << ' ' << error_message;
-            } else {
-                serialize() << SERVER_ERROR << ' ' << error_message;
-            }
+            super::send_buffer().discard_written();
+            serialize() << err_type << ' ' << err_msg;
             flush();
         } catch(const std::exception &) {
             suicide();
@@ -140,13 +143,19 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::send_server_error(const char * message) noexcept {
-        try {
-            serialize() << SERVER_ERROR << ' ' << bytes(message, std::strlen(message));
-            flush();
-        } catch(const std::exception &) {
-            suicide();
+    inline void text_protocol_handler<Sock>::send_error(const error_code error) noexcept {
+        auto msg = error.message();
+        if (error.category() == get_protocol_error_category()) {
+            send_error(CLIENT_ERROR, bytes(msg.c_str(), msg.size()));
+        } else {
+            send_error(SERVER_ERROR, bytes(msg.c_str(), msg.size()));
         }
+    }
+
+
+    template <class Sock>
+    inline void text_protocol_handler<Sock>::send_server_error(const char * message) noexcept {
+        send_error(SERVER_ERROR, bytes(message, std::strlen(message)));
     }
 
 
@@ -200,25 +209,33 @@ namespace cachelot {
                 command_name = command_name.rtrim_n(CRLF.length());
             }
             cache::Command cmd = parse_command_name(command_name);
-            switch (ClassOfCommand(cmd)) {
-                case cache::STORAGE_COMMAND:
+            switch (cmd) {
+                case cache::ADD:
+                case cache::APPEND:
+                case cache::CAS:
+                case cache::PREPEND:
+                case cache::REPLACE:
+                case cache::SET:
                     handle_storage_command(cmd, command_args);
                     return;
-                case cache::DELETE_COMMAND:
+                case cache::DELETE:
                     handle_delete_command(cmd, command_args);
                     break;
-                case cache::ARITHMETIC_COMMAND:
+                case cache::INCR:
+                case cache::DECR:
                     handle_arithmetic_command(cmd, command_args);
                     break;
-                case cache::TOUCH_COMMAND:
+                case cache::TOUCH:
                     handle_touch_command(cmd, command_args);
                     break;
-                case cache::RETRIEVAL_COMMAND:
+                case cache::GET:
+                case cache::GETS:
                     handle_retrieval_command(cmd, command_args);
                     break;
-                case cache::SERVICE_COMMAND:
-                    handle_service_command(cmd, command_args);
-                case cache::QUIT_COMMAND:
+                case cache::STATS:
+                    handle_statistics_command(cmd, command_args);
+                    break;
+                case cache::QUIT:
                     suicide();
                     return;
                 default:
@@ -268,7 +285,11 @@ namespace cachelot {
                 default : return cache::UNDEFINED;
                 }
             case 5:
-                return is_5("touch") ? cache::TOUCH : cache::UNDEFINED;
+                switch (first_char) {
+                case 't': return is_5("touch") ? cache::TOUCH : cache::UNDEFINED;
+                case 's': return is_5("stats") ? cache::STATS : cache::UNDEFINED;
+                default : return cache::UNDEFINED;
+                }
             case 6:
                 switch (first_char) {
                 case 'a': return is_6("append") ? cache::APPEND : cache::UNDEFINED;
@@ -313,7 +334,6 @@ namespace cachelot {
                          });
         } while (args_buf && not m_killed);
         if (not m_killed) {
-            static const bytes END = bytes::from_literal("END");
             serialize() << END << CRLF;
             flush();
         }
@@ -428,7 +448,7 @@ namespace cachelot {
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_touch_command(cache::Command cmd, bytes args_buf) {
-        debug_assert(cmd = cache::TOUCH);
+        debug_assert(cmd == cache::TOUCH);
         // parse
         bytes key;
         tie(key, args_buf) = args_buf.split(SPACE);
@@ -445,9 +465,28 @@ namespace cachelot {
 
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_service_command(cache::Command cmd, bytes args_buf) {
-        (void) cmd; (void) args_buf;
-        send_error(::cachelot::error::not_implemented);
+    inline void text_protocol_handler<Sock>::handle_statistics_command(cache::Command cmd, bytes args_buf) {
+        debug_assert(cmd == cache::STATS);
+        static const bytes STAT = bytes::from_literal("STAT ");
+        if (args_buf.empty()) {
+            cache.flush_stats();
+            #define SERIALIZE_STAT(stat_group, stat_type, stat_name, stat_description) \
+            serialize() << STAT << ' ' << bytes::from_literal(CACHELOT_PP_STR(stat_name)) << ' ' << STAT_GET(stat_group, stat_name) << CRLF;
+
+            #define SERIALIZE_CACHE_STAT(typ, name, desc) SERIALIZE_STAT(cache, typ, name, desc)
+            CACHE_STATS(SERIALIZE_CACHE_STAT)
+            #undef SERIALIZE_CACHE_STAT
+
+            #define SERIALIZE_MEM_STAT(typ, name, desc) SERIALIZE_STAT(mem, typ, name, desc)
+            MEMORY_STATS(SERIALIZE_MEM_STAT)
+            #undef SERIALIZE_MEM_STAT
+
+            #undef SERIALIZE_STAT
+            serialize() << END << CRLF;
+            flush();
+        } else {
+            send_error(::cachelot::error::not_implemented);
+        }
     }
 
 

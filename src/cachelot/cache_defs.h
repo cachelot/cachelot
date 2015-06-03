@@ -19,60 +19,38 @@ namespace cachelot {
 
     namespace cache {
 
-        enum CommandClass {
-            RETRIEVAL_COMMAND,
-            STORAGE_COMMAND,
-            ARITHMETIC_COMMAND,
-            TOUCH_COMMAND,
-            DELETE_COMMAND,
-            SERVICE_COMMAND,
-            QUIT_COMMAND,
-            SYNC_COMMAND,
-            UNDEFINED_COMMAND
-        };
-
 // Primary table of all supported commands and their classes
-#define CACHE_COMMANDS_ENUM(x)              \
-        x(ADD, STORAGE_COMMAND)             \
-        x(APPEND, STORAGE_COMMAND)          \
-        x(CAS, STORAGE_COMMAND)             \
-        x(DECR, ARITHMETIC_COMMAND)         \
-        x(DELETE, DELETE_COMMAND)           \
-        x(GET, RETRIEVAL_COMMAND)           \
-        x(GETS, RETRIEVAL_COMMAND)          \
-        x(INCR, ARITHMETIC_COMMAND)         \
-        x(PREPEND, STORAGE_COMMAND)         \
-        x(REPLACE, STORAGE_COMMAND)         \
-        x(SET, STORAGE_COMMAND)             \
-        x(TOUCH, TOUCH_COMMAND)             \
-        x(QUIT, QUIT_COMMAND)               \
-        x(UNDEFINED, UNDEFINED_COMMAND)
+#define CACHE_COMMANDS_ENUM(x)  \
+        x(ADD)                  \
+        x(APPEND)               \
+        x(CAS)                  \
+        x(DECR)                 \
+        x(DELETE)               \
+        x(GET)                  \
+        x(GETS)                 \
+        x(INCR)                 \
+        x(PREPEND)              \
+        x(REPLACE)              \
+        x(SET)                  \
+        x(STATS)                \
+        x(TOUCH)                \
+        x(QUIT)                 \
+        x(UNDEFINED)
 
         enum Command {
-#define CACHE_COMMANDS_ELEMENT(cmd, type) cmd,
+#define CACHE_COMMANDS_ELEMENT(cmd) cmd,
             CACHE_COMMANDS_ENUM(CACHE_COMMANDS_ELEMENT)
 #undef CACHE_COMMANDS_ELEMENT
         };
 
-        constexpr CommandClass __CommandClasses[] = {
-#define CACHE_COMMANDS_ELEMENT_TYPE(cmd, type) type,
-            CACHE_COMMANDS_ENUM(CACHE_COMMANDS_ELEMENT_TYPE)
-#undef CACHE_COMMANDS_ELEMENT_TYPE
-        };
-
-
-        constexpr CommandClass ClassOfCommand(Command cmd) {
-            return __CommandClasses[static_cast<unsigned>(cmd)];
-        }
-
 
 #define CACHE_RESPONSES_ENUM(x) \
-        x(STORED)                           \
-        x(NOT_STORED)                       \
-        x(EXISTS)                           \
-        x(NOT_FOUND)                        \
-        x(DELETED)                          \
-        x(TOUCHED)                          \
+        x(STORED)               \
+        x(NOT_STORED)           \
+        x(EXISTS)               \
+        x(NOT_FOUND)            \
+        x(DELETED)              \
+        x(TOUCHED)              \
         x(NOT_A_RESPONSE)
 
         /** 

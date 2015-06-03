@@ -55,8 +55,10 @@ namespace cachelot {
         io_buffer & m_buf;
     };
 
+
     struct text_serialization_tag {};
     struct binary_serialization_tag {};
+
 
     inline void do_serialize_bytes(io_buffer & buf, const bytes value) {
         auto dest = buf.begin_write(value.length());
@@ -64,15 +66,18 @@ namespace cachelot {
         buf.complete_write(value.length());
     }
 
+
     template<>
     inline void do_serialize<text_serialization_tag, bytes>(io_buffer & buf, const bytes value) {
         do_serialize_bytes(buf, value);
     }
 
+
     template<>
     inline void do_serialize<binary_serialization_tag, bytes>(io_buffer & buf, const bytes value) {
         do_serialize_bytes(buf, value);
     }
+
 
     template<typename IntType>
     inline void do_serialize_integer_text(io_buffer & buf, const IntType x) {
@@ -81,11 +86,13 @@ namespace cachelot {
         buf.complete_write(written);
     }
 
+
     #define __do_serialize_integer_text_macro(IntType) \
     template<> \
     inline void do_serialize<text_serialization_tag, IntType>(io_buffer & buf, const IntType value) { \
         do_serialize_integer_text<IntType>(buf, value); \
     }
+
 
     __do_serialize_integer_text_macro(int8)
     __do_serialize_integer_text_macro(uint8)
@@ -96,11 +103,22 @@ namespace cachelot {
     __do_serialize_integer_text_macro(int64)
     __do_serialize_integer_text_macro(uint64)
 
+
     template<>
     inline void do_serialize<text_serialization_tag, char>(io_buffer & buf, const char value) {
         auto dest = buf.begin_write(1);
         *dest = value;
         buf.complete_write(1);
+    }
+
+
+    template<>
+    inline void do_serialize<text_serialization_tag, bool>(io_buffer & buf, const bool value) {
+        if (value) {
+            do_serialize_bytes(buf, bytes::from_literal("true"));
+        } else {
+            do_serialize_bytes(buf, bytes::from_literal("false"));
+        }
     }
 
 } // namespace cachelot

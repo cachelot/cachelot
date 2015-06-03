@@ -221,6 +221,9 @@ namespace cachelot {
             return size() == 0;
         }
 
+        /// indicates that dict is in progress of moving items to the new hash_table
+        bool is_expanding() const noexcept { return m_secondary_tbl != nullptr; }
+
     private:
         static iterator iter(std::unique_ptr<hash_table_type> & table, size_type pos_in_table) {
             return iterator(raw_pointer(table), pos_in_table);
@@ -307,8 +310,6 @@ namespace cachelot {
                 end_expand();
             }
         }
-
-        bool is_expanding() const noexcept { return m_secondary_tbl != nullptr; }
 
     private:
         std::unique_ptr<hash_table_type> m_primary_tbl;

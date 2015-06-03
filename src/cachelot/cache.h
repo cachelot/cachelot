@@ -216,8 +216,7 @@ namespace cachelot {
              * `touch` - validate item and prolong its lifetime
              */
             tuple<error_code, Response> do_touch(const bytes key, const hash_type hash, seconds expires) noexcept;
-            
-            
+
             /**
              * `incr` or `decr` value by `delta`
              * On arithmetic operations value is treaten as an decimal ASCII encoded unsigned 64-bit integer
@@ -225,7 +224,6 @@ namespace cachelot {
              * Owerflow in `incr` command is hardware-dependent integer overflow
              */
             tuple<error_code, Response, uint64> do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta) noexcept;
-
 
             /**
              * Create new Item using memalloc
@@ -236,6 +234,11 @@ namespace cachelot {
              * Free existing Item and return memory to the memalloc
              */
             void destroy_item(ItemPtr item) noexcept;
+
+            /**
+             * Publish dynamic stats
+             */
+            void flush_stats() noexcept;
 
         private:
             /**
@@ -537,6 +540,11 @@ namespace cachelot {
         }
 
 
+        inline void Cache::flush_stats() noexcept {
+            STAT_SET(cache.hash_capacity, m_dict.capacity());
+            STAT_SET(cache.curr_items, m_dict.size());
+            STAT_SET(cache.hash_is_expanding, m_dict.is_expanding());
+        }
 
     } // namespace cache
 
