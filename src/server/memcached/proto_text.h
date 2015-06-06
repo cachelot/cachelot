@@ -471,7 +471,7 @@ namespace cachelot {
         if (args_buf.empty()) {
             cache.flush_stats();
             #define SERIALIZE_STAT(stat_group, stat_type, stat_name, stat_description) \
-            serialize() << STAT << ' ' << bytes::from_literal(CACHELOT_PP_STR(stat_name)) << ' ' << STAT_GET(stat_group, stat_name) << CRLF;
+            serialize() << STAT << bytes::from_literal(CACHELOT_PP_STR(stat_name)) << ' ' << STAT_GET(stat_group, stat_name) << CRLF;
 
             #define SERIALIZE_CACHE_STAT(typ, name, desc) SERIALIZE_STAT(cache, typ, name, desc)
             CACHE_STATS(SERIALIZE_CACHE_STAT)

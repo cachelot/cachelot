@@ -145,6 +145,17 @@ class Client(object):
         self.__raise_if_errors(response)
         return self.__expect(response, ['TOUCHED', 'NOT_FOUND']) == 'TOUCHED'
 
+    def stats(self):
+        self.__send('stats\r\n')
+        response = self.__receive_line()
+        self.__raise_if_errors(response)
+        while response.startswith('STAT'):
+            response = response.split(' ')
+            stat_name, stat_value = response[1], response[2]
+            yield (stat_name, stat_value)
+            response = self.__receive_line()
+        self.__expect(response, 'END')
+
     def __retrieve(self, command, keys):
         assert command in ['get', 'gets'],  'unsupported command: ' + command
         command_str = command + ' ' + ' '.join(keys) + '\r\n'
