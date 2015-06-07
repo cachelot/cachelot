@@ -403,7 +403,9 @@ namespace cachelot {
     }
 
     template <class Sock>
-    inline void text_protocol_handler<Sock>::handle_delete_command(cache::Command /*cmd*/, bytes args_buf) {
+    inline void text_protocol_handler<Sock>::handle_delete_command(cache::Command cmd, bytes args_buf) {
+        debug_assert(cmd == cache::DELETE); (void)cmd;
+        // parse
         bytes key;
         tie(key, args_buf) = args_buf.split(SPACE);
         validate_key(key);
@@ -448,7 +450,7 @@ namespace cachelot {
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_touch_command(cache::Command cmd, bytes args_buf) {
-        debug_assert(cmd == cache::TOUCH);
+        debug_assert(cmd == cache::TOUCH); (void)cmd;
         // parse
         bytes key;
         tie(key, args_buf) = args_buf.split(SPACE);
@@ -466,7 +468,7 @@ namespace cachelot {
 
     template <class Sock>
     inline void text_protocol_handler<Sock>::handle_statistics_command(cache::Command cmd, bytes args_buf) {
-        debug_assert(cmd == cache::STATS);
+        debug_assert(cmd == cache::STATS); (void)cmd;
         static const bytes STAT = bytes::from_literal("STAT ");
         if (args_buf.empty()) {
             cache.flush_stats();
