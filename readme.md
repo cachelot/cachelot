@@ -78,6 +78,13 @@ All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
 ### Visit the web site for more information ###
 [www.cachelot.io](http://www.cachelot.io/)
 
+### Follow Cachelot in social media ###
+Be first to know about the new features
+
+Twitter: [@cachelot_io](https://twitter.com/cachelot_io)
+Facebook: [cachelot.io](https://facebook.com/cachelot.io)
+Google+: [+CachelotIo_cache](https://plus.google.com/+CachelotIo_cache)
+
 * * *
 
 ## Upcoming Features ##
