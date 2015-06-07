@@ -88,6 +88,9 @@ namespace cachelot {
             /// assign value to the item
             void assign_value(bytes the_value) noexcept;
 
+            /// assign value from the two parts
+            void assign_compose(bytes left, bytes right) noexcept;
+
             /// user defined flags
             opaque_flags_type opaque_flags() const noexcept { return m_opaque_flags; }
 
@@ -105,12 +108,6 @@ namespace cachelot {
 
             /// update item's expiration time
             void touch(expiration_time_point expiration_time) noexcept { m_expiration_time = expiration_time; }
-
-            /// try to append item's value with given `data`
-            bool append(const bytes data);
-
-            /// try to prepend item's value with given `data`
-            bool prepend(const bytes data);
 
             /// Calculate total size in bytes required to store provided fields
             static size_t CalcSizeRequired(const bytes the_key, const uint32 value_length) noexcept;
@@ -157,6 +154,15 @@ namespace cachelot {
             auto this_ = reinterpret_cast<uint8 *>(this);
             std::memcpy(this_ + ValueOffset(this), the_value.begin(), the_value.length());
             m_value_length = static_cast<decltype(m_value_length)>(the_value.length());
+        }
+
+
+        inline void Item::assign_compose(bytes left, bytes right) noexcept {
+            debug_assert(left.length() + right.length() <= m_value_length);
+            auto this_ = reinterpret_cast<uint8 *>(this);
+            std::memcpy(this_ + ValueOffset(this), left.begin(), left.length());
+            std::memcpy(this_ + ValueOffset(this) + left.length(), right.begin(), right.length());
+            m_value_length = static_cast<decltype(m_value_length)>(left.length() + right.length());
         }
 
 

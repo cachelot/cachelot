@@ -65,6 +65,12 @@ namespace cachelot {
         X(uint64, cmd_decr, "Description of the stat")           \
         X(uint64, decr_hits, "Description of the stat")          \
         X(uint64, decr_misses, "Description of the stat")        \
+        X(uint64, cmd_append, "Description of the stat")         \
+        X(uint64, append_hits, "Description of the stat")        \
+        X(uint64, append_misses, "Description of the stat")      \
+        X(uint64, cmd_prepend, "Description of the stat")        \
+        X(uint64, prepend_hits, "Description of the stat")       \
+        X(uint64, prepend_misses, "Description of the stat")     \
         X(uint64, hash_capacity, "Description of the stat")      \
         X(uint64, curr_items, "Description of the stat")         \
         X(bool, hash_is_expanding, "Description of the stat")

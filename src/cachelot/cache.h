@@ -159,7 +159,7 @@ namespace cachelot {
 
 
             /**
-             * execute on of the storage command
+             * execute on of the storage command: `set` / `add` / `replace` / `cas` / `prepend` / `append`
              *
              * @copydoc doxygen_store_command
              */
@@ -194,19 +194,12 @@ namespace cachelot {
             tuple<error_code, Response> do_cas(ItemPtr item) noexcept;
 
             /**
-             * `append` - write additional data 'after' existing item data
+             * Extend (`prepend` or `append`) existing item with the new data
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_append(ItemPtr item) noexcept;
+            tuple<error_code, Response> do_extend(Command cmd, ItemPtr item) noexcept;
             
-            /**
-             * `prepend` - write additional data 'before' existing item data
-             *
-             * @copydoc doxygen_store_command
-             */
-            tuple<error_code, Response> do_prepend(ItemPtr item) noexcept;
-
             /**
              * `delete` - delete existing item
              */
@@ -322,12 +315,11 @@ namespace cachelot {
                 return do_add(item);
             case REPLACE:
                 return do_replace(item);
-            case APPEND:
-                return do_append(item);
-            case PREPEND:
-                return do_prepend(item);
             case CAS:
                 return do_cas(item);
+            case APPEND:
+            case PREPEND:
+                return do_extend(cmd, item);
             default:
                 debug_assert(false);
                 return make_tuple(error::unknown_error, NOT_A_RESPONSE);
@@ -417,13 +409,53 @@ namespace cachelot {
         }
 
 
-        inline tuple<error_code, Response> Cache::do_append(ItemPtr item) noexcept {
-            return make_tuple(error::not_implemented, NOT_A_RESPONSE);
-        }
-
-
-        inline tuple<error_code, Response> Cache::do_prepend(ItemPtr item) noexcept {
-            return make_tuple(error::not_implemented, NOT_A_RESPONSE);
+        inline tuple<error_code, Response> Cache::do_extend(Command cmd, ItemPtr piece) noexcept {
+            if (cmd == APPEND) {
+                STAT_INCR(cache.cmd_append, 1);
+            } else {
+                debug_assert(cmd == PREPEND);
+                STAT_INCR(cache.cmd_prepend, 1);
+            }
+            bool found; iterator at;
+            Response response = NOT_A_RESPONSE;
+            error_code error = error::success;
+            try {
+                tie(found, at) = retrieve_item(piece->key(), piece->hash());
+                if (found) {
+                    auto old_item = at.value();
+                    const auto new_value_size = old_item->value().length() + piece->value().length();
+                    // do not evict existing items to avoid accidentally free the `piece` or the `old_item`
+                    auto memory = m_allocator.alloc_or_evict(Item::CalcSizeRequired(old_item->key(), new_value_size), false, [=](void *){});
+                    if (memory != nullptr) {
+                        auto new_item = new (memory) Item(old_item->key(), old_item->hash(), new_value_size, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
+                        if (cmd == APPEND) {
+                            new_item->assign_compose(old_item->value(), piece->value());
+                            STAT_INCR(cache.append_hits, 1);
+                        } else {
+                            debug_assert(cmd == PREPEND);
+                            new_item->assign_compose(piece->value(), old_item->value());
+                            STAT_INCR(cache.prepend_hits, 1);
+                        }
+                        replace_item_at(at, new_item);
+                        response = STORED;
+                    } else {
+                        throw std::bad_alloc();
+                    }
+                } else {
+                    if (cmd == APPEND) {
+                        STAT_INCR(cache.append_misses, 1);
+                    } else {
+                        debug_assert(cmd == PREPEND);
+                        STAT_INCR(cache.prepend_misses, 1);
+                    }
+                    response = NOT_FOUND;
+                }
+            } catch (const std::bad_alloc &) {
+                error = error::out_of_memory;
+                response = NOT_A_RESPONSE;
+            }
+            destroy_item(piece);
+            return make_tuple(error, response);
         }
 
 
@@ -463,10 +495,22 @@ namespace cachelot {
 
 
         inline tuple<error_code, Response, uint64> Cache::do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta) noexcept {
+            if (cmd == INCR) {
+                STAT_INCR(cache.cmd_incr, 1);
+            } else {
+                debug_assert(cmd == DECR);
+                STAT_INCR(cache.cmd_decr, 1);
+            }
             try {
                 bool found; iterator at;
                 tie(found, at) = retrieve_item(key, hash);
                 if (not found) {
+                    if (cmd == INCR) {
+                        STAT_INCR(cache.incr_misses, 1);
+                    } else {
+                        debug_assert(cmd == DECR);
+                        STAT_INCR(cache.decr_misses, 1);
+                    }
                     return make_tuple(error::success, NOT_FOUND, 0ull);
                 }
                 // retrieve item value stored as an ASCII string
@@ -477,9 +521,11 @@ namespace cachelot {
                 uint64 new_int_value = 0;
                 if (cmd == INCR) {
                     new_int_value = old_int_value + delta;
+                    STAT_INCR(cache.incr_hits, 1);
                 } else {
                     debug_assert(cmd == DECR);
                     new_int_value = (old_int_value >= delta) ? old_int_value - delta : 0;
+                    STAT_INCR(cache.decr_hits, 1);
                 }
                 // store new value as an ASCII string
                 AsciiIntegerBuffer new_ascii_value;
