@@ -47,7 +47,7 @@ namespace cachelot {
         explicit memalloc(void * arena, const size_t arena_size) noexcept;
 
         /// Try to allocate `size` bytes, return `nullptr` on fail
-        void * alloc(const size_t size) noexcept {
+        void * alloc(const size_t size) {
             return alloc_or_evict(size, false, [=](void *) -> void {});
         }
 
@@ -58,7 +58,7 @@ namespace cachelot {
         /// @tparam ForeachFreed - `void on_free(void * ptr)`
         template <typename ForeachFreed>
         void * alloc_or_evict(const size_t size, bool evict_if_necessary = false,
-                              ForeachFreed on_free_block = [](void *) -> void {}) noexcept;
+                              ForeachFreed on_free_block = [](void *) -> void {});
 
         /// try to extend previously allocated memory up to `new_size`, return `nullptr` on fail
         void * realloc_inplace(void * ptr, const size_t new_size) noexcept;
@@ -91,7 +91,7 @@ namespace cachelot {
 
         template <typename ForeachFreed>
         void * alloc_or_evict_impl(const size_t size, bool evict_if_necessary = false,
-                                   ForeachFreed on_free_block = [](void *) -> void {}) noexcept;
+                                   ForeachFreed on_free_block = [](void *) -> void {});
 
     private:
         // global arena boundaries

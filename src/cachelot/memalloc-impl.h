@@ -1001,7 +1001,7 @@ namespace cachelot {
 
 
     template <typename ForeachFreed>
-    inline void * memalloc::alloc_or_evict(const size_t size, bool evict_if_necessary, ForeachFreed on_free_block) noexcept {
+    inline void * memalloc::alloc_or_evict(const size_t size, bool evict_if_necessary, ForeachFreed on_free_block) {
         STAT_INCR(mem.num_malloc, 1);
         STAT_INCR(mem.total_requested, size);
         auto free_block_incr_evictions = [=](void * ptr) noexcept {
@@ -1020,7 +1020,7 @@ namespace cachelot {
 
 
     template <typename ForeachFreed>
-    inline void * memalloc::alloc_or_evict_impl(const size_t size, bool evict_if_necessary, ForeachFreed on_free_block) noexcept {
+    inline void * memalloc::alloc_or_evict_impl(const size_t size, bool evict_if_necessary, ForeachFreed on_free_block) {
         debug_assert(size <= block::max_size);
         debug_assert(size > 0);
         const uint32 nsize = size > block::min_size ? static_cast<uint32>(size) : block::min_size;
