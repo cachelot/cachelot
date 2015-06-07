@@ -417,7 +417,7 @@ namespace cachelot {
     
 
     /// On-stack buffer to hold the ASCII string representing integer number
-    typedef char AsciiIntegerBuffer[internal::numeric<int64>::max_str_length];
+    typedef char AsciiIntegerBuffer[24];
 
     /// @}
 
