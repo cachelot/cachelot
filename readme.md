@@ -83,7 +83,7 @@ All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
 ## Upcoming Features ##
  Cachelot is still 'work-in-progress' project
 
- * Some Memcached commands not implemented yet (~~`cas`~~, `touch`, `append`, `prepend`, `stats`)
+ * ~~Some Memcached commands not implemented yet (`cas`, `touch`, `append`, `prepend`, `stats`)~~
  * Windows build is broken
  * There is no UDP and binary protocol support
  * Cachelot library doesn't have proper build packaging and has no multi-threaded interface
