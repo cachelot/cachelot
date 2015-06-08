@@ -25,7 +25,7 @@ namespace cachelot {
 
             std::cout << std::endl;
         } catch (const std::exception &) { /* DO NOTHING */ }
-    };
+    }
 
     #undef PRINT_STAT
 

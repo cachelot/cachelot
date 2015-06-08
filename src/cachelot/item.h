@@ -107,7 +107,7 @@ namespace cachelot {
             bool is_expired() const noexcept { return m_expiration_time <= clock::now(); }
 
             /// update item's expiration time
-            void touch(expiration_time_point expiration_time) noexcept { m_expiration_time = expiration_time; }
+            void touch(expiration_time_point exptime) noexcept { m_expiration_time = exptime; }
 
             /// Calculate total size in bytes required to store provided fields
             static size_t CalcSizeRequired(const bytes the_key, const uint32 value_length) noexcept;
