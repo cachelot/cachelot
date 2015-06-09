@@ -44,6 +44,7 @@ BOOST_AUTO_TEST_CASE(test_dict_basic) {
         BOOST_CHECK(the_dict.del(key, hash));
         BOOST_CHECK(not the_dict.contains(key, hash));
     }
+    BOOST_CHECK_EQUAL(the_dict.size(), 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
