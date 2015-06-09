@@ -199,7 +199,7 @@ namespace cachelot {
              * @copydoc doxygen_store_command
              */
             tuple<error_code, Response> do_extend(Command cmd, ItemPtr item) noexcept;
-            
+
             /**
              * `delete` - delete existing item
              */
@@ -231,7 +231,7 @@ namespace cachelot {
             /**
              * Publish dynamic stats
              */
-            void flush_stats() noexcept;
+            void publish_stats() noexcept;
 
         private:
             /**
@@ -552,7 +552,7 @@ namespace cachelot {
             }
         }
 
-        
+
         inline tuple<error_code, ItemPtr> Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type version) noexcept {
             void * memory;
             const size_t size_required = Item::CalcSizeRequired(key, value_length);
@@ -586,7 +586,7 @@ namespace cachelot {
         }
 
 
-        inline void Cache::flush_stats() noexcept {
+        inline void Cache::publish_stats() noexcept {
             STAT_SET(cache.hash_capacity, m_dict.capacity());
             STAT_SET(cache.curr_items, m_dict.size());
             STAT_SET(cache.hash_is_expanding, m_dict.is_expanding());

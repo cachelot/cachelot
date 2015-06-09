@@ -33,6 +33,7 @@ namespace cachelot {
 
         static const size_t command_max_length = 7;
 
+
         /// constructor
         explicit text_protocol_handler(io_service & io_svc, cache::Cache & the_cache)
             : super(io_svc)
@@ -471,7 +472,7 @@ namespace cachelot {
         debug_assert(cmd == cache::STATS); (void)cmd;
         static const bytes STAT = bytes::from_literal("STAT ");
         if (args_buf.empty()) {
-            cache.flush_stats();
+            cache.publish_stats();
             #define SERIALIZE_STAT(stat_group, stat_type, stat_name, stat_description) \
             serialize() << STAT << bytes::from_literal(CACHELOT_PP_STR(stat_name)) << ' ' << STAT_GET(stat_group, stat_name) << CRLF;
 
