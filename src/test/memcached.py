@@ -145,8 +145,11 @@ class Client(object):
         self.__raise_if_errors(response)
         return self.__expect(response, ['TOUCHED', 'NOT_FOUND']) == 'TOUCHED'
 
-    def stats(self):
-        self.__send('stats\r\n')
+    def stats(self, stats_type=None):
+        if stats_type:
+            self.__send('stats %(stats_type)s\r\n' % locals())
+        else:
+            self.__send('stats\r\n')
         response = self.__receive_line()
         self.__raise_if_errors(response)
         while response.startswith('STAT'):

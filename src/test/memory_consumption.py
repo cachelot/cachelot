@@ -13,6 +13,7 @@ import time
 import logging
 import atexit
 import memcached
+import base64
 
 
 log = logging.getLogger()
@@ -29,38 +30,37 @@ VALUE_RANGES = { 'small': (10, 250),
                  'large' :(1024, 100000),
                  'all': (10, 100000)}
 
-MAX_DICT_MEM = 1024 * 1024 * 1024 * 4  # 4Gb
-MAX_DICT_MEM = 1024 * 1024 * 1
+MAX_DICT_MEM = 1024 * 1024 * 64  # 64Mb
+
 
 INTERESTING_STATS = frozenset([ 
-  'hash_capacity',
-  'curr_items',
-  'hash_is_expanding',
-  'num_malloc',
-  'num_free',
-  'num_realloc',
-  'num_alloc_errors',
-  'num_realloc_errors',
-  'total_requested',
-  'total_served',
-  'total_unserved',
-  'total_realloc_requested',
-  'total_realloc_served',
-  'total_realloc_unserved',
-  'num_free_table_hits',
-  'num_free_table_weak_hits',
-  'num_free_table_merges',
-  'num_used_table_hits',
-  'num_used_table_weak_hits',
-  'num_used_table_merges',
-  'limit_maxbytes',
-  'evictions' ])
+    'hash_capacity',
+    'curr_items',
+    'hash_is_expanding',
+    'num_malloc',
+    'num_free',
+    'num_realloc',
+    'num_alloc_errors',
+    'num_realloc_errors',
+    'total_requested',
+    'total_served',
+    'total_unserved',
+    'total_realloc_requested',
+    'total_realloc_served',
+    'total_realloc_unserved',
+    'num_free_table_hits',
+    'num_free_table_weak_hits',
+    'num_free_table_merges',
+    'num_used_table_hits',
+    'num_used_table_weak_hits',
+    'num_used_table_merges',
+    'limit_maxbytes',
+    'evictions' ])
 
 
 def setup_logging():
     """
     Setup python logging module (destinations like terminal output and file, formatting, etc.)
-    Note: This is low-level setup, to change logging output format see config.py instead
     """
     # logging setup
     logging_default_level = logging.DEBUG
@@ -70,7 +70,7 @@ def setup_logging():
     logging_file_format = '%(asctime)s:%(levelname)s: %(message)s'
     logging_file_date_format = '%Y %b %d %H:%M:%S'
     logging_file_dir = './'
-    logging_file_name = SELF + time.strftime('%Y%b%d-%H%M%S') + '.log'
+    logging_file_name = SELF + time.strftime('_%Y%b%d-%H%M%S') + '.log'
 
 
     logging.addLevelName(logging.FATAL, 'FATAL')
@@ -97,7 +97,7 @@ def setup_logging():
 
 
 def random_key():
-    length = random.randint(10, 250)
+    length = random.randint(10, 35)
     return ''.join(random.choice(KEY_ALPHABET) for _ in range(length))
     
 
@@ -121,8 +121,7 @@ def create_kv_data(range_name):
     minval, maxval = VALUE_RANGES[range_name]
     current_dict_mem = 0
     in_memory_kv = []
-    log.info('*' * 45)
-    log.info('*** Test for values in range "%s" [%d:%d]' %(range_name, minval, maxval))
+    log.info('Creating KV data for the range "%s" [%d:%d]' %(range_name, minval, maxval))
     start_time = time.time()
     while current_dict_mem < MAX_DICT_MEM:
         k = random_key()
@@ -131,26 +130,54 @@ def create_kv_data(range_name):
         current_dict_mem += len(v)
         in_memory_kv.append( (k, v) )
     took_time = time.time() - start_time
-    log.info('Effective memory: %d (%d items).', current_dict_mem, len(in_memory_kv))
-    log.debug('Took: %f sec', took_time)
+    log.debug('  Took: %.2f sec', took_time)
+    log.info('Local effective memory: %d (%d items).', current_dict_mem, len(in_memory_kv))
+    
     return in_memory_kv
 
 
 def execute_test(mc, kv_data):
     for run_no in range(5):
         start_time = time.time()
+        log.info('Fill-in caching server ...')
         for k, v in kv_data:
             mc.set(k, v)
-        log.info('Fill data in the cache took %f sec.', time.time() - start_time)
+        log.debug('  Took: %.2f sec', time.time() - start_time)
+        log.info('Checking caching server ...')
+        num_items = 0
+        effective_memory = 0
+        start_time = time.time()
+        for k, local_val in kv_data:
+            external_val = mc.get(k)
+            if not external_val:
+                # item was evicted, move along
+                continue
+            num_items += 1
+            effective_memory += len(k) + len(local_val)
+
+            # Sanity check: values must be equal
+            if external_val != local_val:
+                b64 = base64.b64encode
+                log.fatal('*** Data corruption: [%s]\n', k)
+                log.fatal('local value:\n%s', b64(local_val))
+                log.fatal('external value:\n%s', b64(external_val))
+                sys.exit(1)
+            
+        log.info('External effective memory: %d (%d items).', effective_memory, num_items)
+        log.debug('  Took: %.2f sec', time.time() - start_time)
+
+        # print statistics
         log_stats(mc)
+        random.shuffle(kv_data)
 
 
 def execute_test_for_values_range(range_name):
-
+    log.info('*' * 60)
     # Create test data
     in_memory_kv = create_kv_data(range_name)
 
     # Run dataset on cachelot
+    log.info("*** CACHELOT")
     cache_process = shell_exec(CACHELOTD)
     time.sleep(3)
     mc = memcached.connect_tcp('localhost', 11211)
@@ -160,12 +187,15 @@ def execute_test_for_values_range(range_name):
     log.info('*' * 60)
 
     # Run dataset on memcached
+    log.info("*** MEMCACHED")
     cache_process = shell_exec(MEMCACHED + ' -p 11212')
     time.sleep(3)
     mc = memcached.connect_tcp('localhost', 11212)
     execute_test(mc, in_memory_kv)
     cache_process.terminate()
     time.sleep(2)
+    log.info('*' * 60)
+    log.info('\n\n')
 
 
 def main():
