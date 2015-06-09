@@ -82,7 +82,7 @@ BOOST_AUTO_TEST_CASE(test_block_list) {
 
 
 // allocate and free blocks of a random size
-// in case of internal inconsistency, memalloc will trigger break via debug_assert
+// in case of the internal inconsistency, memalloc will trigger internal failure calling debug_assert
 //
 BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
     std::unique_ptr<char[]> _g_memory(new char[MEMSIZE] );
@@ -132,7 +132,6 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
         }
         // start over again
     }
-    PrintStats();
 }
 
 
