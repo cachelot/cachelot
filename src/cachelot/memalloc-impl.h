@@ -1141,39 +1141,33 @@ namespace cachelot {
         block * blk = block::from_user_ptr(ptr);
 
         // shrink the block
-        if (blk->size() >= new_size) {
+        if (new_size <= blk->size()) {
             block_list::unlink(blk);
             block::unuse(blk);
             return checkout(blk, new_size);
         }
 
-        // extend the block
-
+        // extend the block on the right side
         uint32 available = blk->size();
-        // maybe neighbors are free
-        {
-            auto right = blk->right_adjacent();
-            while (available < new_size && right->is_free()) {
-                available += right->size();
-                right = right->right_adjacent();
-            }
-        }
-        {
-            auto left = blk->left_adjacent();
-            while (available < new_size && left->is_free()) {
-                available += left->size();
-                left = left->left_adjacent();
-            }
+        auto right = blk->right_adjacent();
+        // check if we have enough space first
+        while (available < new_size && right->is_free()) {
+            available += right->size_with_meta();
+            right = right->right_adjacent();
         }
         if (available >= new_size) {
-            const auto old_memory = blk->memory();
             block_list::unlink(blk);
             block::unuse(blk);
-            blk = merge_unused(blk);
-            debug_assert(blk->size() >= new_size);
-            if (blk->memory() != old_memory) {
+            while (blk->size() < new_size) {
+                debug_assert(blk->right_adjacent()->is_free());
+                block_list::unlink(blk->right_adjacent());
+                blk = block::merge(blk, blk->right_adjacent());
             }
+            debug_assert(blk->size() >= new_size);
+            return checkout(blk, new_size);
         }
+
+        // give up
         STAT_INCR(mem.num_realloc_errors, 1);
         return nullptr;
     }
