@@ -43,12 +43,13 @@ namespace cachelot {
         static const char charset[] =
         "0123456789"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz";
+        "abcdefghijklmnopqrstuvwxyz"
+        "!?@#$%^&*()[]<>/|\\_+=-";
         static random_int<size_t> rnd_gen(0, sizeof(charset) - 1);
         auto randchar = [=]() -> char {
             return charset[ rnd_gen() ];
         };
-        static random_int<size_t> rnd_length(minlen, maxlen);
+        random_int<size_t> rnd_length(minlen, maxlen);
         auto const length = rnd_length();
         string str(length, 0);
         std::generate_n(str.begin(), length, randchar);
