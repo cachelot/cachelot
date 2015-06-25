@@ -72,7 +72,7 @@ namespace cachelot { namespace net {
         ConnectionType * new_connection = reinterpret_cast<Impl *>(this)->new_connection();
         m_acceptor.async_accept(new_connection->socket(),
             [=](const error_code error) {
-                if (!error) {
+                if (not error) {
                     this->async_accept();
                     new_connection->run();
                 } else {
