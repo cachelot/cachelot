@@ -188,7 +188,7 @@ def execute_test_for_values_range(range_name):
 
     # Run dataset on memcached
     log.info("*** MEMCACHED")
-    cache_process = shell_exec(MEMCACHED + ' -p 11212')
+    cache_process = shell_exec(MEMCACHED + ' -p 11212 -n 32 -f 1.05')
     time.sleep(3)
     mc = memcached.connect_tcp('localhost', 11212)
     execute_test(mc, in_memory_kv)
@@ -199,7 +199,7 @@ def execute_test_for_values_range(range_name):
 
 
 def main():
-    for range in VALUE_RANGES:
+    for range in ['small', 'medium', 'large', 'all']:
       execute_test_for_values_range(range)
 
 

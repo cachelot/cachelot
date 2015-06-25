@@ -19,7 +19,6 @@ namespace cachelot {
 
     namespace cache {
 
-// Primary table of all supported commands and their classes
 #define CACHE_COMMANDS_ENUM(x)  \
         x(ADD)                  \
         x(APPEND)               \
@@ -37,6 +36,9 @@ namespace cachelot {
         x(QUIT)                 \
         x(UNDEFINED)
 
+        /**
+         * All the supported commands
+         */
         enum Command {
 #define CACHE_COMMANDS_ELEMENT(cmd) cmd,
             CACHE_COMMANDS_ENUM(CACHE_COMMANDS_ELEMENT)
@@ -54,7 +56,7 @@ namespace cachelot {
         x(NOT_A_RESPONSE)
 
         /** 
-         * Cache responces to different commands
+         * Cache responces to the different commands
          *
          * - STORED: indicates Item was stored
          * - NOT_STORED: indicates Item was *not* stored because conditions for `add` or `replace` haven't met
@@ -76,6 +78,7 @@ namespace cachelot {
         };
 #undef CACHE_RESPONSES_ENUM_STRELEMENT
 
+        /// Convert cache response from the Enum type to the ASCII string (without zero terminator)
         constexpr bytes AsciiResponse(Response r) noexcept {
             return __AsciiResponses[static_cast<unsigned>(r)];
         }

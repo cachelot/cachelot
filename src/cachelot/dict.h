@@ -177,7 +177,7 @@ namespace cachelot {
                 return m_primary_tbl->del(key, hash);
             } else {
                 bool deleted = m_secondary_tbl->del(key, hash);
-                if (!deleted) {
+                if (not deleted) {
                     deleted = m_primary_tbl->del(key, hash);
                 }
                 rehash_some();
