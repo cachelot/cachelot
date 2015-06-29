@@ -107,9 +107,9 @@ int main(int argc, char * argv[]) {
         }
 
         // Unix socket
-        std::unique_ptr<memcached::text_unix_stream_server> memcached_unix_stream_text = nullptr;
+        std::unique_ptr<memcached::text_local_socket_server> memcached_unix_stream_text = nullptr;
         if (settings.net.has_unix_socket) {
-            memcached_unix_stream_text.reset(new memcached::text_unix_stream_server(reactor, *the_cache));
+            memcached_unix_stream_text.reset(new memcached::text_local_socket_server(reactor, *the_cache));
             memcached_unix_stream_text->start(settings.net.unix_socket);
         }
 

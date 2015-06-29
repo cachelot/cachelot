@@ -45,6 +45,8 @@ namespace cachelot {
         /// destructor
         ~text_protocol_handler() {}
     public:
+        typedef SocketType socket_type;
+
         /// create new connection
         static this_type * create(io_service & io_svc, cache::Cache & the_cache) {
             return new this_type(io_svc, the_cache);
