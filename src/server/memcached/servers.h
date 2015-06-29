@@ -8,8 +8,8 @@
 //  see LICENSE file
 
 
-#include <server/tcp_server.h>
-#include <server/unix_socket_server.h>
+#include <server/server_tcp.h>
+#include <server/server_local.h>
 #include <server/memcached/proto_text.h>
 
 /**

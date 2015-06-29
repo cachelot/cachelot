@@ -6,8 +6,8 @@ set (CACHELOT_SERVER_SOURCES
         network.h
         settings.cpp
         settings.h
-        tcp_server.h
-        unix_socket_server.h
+        server_tcp.h
+        server_local.h
         memcached/memcached.h
         memcached/proto_text.h
         memcached/servers.h

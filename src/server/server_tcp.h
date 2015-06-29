@@ -1,5 +1,5 @@
-#ifndef CACHELOT_NET_TCP_SERVER_H_INCLUDED
-#define CACHELOT_NET_TCP_SERVER_H_INCLUDED
+#ifndef CACHELOT_NET_SERVER_TCP_H_INCLUDED
+#define CACHELOT_NET_SERVER_TCP_H_INCLUDED
 
 //
 //  (C) Copyright 2015 Iurii Krasnoshchok
@@ -104,4 +104,4 @@ namespace cachelot { namespace net {
 
 /// @}
 
-#endif // CACHELOT_NET_TCP_SERVER_H_INCLUDED
+#endif // CACHELOT_NET_SERVER_TCP_H_INCLUDED
