@@ -121,7 +121,7 @@ namespace cachelot {
     inline void text_protocol_handler<Sock>::receive_command() noexcept {
         super::async_receive_until(CRLF,
             [=](const error_code error, const bytes data) {
-                if (!error) {
+                if (not error) {
                     debug_assert(data.endswith(CRLF));
                     this->on_command(data);
                 } else {
@@ -530,7 +530,7 @@ namespace cachelot {
     inline void text_protocol_handler<Sock>::suicide() noexcept {
         // 'suicide' can be called several times from background operation handlers
         // it must be re-entrable
-        if (! m_killed) {
+        if (not m_killed) {
             m_killed = true;
             super::close();
             super::post([=](){ delete this; });

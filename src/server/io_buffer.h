@@ -20,8 +20,8 @@
 namespace cachelot {
 
     // constants
-    constexpr size_t default_min_buffer_size = 1024; // 1Kb
-    constexpr size_t default_max_buffer_size = 1024 * 1024 * 8; // 8Mb
+    constexpr size_t default_min_buffer_size = 1024;
+    constexpr size_t default_max_buffer_size = 1024 * 1024 * 32; // 32Mb
 
 
     /**
@@ -43,11 +43,15 @@ namespace cachelot {
     class io_buffer {
         typedef std::unique_ptr<char[]> underlying_array_type;
     public:
-        // ctor / dtor
+        /// constructor
         explicit io_buffer(const size_t initial_size, const size_t max_size)
             : m_max_size(max_size) {
-            ensure_capacity(initial_size);
+            if (initial_size > 0) {
+                ensure_capacity(initial_size);
+            }
         }
+
+        // dtor
         ~io_buffer() = default;
         // disallowed copy and aasignment
         io_buffer(const io_buffer & ) = delete;
@@ -91,7 +95,7 @@ namespace cachelot {
                 bytes result(search_range.begin(), found.end());
                 m_read_pos += result.length();
                 if (m_read_pos == m_write_pos) {
-                    discard_all();
+                    discard_all(); // TODO: Possible race condition
                 }
                 return result;
             }
@@ -100,7 +104,8 @@ namespace cachelot {
 
 
         /// positinon in buffer to write to
-        char * begin_write(const size_t at_least = default_min_buffer_size) {
+        char * begin_write(const size_t at_least = default_min_buffer_size / 4) {
+            // TODO: Better buffer growth heuristic
             ensure_capacity(at_least);
             return m_data.get() + m_write_pos;
         }
@@ -138,6 +143,7 @@ namespace cachelot {
         }
 
         void ensure_capacity(const size_t at_least) {
+            debug_assert(at_least > 0);
             if (at_least > available()) {
                 const size_t new_capacity = capacity_advice(at_least);
                 if (new_capacity - size() >= at_least) {
