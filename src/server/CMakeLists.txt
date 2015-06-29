@@ -1,5 +1,5 @@
 set (CACHELOT_SERVER_SOURCES
-        conn_stream.h
+        stream_connection.h
         io_buffer.h
         io_serialization.h
         main.cpp

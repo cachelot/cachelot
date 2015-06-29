@@ -14,8 +14,8 @@
 #ifndef CACHELOT_BYTES_H_INCLUDED
 #  include <cachelot/bytes.h>
 #endif
-#ifndef CACHELOT_NET_CONN_STREAM_H_INCLUDED
-#  include <server/conn_stream.h>
+#ifndef CACHELOT_NET_STREAM_CONNECTION_H_INCLUDED
+#  include <server/stream_connection.h>
 #endif
 #ifndef CACHELOT_IO_BUFFER_H_INCLUDED
 #  include <server/io_buffer.h>
