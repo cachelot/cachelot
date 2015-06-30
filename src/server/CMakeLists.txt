@@ -8,12 +8,13 @@ set (CACHELOT_SERVER_SOURCES
         settings.h
         stream_server.h
         datagram_server.h
-        memcached/memcached.h
         memcached/proto_ascii.h
-        memcached/proto_text.h
+        memcached/proto_binary.h
         memcached/servers.h
         memcached/conversation.h
         memcached/conversation.cpp
+        memcached/memcached.h
+        memcached/memcached.cpp
 )
 
 add_executable (cachelotd ${CACHELOT_SERVER_SOURCES})

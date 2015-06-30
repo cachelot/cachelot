@@ -15,9 +15,11 @@ using std::string;
 namespace po = boost::program_options;
 
 namespace  {
-    // Global io_service to access it from the signal handler
+
+    // Global status flag to terminate application from the signal handler
     static bool killed = false;
-    // Reactor
+
+    // Global reactor service to access it from the signal handler
     static net::io_service reactor;
 
     void on_signal_terminate(int) {
@@ -103,10 +105,11 @@ int main(int argc, char * argv[]) {
         std::unique_ptr<memcached::text_tcp_server> memcached_tcp_text = nullptr;
         if (settings.net.has_TCP) {
             memcached_tcp_text.reset(new memcached::text_tcp_server(reactor, *the_cache));
-            memcached_tcp_text->start(settings.net.TCP_port);
+            net::tcp::endpoint bind_addr(net::ip::address_v4::any(), settings.net.TCP_port);
+            memcached_tcp_text->start(bind_addr);
         }
 
-        // Unix socket
+        // Unix local socket
         std::unique_ptr<memcached::text_local_socket_server> memcached_unix_stream_text = nullptr;
         if (settings.net.has_unix_socket) {
             memcached_unix_stream_text.reset(new memcached::text_local_socket_server(reactor, *the_cache));

@@ -42,9 +42,7 @@ namespace cachelot {
             explicit stream_server(io_service & ios)
                 : m_ios(ios)
                 , m_acceptor(ios) {
-                static_assert(std::is_base_of<this_type, ImplType>::value, "Server implementation <ImplType> must be derived from stream_server");
-                typename protocol_type::acceptor::reuse_address reuse_address_option(true); error_code ignore_error;
-                m_acceptor.set_option(reuse_address_option, ignore_error);
+                static_assert(std::is_base_of<this_type, ImplType>::value, "<ImplType> must be derived from the stream_server");
             }
 
             stream_server(const stream_server &) = delete;
@@ -52,12 +50,6 @@ namespace cachelot {
 
             /// start accept connections
             void start(const typename protocol_type::endpoint bind_addr);
-
-            /// start accept connections
-            void start(uint16 port) {
-                typename protocol_type::endpoint bind_addr(ip::address_v4::any(), port);
-                start(bind_addr);
-            }
 
             /// interrupt all activity
             void stop() noexcept {
@@ -78,6 +70,8 @@ namespace cachelot {
         template <class ImplType, class ConnectionType>
         inline void stream_server<ImplType, ConnectionType>::start(const typename protocol_type::endpoint bind_addr) {
             m_acceptor.open(bind_addr.protocol());
+            error_code ignore_error;
+            m_acceptor.set_option(typename protocol_type::acceptor::reuse_address(true), ignore_error);
             m_acceptor.bind(bind_addr);
             m_acceptor.listen();
             async_accept();

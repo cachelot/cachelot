@@ -25,9 +25,14 @@ namespace cachelot {
     constexpr bytes END = bytes::from_literal("END");
     constexpr char SPACE = ' ';
 
+    /// Memcached error types
+    constexpr bytes ERROR = bytes::from_literal("ERROR"); ///< unknown command
+    constexpr bytes CLIENT_ERROR = bytes::from_literal("CLIENT_ERROR"); ///< request is ill-formed
+    constexpr bytes SERVER_ERROR = bytes::from_literal("SERVER_ERROR"); ///< internal server error
+
     template <class SocketType>
-    class text_protocol_handler : public async_connection<SocketType, text_protocol_handler<SocketType>> {
-        typedef async_connection<SocketType, text_protocol_handler<SocketType>> super;
+    class text_protocol_handler : public stream_connection<SocketType, text_protocol_handler<SocketType>> {
+        typedef stream_connection<SocketType, text_protocol_handler<SocketType>> super;
         typedef text_protocol_handler<SocketType> this_type;
         typedef io_stream<text_serialization_tag> ostream_type;
 
@@ -357,8 +362,7 @@ namespace cachelot {
         tie(parsed, arguments_buf) = arguments_buf.split(SPACE);
         uint32 datalen = str_to_int<uint32>(parsed.begin(), parsed.end());
         if (datalen > settings.cache.max_value_size) {
-            auto errc = make_protocol_error(error::value_length);
-            throw system_error(errc);
+            throw system_error(error::value_length);
         }
         cache::version_type cas_unique = 0;
         if (cmd == cache::CAS) {
@@ -367,7 +371,7 @@ namespace cachelot {
         }
         bool noreply = maybe_noreply(arguments_buf);
         if (not arguments_buf.empty()) {
-            throw system_error(make_protocol_error(error::crlf_expected));
+            throw system_error(error::crlf_expected);
         }
         // create new Item
         error_code alloc_error; cache::Item * new_item;
@@ -390,7 +394,7 @@ namespace cachelot {
                 }
                 if (not data.endswith(CRLF)) {
                     cache.destroy_item(new_item);
-                    send_error(make_protocol_error(error::value_crlf_expected));
+                    send_error(error::value_crlf_expected);
                     suicide();
                     return;
                 }
@@ -498,10 +502,10 @@ namespace cachelot {
     template <class Sock>
     inline void text_protocol_handler<Sock>::validate_key(const bytes key) {
         if (not key) {
-            throw system_error(make_protocol_error(error::key_expected));
+            throw system_error(error::key_expected);
         }
         if (key.length() > cache::Item::max_key_length) {
-            throw system_error(make_protocol_error(error::key_length));
+            throw system_error(error::key_length);
         }
     }
 
@@ -515,7 +519,7 @@ namespace cachelot {
         } else if (noreply == NOREPLY) {
             return true;
         } else {
-            throw system_error(make_protocol_error(error::noreply_expected));
+            throw system_error(error::noreply_expected);
         }
     }
 

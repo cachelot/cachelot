@@ -21,27 +21,27 @@ namespace cachelot {
     namespace net {
 
     /**
-     * async_connection is a network session with asynchronos IO support
+     * stream_connection is a network session with asynchronos IO support
      *
      * @tparam SocketType is a socket (TCP / UDP / Unix / etc) provided by boost::asio
-     * @tparam Conversation is a specific connection implementation based on async_connection
+     * @tparam Conversation is a specific connection implementation based on stream_connection
      */
     template <class SocketType, class Conversation>
-    class async_connection {
-        typedef async_connection<SocketType, Conversation> this_type;
+    class stream_connection {
+        typedef stream_connection<SocketType, Conversation> this_type;
     protected:
         /// constructor
-        explicit async_connection(io_service & io_svc, const size_t rcvbuf_max = default_max_buffer_size, const size_t sndbuf_max = default_max_buffer_size);
+        explicit stream_connection(io_service & io_svc, const size_t rcvbuf_max = default_max_buffer_size, const size_t sndbuf_max = default_max_buffer_size);
 
         /// destructor
-        ~async_connection() {}
+        ~stream_connection() {}
 
     public:
         typedef SocketType socket_type;
         typedef typename SocketType::protocol_type protocol_type;
 
-        async_connection(const async_connection &) = delete;
-        async_connection & operator= (const async_connection &) = delete;
+        stream_connection(const stream_connection &) = delete;
+        stream_connection & operator= (const stream_connection &) = delete;
 
         /// underlying socket
         SocketType & socket() noexcept { return m_socket; }
@@ -84,6 +84,9 @@ namespace cachelot {
         template <typename Function>
         void post(Function fun) noexcept { m_ios.post(fun); }
 
+        /// Publish dynamic stats
+        void publish_stats() noexcept;
+
     private:
         bytes receive_buffer() const noexcept;
 
@@ -96,17 +99,17 @@ namespace cachelot {
 
 
     template <class Sock, class Conversation>
-    inline async_connection<Sock, Conversation>::async_connection(io_service & io_svc, const size_t rcvbuf_max, const size_t sndbuf_max)
+    inline stream_connection<Sock, Conversation>::stream_connection(io_service & io_svc, const size_t rcvbuf_max, const size_t sndbuf_max)
         : m_ios(io_svc)
         , m_socket(io_svc)
         , m_rcv_buf(default_min_buffer_size, rcvbuf_max)
         , m_snd_buf(default_min_buffer_size, sndbuf_max) {
-        static_assert(std::is_base_of<async_connection<Sock, Conversation>, Conversation>::value, "Conversation must be derived class");
+        static_assert(std::is_base_of<stream_connection<Sock, Conversation>, Conversation>::value, "Conversation must be derived class");
     }
 
 
     template <class Sock, class Conversation> template <typename Callback>
-    inline void async_connection<Sock, Conversation>::async_receive_until(const bytes terminator, Callback on_complete) noexcept {
+    inline void stream_connection<Sock, Conversation>::async_receive_until(const bytes terminator, Callback on_complete) noexcept {
         m_socket.async_receive(asio::buffer(m_rcv_buf.begin_write(), m_rcv_buf.available()),
             [=](const error_code error, const size_t bytes_received) {
                 bytes receive_result;
@@ -127,7 +130,7 @@ namespace cachelot {
 
 
     template <class Sock, class Conversation> template <typename Callback>
-    inline void async_connection<Sock, Conversation>::async_receive_n(const size_t n, Callback on_complete) noexcept {
+    inline void stream_connection<Sock, Conversation>::async_receive_n(const size_t n, Callback on_complete) noexcept {
         debug_assert(n > 0);
         while (m_rcv_buf.non_read() < n) {
             // we need to receive more data
@@ -151,9 +154,9 @@ namespace cachelot {
 
 
     template <class Sock, class Conversation> template <typename Callback>
-    inline void async_connection<Sock, Conversation>::async_send_all(Callback on_complete) noexcept {
+    inline void stream_connection<Sock, Conversation>::async_send_all(Callback on_complete) noexcept {
         // start asynchronous sending
-        asio::async_write(m_socket, asio::buffer(m_snd_buf.begin_read(), m_snd_buf.non_read()), transfer_all(),
+        asio::async_write(m_socket, asio::buffer(m_snd_buf.begin_read(), m_snd_buf.non_read()), asio::transfer_all(),
             [=](error_code error, size_t bytes_sent) {
                 if (not error) {
                     debug_assert(m_snd_buf.non_read() == bytes_sent);
@@ -165,7 +168,7 @@ namespace cachelot {
     
 
     template <class Sock, class Conversation>
-    inline void async_connection<Sock, Conversation>::close() noexcept {
+    inline void stream_connection<Sock, Conversation>::close() noexcept {
         if (is_open()) {
             error_code __;
             // try to shutdown the connection gracefully

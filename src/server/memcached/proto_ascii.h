@@ -16,6 +16,50 @@ namespace cachelot {
 
     namespace memcached { namespace ascii {
 
+
+        class protocol_parser : public basic_protocol_parser {
+        public:
+            /// @copydoc protocol_parser::parse_command_name
+            virtual cache::Command parse_command_name(const bytes command) override;
+
+            /// @copydoc protocol_parser::parse_retrieval_command_key
+            virtual tuple<bytes, bytes> parse_retrieval_command_key(bytes args)  override;
+
+            /// @copydoc protocol_parser::parse_storage_command
+            virtual tuple<bytes, cache::opaque_flags_type, cache::expiration_time_point, uint32, cache::version_type, bool> parse_storage_command(cache::Command cmd, bytes args) override;
+
+            /// @copydoc protocol_parser::parse_delete_command
+            virtual tuple<bytes, bool> parse_delete_command(bytes args) override;
+
+            /// @copydoc protocol_parser::parse_arithmetic_command
+            virtual tuple<bytes, uint64, bool> parse_arithmetic_command(bytes args) override;
+
+            /// @copydoc protocol_parser::parse_touch_command
+            virtual tuple<bytes, cache::expiration_time_point, bool> parse_touch_command(bytes args) override;
+
+            /// @copydoc protocol_parser::parse_statistics_command
+            virtual bytes parse_statistics_command(bytes args) override;
+
+            /// @copydoc protocol_parser::write_item
+            virtual void write_item(io_buffer & buf, cache::ItemPtr item, bool with_cas) override;
+
+            /// @copydoc protocol_parser::write_response
+            virtual void write_response(io_buffer & buf, cache::Response response) override;
+
+            /// @copydoc protocol_parser::write_unknown_command_error
+            virtual void write_unknown_command_error(io_buffer & buf) override;
+
+            /// @copydoc protocol_parser::write_client_error
+            virtual void write_client_error(io_buffer & buf, bytes message) override;
+            
+            /// @copydoc protocol_parser::write_server_error
+            virtual void write_server_error(io_buffer & buf, bytes message) override;
+
+        private:
+            bool maybe_noreply(const bytes buffer);
+        };
+
+
         constexpr char SPACE = ' ';
         constexpr bytes CRLF = bytes::from_literal("\r\n");
         constexpr bytes VALUE = bytes::from_literal("VALUE");
@@ -29,7 +73,7 @@ namespace cachelot {
 
 
         /// Parse the name of the `command`
-        inline cache::Command parse_command_name(const bytes command) {
+        inline cache::Command protocol_parser::parse_command_name(const bytes command) {
             static const auto is_3 = [=](const char literal[4]) -> bool { return *command.nth(1) == literal[1] && *command.nth(2) == literal[2]; };
             static const auto is_4 = [=](const char literal[5]) -> bool { return is_3(literal) && *command.nth(3) == literal[3]; };
             static const auto is_5 = [=](const char literal[6]) -> bool { return is_4(literal) && *command.nth(4) == literal[4]; };
@@ -83,25 +127,25 @@ namespace cachelot {
 
         /// Parse the first key of `GET` and `GETS` commans
         /// @return the key and the rest args
-        inline tuple<bytes, bytes> parse_retrieval_command_key(bytes args) {
+        inline tuple<bytes, bytes> protocol_parser::parse_retrieval_command_key(bytes args) {
             return args.split(SPACE);
         }
 
 
         /// @return `true` if buffer equals `noreply`
-        inline bool maybe_noreply(const bytes buffer) {
+        inline bool protocol_parser::maybe_noreply(const bytes buffer) {
             if (buffer.empty()) {
                 return false;
             } else if (buffer == NOREPLY) {
                 return true;
             } else {
-                throw system_error(make_protocol_error(error::noreply_expected));
+                throw system_error(error::noreply_expected);
             }
         }
 
         
         /// Parse args of on of the: `ADD`, `SET`, `REPLACE`, `CAS`, `APPEND`, `PREPEND` commands
-        inline tuple<bytes, cache::opaque_flags_type, cache::expiration_time_point, uint32, cache::version_type, bool> parse_storage_command(cache::Command cmd, bytes args) {
+        inline tuple<bytes, cache::opaque_flags_type, cache::expiration_time_point, uint32, cache::version_type, bool> protocol_parser::parse_storage_command(cache::Command cmd, bytes args) {
             bytes key;
             tie(key, args) = args.split(SPACE);
             validate_key(key);
@@ -113,7 +157,7 @@ namespace cachelot {
             tie(parsed, args) = args.split(SPACE);
             uint32 datalen = str_to_int<uint32>(parsed.begin(), parsed.end());
             if (datalen > settings.cache.max_value_size) {
-                throw system_error(make_protocol_error(error::value_length));
+                throw system_error(error::value_length);
             }
             cache::version_type cas_unique = 0;
             if (cmd == cache::CAS) {
@@ -122,14 +166,14 @@ namespace cachelot {
             }
             bool noreply = maybe_noreply(args);
             if (not args.empty()) {
-                throw system_error(make_protocol_error(error::crlf_expected));
+                throw system_error(error::crlf_expected);
             }
             return cachelot::make_tuple(key, flags, expiration_time_point(keep_alive_duration), datalen, cas_unique, noreply);
         }
 
 
         /// Parse the `DELETE` command args
-        inline tuple<bytes, bool> parse_delete_command(bytes args) {
+        inline tuple<bytes, bool> protocol_parser::parse_delete_command(bytes args) {
             bytes key;
             tie(key, args) = args.split(SPACE);
             validate_key(key);
@@ -139,7 +183,7 @@ namespace cachelot {
 
 
         /// Parse the `INCR` and `DECR` command args
-        inline tuple<bytes, uint64, bool> parse_arithmetic_command(bytes args) {
+        inline tuple<bytes, uint64, bool> protocol_parser::parse_arithmetic_command(bytes args) {
             bytes key;
             tie(key, args) = args.split(SPACE);
             validate_key(key);
@@ -152,7 +196,7 @@ namespace cachelot {
 
 
         /// Parse the `TOUCH` command args
-        inline tuple<bytes, cache::expiration_time_point, bool> parse_touch_command(bytes args) {
+        inline tuple<bytes, cache::expiration_time_point, bool> protocol_parser::parse_touch_command(bytes args) {
             bytes key;
             tie(key, args) = args.split(SPACE);
             validate_key(key);
@@ -166,7 +210,7 @@ namespace cachelot {
 
 
         /// Parse the `STATS` command args
-        inline bytes parse_statistics_command(bytes args) {
+        inline bytes protocol_parser::parse_statistics_command(bytes args) {
             return args; // TODO: Not Implemented
         }
 
@@ -223,7 +267,7 @@ namespace cachelot {
 
 
         /// Serialize cache Item into the io_buffer
-        inline void write_item(io_buffer & buf, cache::ItemPtr item, bool with_cas) {
+        inline void protocol_parser::write_item(io_buffer & buf, cache::ItemPtr item, bool with_cas) {
             buf << VALUE << SPACE << item->key() << SPACE << item->opaque_flags() << SPACE << static_cast<uint32>(item->value().length());
             if (with_cas) {
                 buf << SPACE << item->version();
@@ -233,35 +277,26 @@ namespace cachelot {
 
 
         /// Serialize cache response
-        inline void write_response(io_buffer & buf, cache::Response response) {
+        inline void protocol_parser::write_response(io_buffer & buf, cache::Response response) {
             buf << response << CRLF;
         }
 
 
         /// Serialize unknown command error
-        inline void write_unknown_command_error(io_buffer & buf) {
+        inline void protocol_parser::write_unknown_command_error(io_buffer & buf) {
             buf << ERROR << CRLF;
         }
 
 
         /// Serialize client error
-        inline void write_client_error(io_buffer & buf, bytes message) {
+        inline void protocol_parser::write_client_error(io_buffer & buf, bytes message) {
             buf << CLIENT_ERROR << message << CRLF;
         }
 
 
         /// Serialize server error
-        inline void write_server_error(io_buffer & buf, bytes message) {
+        inline void protocol_parser::write_server_error(io_buffer & buf, bytes message) {
             buf << SERVER_ERROR << message << CRLF;
-        }
-
-        inline void write_server_error(io_buffer & buf, const char * message) {
-            write_server_error(buf, bytes(message, std::strlen(message)));
-        }
-
-        inline void write_server_error(io_buffer & buf, const error_code errc) {
-            auto msg = errc.message();
-            write_server_error(buf, bytes(msg.c_str(), msg.size()));
         }
 
     }} // namespace memcached::ascii

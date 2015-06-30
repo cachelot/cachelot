@@ -9,6 +9,7 @@
 
 
 #include <server/stream_server.h>
+#include <server/datagram_server.h>
 #include <server/memcached/proto_text.h>
 
 /**

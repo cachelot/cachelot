@@ -8,7 +8,7 @@
 //  see LICENSE file
 
 #include <server/memcached/memcached.h>
-#include <memcached/protocol_binary.h>
+#include <thirdparty/memcached/protocol_binary.h>
 
 
 /// @ingroup memcached

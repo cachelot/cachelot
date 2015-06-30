@@ -20,8 +20,8 @@
 namespace cachelot {
 
     // constants
-    constexpr size_t default_min_buffer_size = 1024;
-    constexpr size_t default_max_buffer_size = 1024 * 1024 * 32; // 32Mb
+    constexpr size_t default_min_buffer_size = 500;
+    constexpr size_t default_max_buffer_size = 1024 * 1024 * 30; // ~30Mb
 
 
     /**
@@ -84,6 +84,11 @@ namespace cachelot {
                 discard_all();
             }
             return result;
+        }
+
+        /// read all the non-read data
+        bytes read_all() noexcept {
+            return complete_read(non_read());
         }
 
         /// search for `terminator` and return bytes ending on `terminator` on success or empty bytes otherwise

@@ -17,30 +17,17 @@ namespace cachelot {
 
     namespace memcached {
 
-        enum ConversationReply {
-            READ_MORE,
-            REPLY,
-            REPLY_AND_CLOSE,
-            CLOSE_IMMEDIATELY
-        };
-
         /// Memcached protocol conversation
-        class Conversation {
-            enum {
-                DETERMINE_PROTOCOL,
-                EXPECT_COMMAND
-            } parse_state;
+        class Conversation : public net::basic_conversation {
         public:
             /// constructor
             Conversation(cache::Cache & the_cache);
 
             /// react on the new data
-            ConversationReply handle_data(bytes data) noexcept;
+            Reply handle_data(io_buffer & recv_buf, io_buffer & send_buf) noexcept override;
 
         private:
             cache::Cache & cache;
-            io_buffer m_incoming;
-            io_buffer m_outgoing;
         };
 
 
