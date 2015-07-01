@@ -61,7 +61,6 @@ namespace cachelot {
             enum Reply {
                 READ_MORE,
                 SEND_REPLY,
-                SEND_REPLY_AND_CLOSE,
                 CLOSE_IMMEDIATELY
             };
 

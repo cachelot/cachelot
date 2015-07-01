@@ -20,42 +20,52 @@ namespace cachelot {
         class protocol_parser : public basic_protocol_parser {
         public:
             /// @copydoc protocol_parser::parse_command_name
-            virtual cache::Command parse_command_name(const bytes command) override;
+            virtual cache::Command parse_command_name(io_buffer & recv_buf) override;
 
-            /// @copydoc protocol_parser::parse_retrieval_command_key
-            virtual tuple<bytes, bytes> parse_retrieval_command_key(bytes args)  override;
+            /// @copydoc protocol_parser::parse_retrieval_command()
+            virtual bytes parse_retrieval_command(io_buffer & recv_buf) override;
 
-            /// @copydoc protocol_parser::parse_storage_command
-            virtual tuple<bytes, cache::opaque_flags_type, cache::expiration_time_point, uint32, cache::version_type, bool> parse_storage_command(cache::Command cmd, bytes args) override;
+            /// @copydoc protocol_parser::parse_retrieval_command_key()
+            virtual tuple<bytes, bytes> parse_retrieval_command_keys(bytes keys) override;
 
-            /// @copydoc protocol_parser::parse_delete_command
-            virtual tuple<bytes, bool> parse_delete_command(bytes args) override;
+            /// @copydoc protocol_parser::parse_storage_command()
+            virtual tuple<bytes, bytes, cache::opaque_flags_type, cache::expiration_time_point, cache::version_type, bool> parse_storage_command(cache::Command cmd, io_buffer & recv_buf) override;
 
-            /// @copydoc protocol_parser::parse_arithmetic_command
-            virtual tuple<bytes, uint64, bool> parse_arithmetic_command(bytes args) override;
+            /// @copydoc protocol_parser::parse_delete_command()
+            virtual tuple<bytes, bool> parse_delete_command(io_buffer & recv_buf) override;
 
-            /// @copydoc protocol_parser::parse_touch_command
-            virtual tuple<bytes, cache::expiration_time_point, bool> parse_touch_command(bytes args) override;
+            /// @copydoc protocol_parser::parse_arithmetic_command()
+            virtual tuple<bytes, uint64, bool> parse_arithmetic_command(io_buffer & recv_buf) override;
 
-            /// @copydoc protocol_parser::parse_statistics_command
-            virtual bytes parse_statistics_command(bytes args) override;
+            /// @copydoc protocol_parser::parse_touch_command()
+            virtual tuple<bytes, cache::expiration_time_point, bool> parse_touch_command(io_buffer & recv_buf) override;
 
-            /// @copydoc protocol_parser::write_item
-            virtual void write_item(io_buffer & buf, cache::ItemPtr item, bool with_cas) override;
+            /// @copydoc protocol_parser::parse_statistics_command()
+            virtual bytes parse_statistics_command(io_buffer & recv_buf) override;
 
-            /// @copydoc protocol_parser::write_response
-            virtual void write_response(io_buffer & buf, cache::Response response) override;
+            /// @copydoc protocol_parser::write_item()
+            virtual void write_item(io_buffer & send_buf, cache::ItemPtr item, bool with_cas) override;
 
-            /// @copydoc protocol_parser::write_unknown_command_error
-            virtual void write_unknown_command_error(io_buffer & buf) override;
+            /// @copydoc protocol_parser::finalize_batch()
+            virtual void finalize_batch(io_buffer & send_buf) override;
 
-            /// @copydoc protocol_parser::write_client_error
-            virtual void write_client_error(io_buffer & buf, bytes message) override;
+            /// @copydoc protocol_parser::write_response()
+            virtual void write_response(io_buffer & send_buf, cache::Response response) override;
+
+            /// @copydoc protocol_parser::write_unknown_command_error()
+            virtual void write_unknown_command_error(io_buffer & send_buf) override;
+
+            /// @copydoc protocol_parser::write_client_error()
+            virtual void write_client_error(io_buffer & send_buf, bytes message) override;
             
-            /// @copydoc protocol_parser::write_server_error
-            virtual void write_server_error(io_buffer & buf, bytes message) override;
+            /// @copydoc protocol_parser::write_server_error()
+            virtual void write_server_error(io_buffer & send_buf, bytes message) override;
 
         private:
+            /// read data from the buffer until CRLF found
+            bytes parse_header(io_buffer & recv_buf);
+
+            /// parse optional `noreply` clause
             bool maybe_noreply(const bytes buffer);
         };
 
@@ -73,7 +83,9 @@ namespace cachelot {
 
 
         /// Parse the name of the `command`
-        inline cache::Command protocol_parser::parse_command_name(const bytes command) {
+        inline cache::Command protocol_parser::parse_command_name(io_buffer & recv_buf) {
+            bytes command, _;
+            tie(command, _) = bytes(recv_buf.begin_read(), recv_buf.non_read()).split(SPACE);
             static const auto is_3 = [=](const char literal[4]) -> bool { return *command.nth(1) == literal[1] && *command.nth(2) == literal[2]; };
             static const auto is_4 = [=](const char literal[5]) -> bool { return is_3(literal) && *command.nth(3) == literal[3]; };
             static const auto is_5 = [=](const char literal[6]) -> bool { return is_4(literal) && *command.nth(4) == literal[4]; };
@@ -81,6 +93,7 @@ namespace cachelot {
             static const auto is_7 = [=](const char literal[8]) -> bool { return is_6(literal) && *command.nth(6) == literal[6]; };
 
             if (command) {
+                recv_buf.complete_read(command.length() + 1); // eat command name + space
                 const char first_char = command[0];
                 switch (command.length()) {
                     case 3:
@@ -125,10 +138,30 @@ namespace cachelot {
         }
 
 
-        /// Parse the first key of `GET` and `GETS` commans
-        /// @return the key and the rest args
-        inline tuple<bytes, bytes> protocol_parser::parse_retrieval_command_key(bytes args) {
-            return args.split(SPACE);
+
+        inline bytes protocol_parser::parse_header(io_buffer & recv_buf) {
+            auto unread = bytes(recv_buf.begin_read(), recv_buf.non_read());
+            auto header_end = unread.search(CRLF);
+            if (header_end) {
+                bytes header, rest;
+                tie(header, rest) = unread.split_at(header_end.begin());
+                recv_buf.complete_read(header.length() + CRLF.length());
+                return header;
+            } else {
+                throw system_error(error::not_enough_data);
+            }
+        }
+
+        inline bytes protocol_parser::parse_retrieval_command(io_buffer & recv_buf) {
+            return parse_header(recv_buf);
+        }
+
+
+        inline tuple<bytes, bytes> protocol_parser::parse_retrieval_command_keys(bytes keys) {
+            bytes first, rest;
+            tie(first, rest) = keys.split(SPACE);
+            validate_key(first);
+            return make_tuple(first, rest);
         }
 
 
@@ -145,7 +178,8 @@ namespace cachelot {
 
         
         /// Parse args of on of the: `ADD`, `SET`, `REPLACE`, `CAS`, `APPEND`, `PREPEND` commands
-        inline tuple<bytes, cache::opaque_flags_type, cache::expiration_time_point, uint32, cache::version_type, bool> protocol_parser::parse_storage_command(cache::Command cmd, bytes args) {
+        inline tuple<bytes, bytes, cache::opaque_flags_type, cache::expiration_time_point, cache::version_type, bool> protocol_parser::parse_storage_command(cache::Command cmd, io_buffer & recv_buf) {
+            auto args = parse_header(recv_buf);
             bytes key;
             tie(key, args) = args.split(SPACE);
             validate_key(key);
@@ -165,15 +199,25 @@ namespace cachelot {
                 cas_unique = str_to_int<cache::version_type>(parsed.begin(), parsed.end());
             }
             bool noreply = maybe_noreply(args);
-            if (not args.empty()) {
-                throw system_error(error::crlf_expected);
+            if (recv_buf.non_read() >= datalen + CRLF.length()) {
+                auto value = bytes(recv_buf.begin_read(), datalen);
+                recv_buf.complete_read(datalen);
+                if (bytes(recv_buf.begin_read(), CRLF.length()) == CRLF) {
+                    recv_buf.complete_read(CRLF.length());
+                } else {
+                    throw system_error(error::crlf_expected);
+                }
+                // TODO: Memcached at some point treats `keep_alive_duration` as UNIX epoch time
+                return cachelot::make_tuple(key, value, flags, expiration_time_point(keep_alive_duration), cas_unique, noreply);
+            } else {
+                throw system_error(error::not_enough_data);
             }
-            return cachelot::make_tuple(key, flags, expiration_time_point(keep_alive_duration), datalen, cas_unique, noreply);
         }
 
 
         /// Parse the `DELETE` command args
-        inline tuple<bytes, bool> protocol_parser::parse_delete_command(bytes args) {
+        inline tuple<bytes, bool> protocol_parser::parse_delete_command(io_buffer & recv_buf) {
+            auto args = parse_header(recv_buf);
             bytes key;
             tie(key, args) = args.split(SPACE);
             validate_key(key);
@@ -183,7 +227,8 @@ namespace cachelot {
 
 
         /// Parse the `INCR` and `DECR` command args
-        inline tuple<bytes, uint64, bool> protocol_parser::parse_arithmetic_command(bytes args) {
+        inline tuple<bytes, uint64, bool> protocol_parser::parse_arithmetic_command(io_buffer & recv_buf) {
+            auto args = parse_header(recv_buf);
             bytes key;
             tie(key, args) = args.split(SPACE);
             validate_key(key);
@@ -196,7 +241,8 @@ namespace cachelot {
 
 
         /// Parse the `TOUCH` command args
-        inline tuple<bytes, cache::expiration_time_point, bool> protocol_parser::parse_touch_command(bytes args) {
+        inline tuple<bytes, cache::expiration_time_point, bool> protocol_parser::parse_touch_command(io_buffer & recv_buf) {
+            auto args = parse_header(recv_buf);
             bytes key;
             tie(key, args) = args.split(SPACE);
             validate_key(key);
@@ -210,8 +256,8 @@ namespace cachelot {
 
 
         /// Parse the `STATS` command args
-        inline bytes protocol_parser::parse_statistics_command(bytes args) {
-            return args; // TODO: Not Implemented
+        inline bytes protocol_parser::parse_statistics_command(io_buffer & recv_buf) {
+            return parse_header(recv_buf); // TODO: Not Implemented
         }
 
 
@@ -276,27 +322,28 @@ namespace cachelot {
         }
 
 
-        /// Serialize cache response
-        inline void protocol_parser::write_response(io_buffer & buf, cache::Response response) {
-            buf << response << CRLF;
+        inline void protocol_parser::finalize_batch(io_buffer & send_buf) {
+            send_buf << CRLF;
         }
 
 
-        /// Serialize unknown command error
-        inline void protocol_parser::write_unknown_command_error(io_buffer & buf) {
-            buf << ERROR << CRLF;
+        inline void protocol_parser::write_response(io_buffer & send_buf, cache::Response response) {
+            send_buf << response << CRLF;
         }
 
 
-        /// Serialize client error
-        inline void protocol_parser::write_client_error(io_buffer & buf, bytes message) {
-            buf << CLIENT_ERROR << message << CRLF;
+        inline void protocol_parser::write_unknown_command_error(io_buffer & send_buf) {
+            send_buf << ERROR << CRLF;
         }
 
 
-        /// Serialize server error
-        inline void protocol_parser::write_server_error(io_buffer & buf, bytes message) {
-            buf << SERVER_ERROR << message << CRLF;
+        inline void protocol_parser::write_client_error(io_buffer & send_buf, bytes message) {
+            send_buf << CLIENT_ERROR << message << CRLF;
+        }
+
+
+        inline void protocol_parser::write_server_error(io_buffer & send_buf, bytes message) {
+            send_buf << SERVER_ERROR << message << CRLF;
         }
 
     }} // namespace memcached::ascii
