@@ -136,16 +136,10 @@ namespace cachelot {
             /**
              * `get` -  retrieve item
              *
-             * @tparam Callback - callback will be called when request is completed
-             *
-             * Callback must have following signature:
-             * @code
-             *    void on_get(error_code error, bool found, bytes value, opaque_flags_type flags, version_type version)
-             * @endcode
-             * @warning Key/value pointers may not be valid outside of callback.
+             * @return pointer to the Item or `nullptr` if none was found
+             * @warning pointer is only valid *before* the next cache API call
              */
-            template <typename Callback>
-            void do_get(const bytes key, const hash_type hash, Callback on_get) noexcept;
+            ItemPtr do_get(const bytes key, const hash_type hash) noexcept;
 
 
             /**
@@ -288,8 +282,7 @@ namespace cachelot {
         }
 
 
-        template <typename Callback>
-        inline void Cache::do_get(const bytes key, const hash_type hash, Callback on_get) noexcept {
+        inline ItemPtr Cache::do_get(const bytes key, const hash_type hash) noexcept {
             STAT_INCR(cache.cmd_get, 1);
             // try to retrieve existing item
             bool found; iterator at; bool readonly = true;
@@ -299,10 +292,10 @@ namespace cachelot {
                 auto item = at.value();
                 debug_assert(item->key() == key);
                 debug_assert(item->hash() == hash);
-                on_get(error::success, true, item->value(), item->opaque_flags(), item->version());
+                return item;
             } else {
                 STAT_INCR(cache.get_misses, 1);
-                on_get(error::success, false, bytes(), opaque_flags_type(), version_type());
+                return ItemPtr(nullptr);
             }
         }
 

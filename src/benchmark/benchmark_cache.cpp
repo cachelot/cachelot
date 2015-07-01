@@ -72,16 +72,10 @@ public:
 
     void get(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
-        m_cache.do_get(k, calc_hash(k),
-                    [=](error_code error, bool found, bytes, cache::opaque_flags_type, cache::version_type) {
-                        bench_stats.num_get += 1;
-                        if (not error) {
-                            auto & counter = found ? bench_stats.num_cache_hit : bench_stats.num_cache_miss;
-                            counter += 1;
-                        } else {
-                            bench_stats.num_error += 1;
-                        }
-                    });
+        auto found_item = m_cache.do_get(k, calc_hash(k));
+        bench_stats.num_get += 1;
+        auto & counter = found_item ? bench_stats.num_cache_hit : bench_stats.num_cache_miss;
+        counter += 1;
     }
 
     void del(iterator it) {
