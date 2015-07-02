@@ -55,19 +55,18 @@ namespace cachelot {
 
         namespace io_error = asio::error;
 
+        enum ConversationReply {
+            READ_MORE,
+            SEND_REPLY,
+        };
+
         /// Unified TCP/UDP/Local converation interface
         class basic_conversation {
         protected:
-            enum Reply {
-                READ_MORE,
-                SEND_REPLY,
-                CLOSE_IMMEDIATELY
-            };
-
             /// main interface function of the conversation called upon async receive completion
             /// Implementation shall read data from the `recv_buf` and write reply to the `send_buf`
             /// @return one of the possible replies to instruct what to do with the connection next
-            virtual Reply handle_data(io_buffer & recv_buf, io_buffer & send_buf) noexcept = 0;
+            virtual ConversationReply handle_data(io_buffer & recv_buf, io_buffer & send_buf) noexcept = 0;
 
         public:
             basic_conversation() = default;
