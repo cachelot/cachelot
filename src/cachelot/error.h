@@ -20,13 +20,14 @@ namespace cachelot {
 
     // Application level errors defined here
     // Note: all error codes declared in `error` namespace, so use as `error::unknown_error`
-    #define CACHELOT_ERROR_ENUM(x) \
-        x(unknown_error,    "Unknown error") \
-        x(out_of_memory,    "Out of memory") \
-        x(numeric_convert,  "Numeric conversion error") \
-        x(numeric_overflow, "Numeric value is out of range") \
-        x(not_implemented,  "Not implemented")
-
+    #define CACHELOT_ERROR_ENUM(x)                                  \
+        x(unknown_error,        "Unknown error")                    \
+        x(out_of_memory,        "Out of memory")                    \
+        x(numeric_convert,      "Numeric conversion error")         \
+        x(numeric_overflow,     "Numeric value is out of range")    \
+        x(not_implemented,      "Not implemented")                  \
+        x(incomplete_request,   "Request packet is incomplete")     \
+        x(brocken_request,      "Request packet is brocken")
 
     /// system error handling
     using boost::system::error_code;      // boost::error is used rather than std's because it is used by boost::asio

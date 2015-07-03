@@ -17,14 +17,11 @@
 namespace cachelot {
 
     #define MEMCACHED_PROTO_ERROR_ENUM(x)                                       \
-        x(not_enough_data, "Expected more data in the message")                 \
         x(key_length, "Maximum key length exceeded")                            \
         x(value_length, "Maximum value length exceeded")                        \
         x(crlf_expected, "Invalid request: \\r\\n expected")                    \
         x(value_crlf_expected, "Invalid value: \\r\\n expected")                \
         x(key_expected, "Invalid request: key expected")                        \
-        x(integer_conv, "Invalid request: failed to convert integer argument")  \
-        x(integer_range, "Invalid request: integer value is out of range")      \
         x(noreply_expected, "Invalid request: expected noreply")                \
         x(udp_header_size, "UDP packet header is too small")                    \
         x(udp_proto_reserverd, "UDP reserved flag expected to be zero")
