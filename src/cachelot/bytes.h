@@ -165,7 +165,7 @@ namespace cachelot {
             return make_tuple(bytes(begin(), at), bytes(at, end()));
         }
 
-        /// split bytes at given index (`index` must be less than this range length)
+        /// split bytes at the given index (`index` must be less than this range length)
         tuple<bytes, bytes> split_at(const size_t index) const noexcept {
             const char * split_pos = nth(index);
             return split_at(split_pos);

@@ -56,17 +56,18 @@ public:
     void set(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
-        error_code error; cache::ItemPtr item;
-        tie(error, item) = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, forever, /*CAS*/0);
-        if (not error) {
+        cache::ItemPtr item;
+        try {
+            item = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, forever, /*CAS*/0);
             item->assign_value(v);
             cache::Response cache_reply;
-            tie(error, cache_reply) = m_cache.do_set(item);
-        }
-        if (not error) {
+            cache_reply = m_cache.do_set(item);
             bench_stats.num_set += 1;
-        } else {
+        } catch (const std::exception &) {
             bench_stats.num_error += 1;
+            if (item) {
+                m_cache.destroy_item(item);
+            }
         }
     }
 
@@ -81,15 +82,10 @@ public:
     void del(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         error_code error; cache::Response cache_reply;
-        tie(error, cache_reply) = m_cache.do_delete(k, calc_hash(k));
+        cache_reply = m_cache.do_delete(k, calc_hash(k));
         bench_stats.num_del += 1;
-        if (not error) {
-            auto & counter = (cache_reply == cache::DELETED) ? bench_stats.num_cache_hit : bench_stats.num_cache_miss;
-            counter += 1;
-        } else {
-            bench_stats.num_error += 1;
-        }
-
+        auto & counter = (cache_reply == cache::DELETED) ? bench_stats.num_cache_hit : bench_stats.num_cache_miss;
+        counter += 1;
     }
 private:
     cache::Cache m_cache;
