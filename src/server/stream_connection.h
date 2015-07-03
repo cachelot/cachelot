@@ -30,19 +30,25 @@ namespace cachelot {
     template <class SocketType, class Conversation>
     class stream_connection {
         typedef stream_connection<SocketType, Conversation> this_type;
+        stream_connection(const stream_connection &) = delete;
+        stream_connection & operator= (const stream_connection &) = delete;
     protected:
         /// constructor
         explicit stream_connection(io_service & io_svc, const size_t rcvbuf_max = default_max_buffer_size, const size_t sndbuf_max = default_max_buffer_size);
 
-        /// destructor
-        ~stream_connection() {}
+        /// virtual destructor
+        virtual ~stream_connection() = default;
+
+        /// React on the data
+        /// Parse incoming message from the `recv_buf`, call the Cache API functions and write reply into the `send_buf`
+        /// @return ConversationReply indicates whether to send reply or just wait for more data
+        virtual net::ConversationReply handle_data(io_buffer & recv_buf, io_buffer & send_buf) noexcept = 0;
 
     public:
+        /// Type of the underlying socket
         typedef SocketType socket_type;
+        /// Transport layer protocol
         typedef typename SocketType::protocol_type protocol_type;
-
-        stream_connection(const stream_connection &) = delete;
-        stream_connection & operator= (const stream_connection &) = delete;
 
         /// underlying socket
         SocketType & socket() noexcept { return m_socket; }
@@ -51,7 +57,7 @@ namespace cachelot {
         bool is_open() const noexcept { return m_socket.is_open(); }
 
         /// start communication for connection
-        void start() noexcept;
+        void start() noexcept { async_receive_some(); }
 
         /// immediately cancel all pending operations and close the connection
         void close() noexcept;
@@ -75,9 +81,6 @@ namespace cachelot {
         void suicide() noexcept;
 
     private:
-        bytes receive_buffer() const noexcept;
-
-    private:
         SocketType m_socket;
         io_buffer m_recv_buf;
         io_buffer m_send_buf;
@@ -98,18 +101,22 @@ namespace cachelot {
     template <class Sock, class Conversation>
     inline void stream_connection<Sock, Conversation>::async_receive_some() noexcept {
         if (m_killed) { return; }
-        m_socket.async_receive_some(asio::buffer(m_recv_buf.begin_write(), m_recv_buf.available()),
+        m_socket.async_read_some(asio::buffer(m_recv_buf.begin_write(), m_recv_buf.available()),
             [=](const error_code error, const size_t bytes_received) {
                 bytes receive_result;
                 if (not error) {
                     m_recv_buf.complete_write(bytes_received);
-                    ConversationReply reply = static_cast<Conversation *>(this)->handle_data(m_recv_buf, m_send_buf);
+                    ConversationReply reply = handle_data(m_recv_buf, m_send_buf);
                     switch (reply) {
                     case SEND_REPLY:
                         async_send_all();
-                        // there is no break so we'll continue receive
+                        // there is no `break` so we'll continue receive
                     case READ_MORE:
                         async_receive_some();
+                        break;
+                    case CLOSE_IMMEDIATELY:
+                        suicide();
+                        break;
                     }
                 } else {
                     if (error == io_error::message_size) {

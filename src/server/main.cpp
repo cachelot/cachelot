@@ -1,8 +1,8 @@
 #include <cachelot/common.h>
-#include <server/memcached/servers.h>
 #include <cachelot/cache.h>
-#include <server/settings.h>
 #include <cachelot/stats.h>
+#include <server/settings.h>
+#include <server/memcached/conversation.h>
 
 #include <iostream>
 #include <boost/program_options.hpp>
@@ -43,12 +43,12 @@ namespace  {
     int parse_cmdline(int argc, const char * const argv[]) {
         po::options_description desc("Allowed options");
         desc.add_options()
-            ("help,h", "produce help message")
-            ("tcp-port,p", po::value<uint16>()->default_value(11211),   "TCP port number to listen on")
-            ("udp-port,U", po::value<uint16>()->default_value(11211),   "UDP port number to listen on (0 is off)")
-            ("socket,s",   po::value<string>(),                         "UNIX socket path to listen on")
-            ("socket_access,a", po::value<unsigned>(),                  "access mask for UNIX socket, in octal (default: 0700)")
-            ("listen,l",   po::value<std::vector<string>>(),            "interface to listen on (default: INADDR_ANY, all addresses)\n"
+            ("help,h",                                                  "produce this help message")
+            ("tcp-port,p", po::value<uint16>()->default_value(11211),   "TCP port number to listen on (0 to disable TCP)")
+            ("udp-port,U", po::value<uint16>()->default_value(11211),   "UDP port number to listen on (0 to disable UDP)")
+            ("socket,s",   po::value<string>(),                         "unix socket path to listen on (disabled by default)")
+            ("socket_access,a", po::value<unsigned>(),                  "access mask for the unix socket, in octal (default: 0700)")
+            ("listen,l",   po::value<std::vector<string>>(),            "interface to listen on (default: INADDR_ANY - all addresses)\n"
                                                                         "<arg> may be specified as host:port. If you don't specify a port number,"
                                                                         "the value you specified with -p or -U is used."
                                                                         "You may specify multiple addresses separated by comma or by using -l multiple times")
@@ -102,18 +102,18 @@ int main(int argc, char * argv[]) {
         setup_signals();
 
         // TCP
-        std::unique_ptr<memcached::text_tcp_server> memcached_tcp_text = nullptr;
+        std::unique_ptr<memcached::tcp_server> memcached_tcp = nullptr;
         if (settings.net.has_TCP) {
-            memcached_tcp_text.reset(new memcached::text_tcp_server(reactor, *the_cache));
+            memcached_tcp.reset(new memcached::tcp_server(*the_cache, reactor));
             net::tcp::endpoint bind_addr(net::ip::address_v4::any(), settings.net.TCP_port);
-            memcached_tcp_text->start(bind_addr);
+            memcached_tcp->start(bind_addr);
         }
 
         // Unix local socket
-        std::unique_ptr<memcached::text_local_socket_server> memcached_unix_stream_text = nullptr;
+        std::unique_ptr<memcached::unix_socket_server> memcached_unix_socket = nullptr;
         if (settings.net.has_unix_socket) {
-            memcached_unix_stream_text.reset(new memcached::text_local_socket_server(reactor, *the_cache));
-            memcached_unix_stream_text->start(settings.net.unix_socket);
+            memcached_unix_socket.reset(new memcached::unix_socket_server(*the_cache, reactor));
+            memcached_unix_socket->start(settings.net.unix_socket);
         }
 
         error_code error;
@@ -121,11 +121,11 @@ int main(int argc, char * argv[]) {
             reactor.run(error);
         } while(not killed && not error);
 
-        if (memcached_tcp_text) {
-            memcached_tcp_text->stop();
+        if (memcached_tcp) {
+            memcached_tcp->stop();
         }
-        if (memcached_unix_stream_text) {
-            memcached_unix_stream_text->stop();
+        if (memcached_unix_socket) {
+            memcached_unix_socket->stop();
         }
 
         return EXIT_SUCCESS;

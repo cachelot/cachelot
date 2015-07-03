@@ -1,5 +1,5 @@
-#ifndef CACHELOT_PROTO_MEMCACHED_H_INCLUDED
-#define CACHELOT_PROTO_MEMCACHED_H_INCLUDED
+#ifndef CACHELOT_SERVER_MEMCACHED_H_INCLUDED
+#define CACHELOT_SERVER_MEMCACHED_H_INCLUDED
 
 //
 //  (C) Copyright 2015 Iurii Krasnoshchok
@@ -16,9 +16,6 @@
 #endif
 #ifndef CACHELOT_IO_BUFFER_H_INCLUDED
 #  include <server/io_buffer.h>
-#endif
-#ifndef CACHELOT_IO_SERIALIZATION_H_INCLUDED
-#  include <server/io_serialization.h>
 #endif
 #ifndef CACHELOT_CACHE_H_INCLUDED
 #  include <cachelot/cache.h>
@@ -50,59 +47,24 @@ namespace cachelot {
             static udp_header fromBytes(bytes raw);
         };
 
-        /// memcached protocol parser interface
-        struct basic_protocol_parser {
+
+        class basic_protocol_handler {
+        public:
+            /// constructor
+            explicit basic_protocol_handler(cache::Cache & the_cache) : cache_api(the_cache), calc_hash() {}
+
+            /// virtual destructor
+            virtual ~basic_protocol_handler() = default;
+
+            /// React on the data
+            virtual net::ConversationReply handle_data(io_buffer & recv_buf, io_buffer & send_buf) noexcept = 0;
+
             /// choose between ascii and binary protocol
-            static std::unique_ptr<basic_protocol_parser> determine_protocol(io_buffer & recv_buf);
+            static std::unique_ptr<basic_protocol_handler> determine_protocol(io_buffer & recv_buf, cache::Cache & the_cache);
 
-            /// ctor
-            basic_protocol_parser() = default;
-
-            /// dtor
-            virtual ~basic_protocol_parser() {}
-
-            /// Parse the name of the `command`
-            virtual cache::Command parse_command_name(io_buffer & recv_buf) = 0;
-
-            /// Parse the `GET` or `GETS` command header
-            virtual bytes parse_retrieval_command(io_buffer & recv_buf) = 0;
-
-            /// Parse the first key of `GET` and `GETS` commans
-            /// @return the key and the rest args
-            virtual tuple<bytes, bytes> parse_retrieval_command_keys(bytes keys) = 0;
-
-            /// Parse args of on of the: `ADD`, `SET`, `REPLACE`, `CAS`, `APPEND`, `PREPEND` commands
-            virtual tuple<bytes, bytes, cache::opaque_flags_type, cache::expiration_time_point, cache::version_type, bool> parse_storage_command(cache::Command cmd, io_buffer & recv_buf) = 0;
-
-            /// Parse the `DELETE` command args
-            virtual tuple<bytes, bool> parse_delete_command(io_buffer & recv_buf) = 0;
-
-            /// Parse the `INCR` and `DECR` command args
-            virtual tuple<bytes, uint64, bool> parse_arithmetic_command(io_buffer & recv_buf) = 0;
-
-            /// Parse the `TOUCH` command args
-            virtual tuple<bytes, cache::expiration_time_point, bool> parse_touch_command(io_buffer & recv_buf) = 0;
-
-            /// Parse the `STATS` command args
-            virtual bytes parse_statistics_command(io_buffer & recv_buf) = 0;
-
-            /// Serialize cache Item into the io_buffer
-            virtual void write_item(io_buffer & send_buf, cache::ItemPtr item, bool with_cas) = 0;
-
-            /// Finalize the batch
-            virtual void finalize_batch(io_buffer & send_buf) = 0;
-
-            /// Serialize one of the cache responses
-            virtual void write_response(io_buffer & send_buf, cache::Response response) = 0;
-
-            /// Serialize unknown command error
-            virtual void write_unknown_command_error(io_buffer & send_buf) = 0;
-
-            /// Serialize client error
-            virtual void write_client_error(io_buffer & send_buf, bytes message) = 0;
-
-            /// Serialize server error
-            virtual void write_server_error(io_buffer & send_buf, bytes message) = 0;
+        protected:
+            cache::Cache & cache_api;
+            const cache::HashFunction calc_hash;
         };
 
 
@@ -147,4 +109,4 @@ namespace cachelot {
 
 /// @}
 
-#endif // CACHELOT_PROTO_MEMCACHED_H_INCLUDED
+#endif // CACHELOT_SERVER_MEMCACHED_H_INCLUDED

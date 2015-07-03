@@ -58,6 +58,7 @@ namespace cachelot {
         enum ConversationReply {
             READ_MORE,
             SEND_REPLY,
+            CLOSE_IMMEDIATELY
         };
 
         /// Unified TCP/UDP/Local converation interface

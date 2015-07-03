@@ -11,6 +11,9 @@
 #ifndef CACHELOT_NETWORK_H_INCLUDED
 #  include <server/network.h>
 #endif
+#ifndef CACHELOT_NET_STREAM_CONNECTION_H_INCLUDED
+#  include <server/stream_connection.h>
+#endif
 
 
 /// @ingroup net
@@ -23,19 +26,16 @@ namespace cachelot {
         /**
          * stream_server is an acceptor and connection manager for the `SOCK_STREAM` sockets (TCP/IP and local unix stream socket)
          *
+         * @tparam SocketType -     Socket implementation from the boost::asio
          * @tparam ImplType -       Actual protocol_type Server implementation class, must be derived from stream_server
          *                          stream_server expects that ImplType class provides the following functions:
-         *                          `ConnectionType * new_connection()` to create new connections
-         *                          `delete_connection(ConnectionType *)` to delete broken / expired connections
-         * @tparam ConnectionType - class representing connections of this protocol_type Server
-         *                          stream_server expects that ConnectionType provides function
-         *                          `void run()` that will be called after establishing connection
-         *                           with the client
+         *                          `ConversationType * new_conversation()` to create new conversations
+         *                          `delete_conversation(ConversationType *)` to delete broken / expired conversations
          */
-        template <class ImplType, class ConnectionType>
+        template <class SocketType, class ImplType>
         class stream_server {
-            typedef stream_server<ImplType, ConnectionType> this_type;
-            typedef typename ConnectionType::socket_type socket_type;
+            typedef stream_server<SocketType, ImplType> this_type;
+            typedef SocketType socket_type;
             typedef typename socket_type::protocol_type protocol_type;
         public:
             /// constructor
@@ -67,8 +67,8 @@ namespace cachelot {
             typename protocol_type::acceptor m_acceptor;
         };
 
-        template <class ImplType, class ConnectionType>
-        inline void stream_server<ImplType, ConnectionType>::start(const typename protocol_type::endpoint bind_addr) {
+        template <class SocketType, class ImplType>
+        inline void stream_server<SocketType, ImplType>::start(const typename protocol_type::endpoint bind_addr) {
             m_acceptor.open(bind_addr.protocol());
             error_code ignore_error;
             m_acceptor.set_option(typename protocol_type::acceptor::reuse_address(true), ignore_error);
@@ -77,16 +77,16 @@ namespace cachelot {
             async_accept();
         }
 
-        template <class ImplType, class ConnectionType>
-        inline void stream_server<ImplType, ConnectionType>::async_accept() {
+        template <class SocketType, class ImplType>
+        inline void stream_server<SocketType, ImplType>::async_accept() {
             try {
-                ConnectionType * new_connection = reinterpret_cast<ImplType *>(this)->new_connection();
-                m_acceptor.async_accept(new_connection->socket(),
+                auto new_conversation = static_cast<ImplType *>(this)->new_conversation();
+                m_acceptor.async_accept(new_conversation->socket(),
                     [=](const error_code error) {
                         if (not error) {
-                            new_connection->run();
+                            new_conversation->start();
                         } else {
-                            reinterpret_cast<ImplType *>(this)->delete_connection(new_connection);
+                            static_cast<ImplType *>(this)->delete_conversation(new_conversation);
                         }
                         this->async_accept();
                     });

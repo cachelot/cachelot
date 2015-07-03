@@ -80,10 +80,16 @@ namespace cachelot {
             debug_assert((m_read_pos + num_bytes) <= m_write_pos);
             bytes result(m_data.get() + m_read_pos, num_bytes);
             m_read_pos += num_bytes;
-            if (m_read_pos == m_write_pos) {
-                discard_all();
-            }
+//            if (m_read_pos == m_write_pos) {
+//                reset();
+//            }
             return result;
+        }
+
+        /// make bytes unred again up to `savepoint`
+        void discard_read(const char * const savepoint) noexcept {
+            debug_assert(m_data.get() >= savepoint && savepoint <= m_data.get() + m_read_pos);
+            m_read_pos = savepoint - m_data.get();
         }
 
         /// read all the non-read data
@@ -99,9 +105,9 @@ namespace cachelot {
             if (found) {
                 bytes result(search_range.begin(), found.end());
                 m_read_pos += result.length();
-                if (m_read_pos == m_write_pos) {
-                    discard_all(); // TODO: Possible race condition
-                }
+//                if (m_read_pos == m_write_pos) {
+//                    reset(); // TODO: Possible race condition
+//                }
                 return result;
             }
             return bytes();
@@ -121,14 +127,20 @@ namespace cachelot {
             m_write_pos += num_bytes;
         }
 
+        /// forget written data above the `savepoint`
+        void discard_written(const char * const savepoint) noexcept {
+            debug_assert(m_data.get() >= savepoint && savepoint <= m_data.get() + m_write_pos);
+            m_write_pos = savepoint - m_data.get();
+        }
+
         /// number of unfilled bytes in buffer
         size_t available() const noexcept { return m_capacity - m_write_pos; }
 
-        /// forget all written data
-        void discard_written() noexcept { m_write_pos = m_read_pos; }
-
-        /// reset read and write pos
-        void discard_all() noexcept { m_read_pos = 0; m_write_pos = 0; }
+        /// forgert reading and writing pos
+        void reset() noexcept {
+            m_read_pos = 0u;
+            m_write_pos = 0u;
+        }
 
     private:
         size_t capacity_advice(size_t at_least) const noexcept {
