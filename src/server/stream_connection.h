@@ -138,6 +138,7 @@ namespace cachelot {
                 if (not error) {
                     debug_assert(m_send_buf.non_read() == bytes_sent);
                     m_send_buf.complete_read(bytes_sent);
+                    m_send_buf.cleanup();
                 } else {
                     suicide();
                 }

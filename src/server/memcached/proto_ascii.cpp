@@ -81,8 +81,8 @@ namespace cachelot {
 
 
         net::ConversationReply protocol_handler::handle_data(io_buffer & recv_buf, io_buffer & send_buf) noexcept {
-            auto r_savepoint = recv_buf.begin_read();
-            auto w_savepoint = send_buf.begin_write();
+            auto r_savepoint = recv_buf.read_savepoint();
+            auto w_savepoint = send_buf.write_savepoint();
             try {
                 // read command header <cmd> <key> <args...>\r\n
                 bytes header = recv_buf.try_read_until(CRLF);
@@ -91,34 +91,55 @@ namespace cachelot {
                 }
                 debug_assert(header.endswith(CRLF));
                 header = header.rtrim_n(CRLF.length());
+
+                // determine command name
                 bytes ascii_cmd, args;
                 tie(ascii_cmd, args) = header.split(SPACE);
                 auto command = parse_command_name(ascii_cmd);
+                net::ConversationReply reply;
+                // process the command
                 switch (command) {
+                // retrieval command
+                case cache::GET:
+                case cache::GETS:
+                    reply = handle_retrieval_command(command, args, send_buf);
+                    break;
+                // storage command
                 case cache::ADD:
                 case cache::APPEND:
                 case cache::CAS:
                 case cache::PREPEND:
                 case cache::REPLACE:
                 case cache::SET:
-                    return handle_storage_command(command, args, recv_buf, send_buf);
+                    reply = handle_storage_command(command, args, recv_buf, send_buf);
+                    break;
+                // delete
                 case cache::DELETE:
-                    return handle_delete_command(command, args, send_buf);
+                    reply = handle_delete_command(command, args, send_buf);
+                    break;
+                // arithmetic
                 case cache::INCR:
                 case cache::DECR:
-                    return handle_arithmetic_command(command, args, send_buf);
+                    reply = handle_arithmetic_command(command, args, send_buf);
+                    break;
+                // touch
                 case cache::TOUCH:
-                    return handle_touch_command(command, args, send_buf);
-                case cache::GET:
-                case cache::GETS:
-                    return handle_retrieval_command(command, args, send_buf);
+                    reply = handle_touch_command(command, args, send_buf);
+                    break;
+                // statistics retrieval
                 case cache::STATS:
-                    return handle_statistics_command(command, args, send_buf);
+                    reply = handle_statistics_command(command, args, send_buf);
+                    break;
+                // terminate session
                 case cache::QUIT:
                     return net::CLOSE_IMMEDIATELY;
+                // unknown command
                 default:
                     throw system_error(error::brocken_request);
                 }
+                // receive buffer is processed at this point
+                recv_buf.cleanup();
+                return reply;
 
             } catch (const system_error & syserr) {
                 // discard any written data to write error message instead
@@ -164,47 +185,47 @@ namespace cachelot {
 
 
         inline cache::Command protocol_handler::parse_command_name(bytes command) noexcept {
-            static const auto is_3 = [=](const char literal[4]) -> bool { return *command.nth(1) == literal[1] && *command.nth(2) == literal[2]; };
-            static const auto is_4 = [=](const char literal[5]) -> bool { return is_3(literal) && *command.nth(3) == literal[3]; };
-            static const auto is_5 = [=](const char literal[6]) -> bool { return is_4(literal) && *command.nth(4) == literal[4]; };
-            static const auto is_6 = [=](const char literal[7]) -> bool { return is_5(literal) && *command.nth(5) == literal[5]; };
-            static const auto is_7 = [=](const char literal[8]) -> bool { return is_6(literal) && *command.nth(6) == literal[6]; };
+            static const auto is_3 = [=](const char literal[4], bytes cmd) -> bool {  return cmd[1] == literal[1] && cmd[2] == literal[2]; };
+            static const auto is_4 = [=](const char literal[5], bytes cmd) -> bool {  return is_3(literal, cmd) && cmd[3] == literal[3]; };
+            static const auto is_5 = [=](const char literal[6], bytes cmd) -> bool {  return is_4(literal, cmd) && cmd[4] == literal[4]; };
+            static const auto is_6 = [=](const char literal[7], bytes cmd) -> bool {  return is_5(literal, cmd) && cmd[5] == literal[5]; };
+            static const auto is_7 = [=](const char literal[8], bytes cmd) -> bool {  return is_6(literal, cmd) && cmd[6] == literal[6]; };
 
             if (command) {
                 const char first_char = command[0];
                 switch (command.length()) {
                     case 3:
                         switch (first_char) {
-                            case 'a': return is_3("add") ? cache::ADD : cache::UNDEFINED;
-                            case 'c': return is_3("cas") ? cache::CAS : cache::UNDEFINED;
-                            case 'g': return is_3("get") ? cache::GET : cache::UNDEFINED;
-                            case 's': return is_3("set") ? cache::SET : cache::UNDEFINED;
+                            case 'a': return is_3("add", command) ? cache::ADD : cache::UNDEFINED;
+                            case 'c': return is_3("cas", command) ? cache::CAS : cache::UNDEFINED;
+                            case 'g': return is_3("get", command) ? cache::GET : cache::UNDEFINED;
+                            case 's': return is_3("set", command) ? cache::SET : cache::UNDEFINED;
                             default : return cache::UNDEFINED;
                         }
                     case 4:
                         switch (first_char) {
-                            case 'd': return is_4("decr") ? cache::DECR : cache::UNDEFINED;
-                            case 'g': return is_4("gets") ? cache::GETS : cache::UNDEFINED;
-                            case 'i': return is_4("incr") ? cache::INCR : cache::UNDEFINED;
-                            case 'q': return is_4("quit") ? cache::QUIT : cache::UNDEFINED;
+                            case 'd': return is_4("decr", command) ? cache::DECR : cache::UNDEFINED;
+                            case 'g': return is_4("gets", command) ? cache::GETS : cache::UNDEFINED;
+                            case 'i': return is_4("incr", command) ? cache::INCR : cache::UNDEFINED;
+                            case 'q': return is_4("quit", command) ? cache::QUIT : cache::UNDEFINED;
                             default : return cache::UNDEFINED;
                         }
                     case 5:
                         switch (first_char) {
-                            case 't': return is_5("touch") ? cache::TOUCH : cache::UNDEFINED;
-                            case 's': return is_5("stats") ? cache::STATS : cache::UNDEFINED;
+                            case 't': return is_5("touch", command) ? cache::TOUCH : cache::UNDEFINED;
+                            case 's': return is_5("stats", command) ? cache::STATS : cache::UNDEFINED;
                             default : return cache::UNDEFINED;
                         }
                     case 6:
                         switch (first_char) {
-                            case 'a': return is_6("append") ? cache::APPEND : cache::UNDEFINED;
-                            case 'd': return is_6("delete") ? cache::DELETE : cache::UNDEFINED;
+                            case 'a': return is_6("append", command) ? cache::APPEND : cache::UNDEFINED;
+                            case 'd': return is_6("delete", command) ? cache::DELETE : cache::UNDEFINED;
                             default : return cache::UNDEFINED;
                         }
                     case 7:
                         switch (first_char) {
-                            case 'p': return is_7("prepend") ? cache::PREPEND : cache::UNDEFINED;
-                            case 'r': return is_7("replace") ? cache::REPLACE : cache::UNDEFINED;
+                            case 'p': return is_7("prepend", command) ? cache::PREPEND : cache::UNDEFINED;
+                            case 'r': return is_7("replace", command) ? cache::REPLACE : cache::UNDEFINED;
                             default : return cache::UNDEFINED;
                         }
                     default :
@@ -272,6 +293,8 @@ namespace cachelot {
             bool noreply = parse_noreply(args);
             // read <value>\r\n
             if (recv_buf.non_read() < datalen + CRLF.length()) {
+                // help buffer to grow up to the necessary size
+                recv_buf.ensure_capacity(datalen + CRLF.length() - recv_buf.non_read());
                 throw system_error(error::incomplete_request);
             }
             auto value = bytes(recv_buf.begin_read(), datalen + CRLF.length());
@@ -279,7 +302,7 @@ namespace cachelot {
                 value = value.rtrim_n(CRLF.length()); // strip trailing \r\n
                 recv_buf.complete_read(datalen + CRLF.length());
             } else {
-                throw system_error(error::crlf_expected);
+                throw system_error(error::value_crlf_expected);
             }
             // create new item and execute the cache API
             auto new_item = cache_api.create_item(key, calc_hash(key), value.length(), flags, realtime_expiration, cas_unique);
