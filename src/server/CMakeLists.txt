@@ -11,6 +11,7 @@ set (CACHELOT_SERVER_SOURCES
         memcached/proto_ascii.h
         memcached/proto_ascii.cpp
         memcached/proto_binary.h
+        memcached/proto_binary.cpp
         memcached/servers.h
         memcached/conversation.h
         memcached/memcached.h

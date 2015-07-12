@@ -67,6 +67,7 @@ namespace cachelot {
             typename protocol_type::acceptor m_acceptor;
         };
 
+
         template <class SocketType, class ImplType>
         inline void stream_server<SocketType, ImplType>::start(const typename protocol_type::endpoint bind_addr) {
             m_acceptor.open(bind_addr.protocol());
@@ -76,6 +77,7 @@ namespace cachelot {
             m_acceptor.listen();
             async_accept();
         }
+        
 
         template <class SocketType, class ImplType>
         inline void stream_server<SocketType, ImplType>::async_accept() {

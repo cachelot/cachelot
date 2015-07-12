@@ -64,7 +64,7 @@ namespace cachelot {
         /// Maximum key length in bytes
         static constexpr auto max_key_length = Item::max_key_length;
 
-        /// Single entry in the main cache dict
+        /// Item has both - the key and the value. This is wrapper to use Item pointer as a dict entry
         class ItemDictEntry {
         public:
             ItemDictEntry() = default;
