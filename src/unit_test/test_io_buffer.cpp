@@ -26,9 +26,10 @@ BOOST_AUTO_TEST_CASE(test_io_buffer_basic) {
     buf.reset();
     BOOST_CHECK_EQUAL(buf.non_read(), 0);
     // write 16 bytes of nothing and discard it immediately
+    auto w_savepoint = buf.write_savepoint();
     ptr = buf.begin_write(16);
     buf.complete_write(16);
-    buf.discard_written(ptr);
+    buf.discard_written(w_savepoint);
     // write 16 bytes of 'X'
     ptr = buf.begin_write(16);
     std::memset(ptr, 'X', 16);

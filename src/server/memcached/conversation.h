@@ -12,9 +12,8 @@
 /// @{
 
 #include <server/memcached/memcached.h>
-#include <server/stream_connection.h>
-#include <server/stream_server.h>
-#include <server/datagram_server.h>
+#include <server/socket_stream.h>
+#include <server/socket_datagram.h>
 
 namespace cachelot {
 
