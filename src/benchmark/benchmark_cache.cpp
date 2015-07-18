@@ -56,12 +56,11 @@ public:
     void set(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
-        cache::ItemPtr item;
+        cache::ItemPtr item = nullptr;
         try {
             item = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, forever, /*CAS*/0);
             item->assign_value(v);
-            cache::Response cache_reply;
-            cache_reply = m_cache.do_set(item);
+            m_cache.do_set(item);
             bench_stats.num_set += 1;
         } catch (const std::exception &) {
             bench_stats.num_error += 1;
