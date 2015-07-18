@@ -65,10 +65,15 @@ namespace cachelot {
         };
 
 
-        class DatagramServer : public net::datagram_server<net::udp::socket> {
+
+        typedef StreamServer<net::tcp::socket> TcpServer;
+        typedef StreamServer<net::local::stream_protocol::socket> UnixSocketServer;
+
+
+        class UdpServer : public net::datagram_server<net::udp::socket> {
             typedef net::datagram_server<net::udp::socket> super;
         public:
-            explicit DatagramServer(cache::Cache & the_cache, net::io_service & io_svc)
+            explicit UdpServer(cache::Cache & the_cache, net::io_service & io_svc)
                 : super(io_svc)
                 , cache_api(the_cache) {
             }
@@ -119,10 +124,6 @@ namespace cachelot {
         private:
             cache::Cache & cache_api;
         };
-
-
-        typedef StreamServer<net::tcp::socket> tcp_server;
-        typedef StreamServer<net::local::stream_protocol::socket> unix_socket_server;
 
 
     } // namespace memcached

@@ -102,18 +102,26 @@ int main(int argc, char * argv[]) {
         setup_signals();
 
         // TCP
-        std::unique_ptr<memcached::tcp_server> memcached_tcp = nullptr;
+        std::unique_ptr<memcached::TcpServer> memcached_tcp = nullptr;
         if (settings.net.has_TCP) {
-            memcached_tcp.reset(new memcached::tcp_server(*the_cache, reactor));
+            memcached_tcp.reset(new memcached::TcpServer(*the_cache, reactor));
             net::tcp::endpoint bind_addr(net::ip::address_v4::any(), settings.net.TCP_port);
             memcached_tcp->start(bind_addr);
         }
 
         // Unix local socket
-        std::unique_ptr<memcached::unix_socket_server> memcached_unix_socket = nullptr;
+        std::unique_ptr<memcached::UnixSocketServer> memcached_unix_socket = nullptr;
         if (settings.net.has_unix_socket) {
-            memcached_unix_socket.reset(new memcached::unix_socket_server(*the_cache, reactor));
+            memcached_unix_socket.reset(new memcached::UnixSocketServer(*the_cache, reactor));
             memcached_unix_socket->start(settings.net.unix_socket);
+        }
+
+        // UDP
+        std::unique_ptr<memcached::UdpServer> memcached_udp = nullptr;
+        if (settings.net.has_UDP) {
+            memcached_udp.reset(new memcached::UdpServer(*the_cache, reactor));
+            net::udp::endpoint bind_addr(net::ip::address_v4::any(), settings.net.UDP_port);
+            memcached_udp->start(bind_addr);
         }
 
         error_code error;
