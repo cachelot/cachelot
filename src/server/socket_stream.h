@@ -108,7 +108,7 @@ namespace cachelot {
                         m_recv_buf.complete_write(bytes_received);
                         ConversationReply reply = handle_data(m_recv_buf, m_send_buf);
                         switch (reply) {
-                        case SEND_REPLY:
+                        case SEND_REPLY_AND_READ:
                             async_send_all();
                             // there is no `break` so we'll continue receive
                         case READ_MORE:

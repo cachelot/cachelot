@@ -57,7 +57,7 @@ namespace cachelot {
 
         enum ConversationReply {
             READ_MORE,
-            SEND_REPLY,
+            SEND_REPLY_AND_READ,
             CLOSE_IMMEDIATELY
         };
 

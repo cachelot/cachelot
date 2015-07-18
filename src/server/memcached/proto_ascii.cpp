@@ -188,7 +188,7 @@ namespace cachelot {
                     send_buf << CLIENT_ERROR << SPACE << errmsg << CRLF;
                     // ill-formed packet, swallow recv_buf data
                     recv_buf.reset();
-                    return net::SEND_REPLY;
+                    return net::SEND_REPLY_AND_READ;
                 } else {
                     // server error
                     switch (syserr.code().value()) {
@@ -200,23 +200,23 @@ namespace cachelot {
                         // ill-formed packet, swallow recv_buf data
                         recv_buf.reset();
                         send_buf << ERROR << CRLF;
-                        return net::SEND_REPLY;
+                        return net::SEND_REPLY_AND_READ;
                     case error::numeric_convert:
                     case error::numeric_overflow:
                         // numeric errors are considered as a client fault
                         send_buf << CLIENT_ERROR << SPACE << errmsg << CRLF;
-                        return net::SEND_REPLY;
+                        return net::SEND_REPLY_AND_READ;
                     default:
                         // internal server error
                         send_buf << SERVER_ERROR << SPACE << errmsg << CRLF;
-                        return net::SEND_REPLY;
+                        return net::SEND_REPLY_AND_READ;
                     }
                 }
             } catch (const std::exception & exc) {
                 // discard any written data to write error message instead
                 send_buf.discard_written(w_savepoint);
                 send_buf << SERVER_ERROR << SPACE << exc.what() << CRLF;
-                return net::SEND_REPLY;
+                return net::SEND_REPLY_AND_READ;
             }
         }
 
@@ -253,7 +253,7 @@ namespace cachelot {
                 }
             } while (not args.empty());
             send_buf << END << CRLF;
-            return net::SEND_REPLY;
+            return net::SEND_REPLY_AND_READ;
         }
 
 
@@ -326,7 +326,7 @@ namespace cachelot {
             } else {
                 send_buf << response << CRLF;
             }
-            return net::SEND_REPLY;
+            return net::SEND_REPLY_AND_READ;
         }
 
 
@@ -359,14 +359,14 @@ namespace cachelot {
 
             #undef SERIALIZE_STAT
             send_buf << END << CRLF;
-            return net::SEND_REPLY;
+            return net::SEND_REPLY_AND_READ;
         }
 
 
         inline net::ConversationReply reply_with_response(io_buffer & send_buf, cache::Response response, bool noreply) {
             if (not noreply) {
                 send_buf << response << CRLF;
-                return net::SEND_REPLY;
+                return net::SEND_REPLY_AND_READ;
             } else {
                 return net::READ_MORE;
             }
