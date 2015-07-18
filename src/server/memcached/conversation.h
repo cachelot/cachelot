@@ -65,41 +65,8 @@ namespace cachelot {
         };
 
 
-        class DatagramConversation {
-        public:
-            DatagramConversation(cache::Cache & the_cache, net::io_service & io_svc);
-        private:
-            cache::Cache & cache_api;
-            /// UDP Protocol header
-            struct udp_frame_header {
-                static constexpr size_t size = 8;
-                uint16 request_id;
-                uint16 sequence_no;
-                uint16 packets_in_msg;
-                uint16 reserved;
-
-                static udp_frame_header fromBytes(bytes raw);
-            };
-        };
-
-        inline DatagramConversation::udp_frame_header DatagramConversation::udp_frame_header::fromBytes(bytes raw) {
-            debug_assert(unaligned_bytes(raw.begin(), alignof(uint16)) == 0);
-            if (raw.length() < udp_frame_header::size) {
-                throw system_error(error::make_error_code(error::udp_header_size));
-            }
-            uint16 request_id = ntohs(*reinterpret_cast<const uint16 *>(raw.begin() + sizeof(uint16) * 0));
-            uint16 sequence_no = ntohs(*reinterpret_cast<const uint16 *>(raw.begin() + sizeof(uint16) * 1));
-            uint16 packets_in_msg = ntohs(*reinterpret_cast<const uint16 *>(raw.begin() + sizeof(uint16) * 2));
-            uint16 reserved = *reinterpret_cast<const uint16 *>(raw.begin() + sizeof(uint16) * 3);
-            if (reserved != 0) {
-                throw system_error(error::make_error_code(error::udp_proto_reserverd));
-            }
-            return udp_frame_header { request_id, sequence_no, packets_in_msg, reserved };
-        }
-
-
-        class DatagramServer : public net::datagram_server<net::udp::socket, DatagramConversation> {
-            typedef net::datagram_server<net::udp::socket, DatagramConversation> super;
+        class DatagramServer : public net::datagram_server<net::udp::socket> {
+            typedef net::datagram_server<net::udp::socket> super;
         public:
             explicit DatagramServer(cache::Cache & the_cache, net::io_service & io_svc)
                 : super(io_svc)
@@ -107,18 +74,51 @@ namespace cachelot {
             }
 
         protected:
+            net::ConversationReply handle_data(io_buffer & recv_buf, io_buffer & send_buf) noexcept override {
+                auto w_savepoint = send_buf.write_savepoint();
+                try {
+                    handle_udp_frame_header(recv_buf, send_buf);
+                    return handle_received_data(recv_buf, send_buf, cache_api);
+                } catch (const std::exception & exc) {
+                    send_buf.discard_written(w_savepoint);
+                    return net::CLOSE_IMMEDIATELY;
+                }
+            }
 
-            DatagramConversation * new_conversation() override;
+            void handle_udp_frame_header(io_buffer & recv_buf, io_buffer & send_buf) {
+                static constexpr size_t udp_frame_header_size = 8;
+                // UDP frame header is:
+                // 0               16               32               48               64
+                // +----------------+----------------+----------------+----------------+
+                // |  request id    |   sequence_no  | packets_in_msg |    reserved    |
+                // +----------------+----------------+----------------+----------------+
+                // All number are unsigned 16 bit integers in network byte order
 
-            void delete_conversation(DatagramConversation *)  override;
+                if (recv_buf.non_read() < udp_frame_header_size) {
+                    throw system_error(error::udp_header_size);
+                }
+                bytes raw = bytes(recv_buf.begin_read(), udp_frame_header_size);
+                recv_buf.complete_read(udp_frame_header_size);
 
+                uint16 sequence_no = ntohs(*reinterpret_cast<const uint16 *>(raw.begin() + sizeof(uint16) * 1));
+                uint16 packets_in_msg = ntohs(*reinterpret_cast<const uint16 *>(raw.begin() + sizeof(uint16) * 2));
+                if (sequence_no != 0 || packets_in_msg > 1) {
+                    // multi-frame requests are not supported
+                    throw system_error(error::not_implemented);
+                }
+                uint16 reserved = *reinterpret_cast<const uint16 *>(raw.begin() + sizeof(uint16) * 3);
+                if (reserved != 0) {
+                    throw system_error(error::udp_proto_reserverd);
+                }
+                // write UDP header back to the response
+                auto dest = send_buf.begin_write(raw.length());
+                std::memcpy(dest, raw.begin(), raw.length());
+                send_buf.complete_write(raw.length());
+            }
 
         private:
             cache::Cache & cache_api;
         };
-
-
-
 
 
         typedef StreamServer<net::tcp::socket> tcp_server;

@@ -25,9 +25,9 @@ namespace cachelot {
         x(out_of_memory,        "Out of memory")                    \
         x(numeric_convert,      "Numeric conversion error")         \
         x(numeric_overflow,     "Numeric value is out of range")    \
-        x(not_implemented,      "Not implemented")                  \
+        x(not_implemented,      "Operation does not supported")     \
         x(incomplete_request,   "Request packet is incomplete")     \
-        x(brocken_request,      "Request packet is brocken")
+        x(broken_request,       "Request packet is broken")
 
     /// system error handling
     using boost::system::error_code;      // boost::error is used rather than std's because it is used by boost::asio

@@ -173,7 +173,7 @@ namespace cachelot {
                     return net::CLOSE_IMMEDIATELY;
                 // unknown command
                 default:
-                    throw system_error(error::brocken_request);
+                    throw system_error(error::broken_request);
                 }
                 // receive buffer is processed at this point
                 recv_buf.cleanup();
@@ -196,7 +196,7 @@ namespace cachelot {
                         // rollback read position, start over when more data will come
                         recv_buf.discard_read(r_savepoint);
                         return net::READ_MORE;
-                    case error::brocken_request:
+                    case error::broken_request:
                         // ill-formed packet, swallow recv_buf data
                         recv_buf.reset();
                         send_buf << ERROR << CRLF;
