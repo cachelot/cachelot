@@ -115,6 +115,12 @@ class Client(object):
     def replace(self, key, value, expire_time=0):
         return self.__store('replace', key, value, expire_time) == 'STORED'
 
+    def append(self, key, value, expire_time=0):
+        return self.__store('append', key, value, expire_time) == 'STORED'
+
+    def prepend(self, key, value, expire_time=0):
+        return self.__store('prepend', key, value, expire_time) == 'STORED'
+
     def cas(self, key, value, expire_time, cas_unique):
         reply = self.__store('cas', key, value, expire_time, cas_unique)
         if reply == 'STORED':
@@ -181,7 +187,7 @@ class Client(object):
         self.__expect(response, 'END')
 
     def __store(self, command, key, value, expire_time, cas_unique=None):
-        assert command in ['set', 'add', 'replace', 'cas'], 'unsupported command: ' + command
+        assert command in ['set', 'add', 'replace', 'cas', 'append', 'prepend'], 'unsupported command: ' + command
         flags, data = self.__serialize(value)
         data_length = len(data)
         command_str = '%(command)s %(key)s %(flags)d %(expire_time)d %(data_length)d'

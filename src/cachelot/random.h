@@ -46,7 +46,7 @@ namespace cachelot {
         "abcdefghijklmnopqrstuvwxyz"
         "!?@#$%^&*()[]<>/|\\_+=-";
         random_int<size_t> rnd_gen(0, sizeof(charset) - 1);
-        auto randchar = [=]() -> char {
+        auto randchar = [&]() -> char {
             return charset[ rnd_gen() ];
         };
         random_int<size_t> rnd_length(minlen, maxlen);

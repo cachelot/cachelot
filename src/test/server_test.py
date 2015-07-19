@@ -24,7 +24,9 @@ def CHECK(condition):
 
 def CHECK_EQ(v1, v2):
     if v1 != v2:
-        raise TestFailedError(str(v1) + ' != ' + str(v2))
+        v1 = str(v1)[:30]
+        v2 = str(v2)[:30]
+        raise TestFailedError(v1 + ' != ' + v2)
 
 
 def CHECK_EXC(fcn, exc):
@@ -44,12 +46,12 @@ def random_key():
     
 
 def random_value():
-    length = random.randint(1, 524288)
+    length = random.randint(1, 100000)
     return ''.join(chr(random.randint(0, 254)) for _ in range(length))
 
 
 def basic_storage_test(mc):
-    log.info("set/get/add/delete/replace commands")
+    log.info("set/get/add/delete/replace/append/prepend commands")
     key1 = random_key()
     value1 = random_value()
     # replace, add, get, delete
@@ -61,6 +63,19 @@ def basic_storage_test(mc):
     CHECK_EQ( mc.replace(key1, value1), True )
     CHECK_EQ( mc.get(key1), value1 )
     CHECK_EQ( mc.delete(key1), True )
+    CHECK_EXC( lambda: mc.delete(key1), memcached.KeyNotFoundError )
+    # append / prepend
+    k = random_key()
+    v = random_value()
+    mc.set(k, v)
+    v1 = random_value()
+    mc.append(k, v1)
+    v += v1
+    CHECK_EQ( mc.get(k), v )
+    v1 = random_value()
+    mc.prepend(k, v1)
+    v = v1 + v
+    CHECK_EQ( mc.get(k), v )
     log.info("success")
    
 
@@ -89,6 +104,7 @@ def basic_cas_test(mc):
     mc.set(k, v)
     CHECK_EQ( mc.cas(k, v, 0, ver), False )  # cas after set shall fail
     CHECK_EQ( mc.get(k), v )
+
     log.info("success")
 
 
