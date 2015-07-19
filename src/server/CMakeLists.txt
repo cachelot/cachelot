@@ -1,16 +1,20 @@
 set (CACHELOT_SERVER_SOURCES
-        async_connection.h
         io_buffer.h
-        io_serialization.h
-        main.cpp
         network.h
+        socket_stream.h
+        socket_datagram.h
         settings.cpp
         settings.h
-        tcp_server.h
-        unix_socket_server.h
-        memcached/memcached.h
-        memcached/proto_text.h
+        memcached/error.h
+        memcached/proto_ascii.h
+        memcached/proto_ascii.cpp
+        memcached/proto_binary.h
+        memcached/proto_binary.cpp
         memcached/servers.h
+        memcached/conversation.h
+        memcached/memcached.h
+        memcached/memcached.cpp
+        main.cpp
 )
 
 add_executable (cachelotd ${CACHELOT_SERVER_SOURCES})

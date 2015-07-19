@@ -49,8 +49,8 @@ namespace cachelot {
             typedef ExpirationClock clock;
             typedef clock::time_point expiration_time_point;
             typedef uint64 version_type;
-            static constexpr size_t max_key_length = 250; // ! key size is limited to uint8
-            static constexpr size_t max_value_length = std::numeric_limits<uint32>::max(); // ! key size is limited to uint8
+            static constexpr uint8 max_key_length = 250; // ! key size is limited to uint8
+            static constexpr uint32 max_value_length = std::numeric_limits<uint32>::max(); // ! value size is limited to uint32
         private:
             // Important! declaration order affects item size
             version_type m_version; // version of this item

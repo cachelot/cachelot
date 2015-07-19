@@ -8,8 +8,8 @@
 //  see LICENSE file
 
 
-#include <server/tcp_server.h>
-#include <server/unix_socket_server.h>
+#include <server/stream_server.h>
+#include <server/datagram_server.h>
 #include <server/memcached/proto_text.h>
 
 /**
@@ -27,8 +27,8 @@ namespace cachelot {
     typedef text_protocol_handler<tcp::socket> tcp_text_protocol_handler;
 
     /// TCP based memcached server handling text protocol
-    class text_tcp_server : public tcp_server<text_tcp_server, tcp_text_protocol_handler> {
-        typedef tcp_server<text_tcp_server, tcp_text_protocol_handler> super;
+    class text_tcp_server : public stream_server<text_tcp_server, tcp_text_protocol_handler> {
+        typedef stream_server<text_tcp_server, tcp_text_protocol_handler> super;
     public:
         text_tcp_server(io_service & ios, cache::Cache & the_cache)
             : super(ios)
@@ -56,15 +56,15 @@ namespace cachelot {
     typedef text_protocol_handler<local::stream_protocol::socket> unix_text_protocol_handler;
 
     /// Unix socket based memcached server handling text protocol
-    class text_unix_stream_server : public unix_stream_server<text_unix_stream_server, unix_text_protocol_handler> {
-        typedef unix_stream_server<text_unix_stream_server, unix_text_protocol_handler> super;
+    class text_local_socket_server : public stream_server<text_local_socket_server, unix_text_protocol_handler> {
+        typedef stream_server<text_local_socket_server, unix_text_protocol_handler> super;
     public:
-        explicit text_unix_stream_server(asio::io_service & ios, cache::Cache & the_cache)
+        explicit text_local_socket_server(asio::io_service & ios, cache::Cache & the_cache)
             : super(ios)
             , cache(the_cache) {
         }
 
-        ~text_unix_stream_server() {
+        ~text_local_socket_server() {
             super::stop();
         }
 

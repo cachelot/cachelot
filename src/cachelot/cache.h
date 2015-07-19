@@ -64,7 +64,7 @@ namespace cachelot {
         /// Maximum key length in bytes
         static constexpr auto max_key_length = Item::max_key_length;
 
-        /// Single entry in the main cache dict
+        /// Item has both - the key and the value. This is wrapper to use Item pointer as a dict entry
         class ItemDictEntry {
         public:
             ItemDictEntry() = default;
@@ -136,24 +136,16 @@ namespace cachelot {
             /**
              * `get` -  retrieve item
              *
-             * @tparam Callback - callback will be called when request is completed
-             *
-             * Callback must have following signature:
-             * @code
-             *    void on_get(error_code error, bool found, bytes value, opaque_flags_type flags, version_type version)
-             * @endcode
-             * @warning Key/value pointers may not be valid outside of callback.
+             * @return pointer to the Item or `nullptr` if none was found
+             * @warning pointer is only valid *before* the next cache API call
              */
-            template <typename Callback>
-            void do_get(const bytes key, const hash_type hash, Callback on_get) noexcept;
+            ItemPtr do_get(const bytes key, const hash_type hash) noexcept;
 
 
             /**
              * @class doxygen_store_command
              *
-             * @return `tuple<error_code, Response>`
-             *  - error: indicates that Item has *not* stored because of an error (the most likely out of memory)
-             *  - Response: one of a possible cache responses
+             * @return Response: one of a possible cache responses
              * TODO: responses
              */
 
@@ -163,52 +155,52 @@ namespace cachelot {
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_storage(Command cmd, ItemPtr item) noexcept;
+            Response do_storage(Command cmd, ItemPtr item);
 
             /**
              * `set` - store item unconditionally
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_set(ItemPtr item) noexcept;
+            Response do_set(ItemPtr item);
 
             /**
              * `add` - store non-existing item
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_add(ItemPtr item) noexcept;
+            Response do_add(ItemPtr item);
 
             /**
              * `replace` - modify existing item
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_replace(ItemPtr item) noexcept;
+            Response do_replace(ItemPtr item);
 
             /**
              * `cas` - compare-and-swap items
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_cas(ItemPtr item) noexcept;
+            Response do_cas(ItemPtr item);
 
             /**
              * Extend (`prepend` or `append`) existing item with the new data
              *
              * @copydoc doxygen_store_command
              */
-            tuple<error_code, Response> do_extend(Command cmd, ItemPtr item) noexcept;
+            Response do_extend(Command cmd, ItemPtr item);
 
             /**
              * `delete` - delete existing item
              */
-            tuple<error_code, Response> do_delete(const bytes key, const hash_type hash) noexcept;
+            Response do_delete(const bytes key, const hash_type hash) noexcept;
 
             /**
              * `touch` - validate item and prolong its lifetime
              */
-            tuple<error_code, Response> do_touch(const bytes key, const hash_type hash, seconds expires) noexcept;
+            Response do_touch(const bytes key, const hash_type hash, seconds expires) noexcept;
 
             /**
              * `incr` or `decr` value by `delta`
@@ -216,12 +208,12 @@ namespace cachelot {
              * Decrement operation handle underflow and set value to zero if `delta` is greater than item value
              * Owerflow in `incr` command is hardware-dependent integer overflow
              */
-            tuple<error_code, Response, uint64> do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta) noexcept;
+            tuple<Response, uint64> do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta);
 
             /**
              * Create new Item using memalloc
              */
-            tuple<error_code, ItemPtr> create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type version) noexcept;
+            ItemPtr create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type version);
 
             /**
              * Free existing Item and return memory to the memalloc
@@ -288,8 +280,7 @@ namespace cachelot {
         }
 
 
-        template <typename Callback>
-        inline void Cache::do_get(const bytes key, const hash_type hash, Callback on_get) noexcept {
+        inline ItemPtr Cache::do_get(const bytes key, const hash_type hash) noexcept {
             STAT_INCR(cache.cmd_get, 1);
             // try to retrieve existing item
             bool found; iterator at; bool readonly = true;
@@ -299,15 +290,15 @@ namespace cachelot {
                 auto item = at.value();
                 debug_assert(item->key() == key);
                 debug_assert(item->hash() == hash);
-                on_get(error::success, true, item->value(), item->opaque_flags(), item->version());
+                return item;
             } else {
                 STAT_INCR(cache.get_misses, 1);
-                on_get(error::success, false, bytes(), opaque_flags_type(), version_type());
+                return ItemPtr(nullptr);
             }
         }
 
 
-        inline tuple<error_code, Response> Cache::do_storage(Command cmd, ItemPtr item) noexcept {
+        inline Response Cache::do_storage(Command cmd, ItemPtr item) {
             switch (cmd) {
             case SET:
                 return do_set(item);
@@ -322,94 +313,78 @@ namespace cachelot {
                 return do_extend(cmd, item);
             default:
                 debug_assert(false);
-                return make_tuple(error::unknown_error, NOT_A_RESPONSE);
+                throw system_error(error::unknown_error);
             }
         }
 
 
 
-        inline tuple<error_code, Response> Cache::do_set(ItemPtr item) noexcept {
-            try {
-                STAT_INCR(cache.cmd_set, 1);
-                bool found; iterator at;
-                tie(found, at) = retrieve_item(item->key(), item->hash());
-                if (not found) {
-                    STAT_INCR(cache.set_new, 1);
-                    m_dict.insert(at, item->key(), item->hash(), item);
-                } else {
-                    STAT_INCR(cache.set_existing, 1);
+        inline Response Cache::do_set(ItemPtr item) {
+            STAT_INCR(cache.cmd_set, 1);
+            bool found; iterator at;
+            tie(found, at) = retrieve_item(item->key(), item->hash());
+            if (not found) {
+                STAT_INCR(cache.set_new, 1);
+                m_dict.insert(at, item->key(), item->hash(), item);
+            } else {
+                STAT_INCR(cache.set_existing, 1);
+                replace_item_at(at, item);
+            }
+            return STORED;
+        }
+
+
+        inline Response Cache::do_add(ItemPtr item) {
+            bool found; iterator at;
+            STAT_INCR(cache.cmd_add, 1);
+            tie(found, at) = retrieve_item(item->key(), item->hash());
+            if (not found) {
+                m_dict.insert(at, item->key(), item->hash(), item);
+                STAT_INCR(cache.add_stored, 1);
+                return STORED;
+            } else {
+                STAT_INCR(cache.add_not_stored, 1);
+                return NOT_STORED;
+            }
+        }
+
+
+        inline Response Cache::do_replace(ItemPtr item) {
+            bool found; iterator at;
+            STAT_INCR(cache.cmd_replace, 1);
+            tie(found, at) = retrieve_item(item->key(), item->hash());
+            if (found) {
+                replace_item_at(at, item);
+                STAT_INCR(cache.replace_stored, 1);
+                return STORED;
+            } else {
+                STAT_INCR(cache.replace_not_stored, 1);
+                return NOT_STORED;
+            }
+        }
+
+
+        inline Response Cache::do_cas(ItemPtr item) {
+            bool found; iterator at;
+            STAT_INCR(cache.cmd_cas, 1);
+            tie(found, at) = retrieve_item(item->key(), item->hash());
+            if (found) {
+                if (item->version() == at.value()->version()) {
                     replace_item_at(at, item);
-                }
-                return make_tuple(error::success, STORED);
-            } catch (const std::bad_alloc &) {
-                return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
-            }
-        }
-
-
-        inline tuple<error_code, Response> Cache::do_add(ItemPtr item) noexcept {
-            bool found; iterator at;
-            try {
-                STAT_INCR(cache.cmd_add, 1);
-                tie(found, at) = retrieve_item(item->key(), item->hash());
-                if (not found) {
-                    m_dict.insert(at, item->key(), item->hash(), item);
-                    STAT_INCR(cache.add_stored, 1);
-                    return make_tuple(error::success, STORED);
+                    STAT_INCR(cache.cas_hits, 1);
+                    return STORED;
                 } else {
-                    STAT_INCR(cache.add_not_stored, 1);
-                    return make_tuple(error::success, NOT_STORED);
+                    STAT_INCR(cache.cas_badval, 1);
+                    return EXISTS;
                 }
-            } catch (const std::bad_alloc &) {
-                return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
+            } else {
+                STAT_INCR(cache.cas_misses, 1);
+                return NOT_FOUND;
             }
         }
 
 
-        inline tuple<error_code, Response> Cache::do_replace(ItemPtr item) noexcept {
-            bool found; iterator at;
-            try {
-                STAT_INCR(cache.cmd_replace, 1);
-                tie(found, at) = retrieve_item(item->key(), item->hash());
-                if (found) {
-                    replace_item_at(at, item);
-                    STAT_INCR(cache.replace_stored, 1);
-                    return make_tuple(error::success, STORED);
-                } else {
-                    STAT_INCR(cache.replace_not_stored, 1);
-                    return make_tuple(error::success, NOT_STORED);
-                }
-            } catch (const std::bad_alloc &) {
-                return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
-            }
-        }
-
-
-        inline tuple<error_code, Response> Cache::do_cas(ItemPtr item) noexcept {
-            bool found; iterator at;
-            try {
-                STAT_INCR(cache.cmd_cas, 1);
-                tie(found, at) = retrieve_item(item->key(), item->hash());
-                if (found) {
-                    if (item->version() == at.value()->version()) {
-                        replace_item_at(at, item);
-                        STAT_INCR(cache.cas_hits, 1);
-                        return make_tuple(error::success, STORED);
-                    } else {
-                        STAT_INCR(cache.cas_badval, 1);
-                        return make_tuple(error::success, EXISTS);
-                    }
-                } else {
-                    STAT_INCR(cache.cas_misses, 1);
-                    return make_tuple(error::success, NOT_FOUND);
-                }
-            } catch (const std::bad_alloc &) {
-                return make_tuple(error::out_of_memory, NOT_A_RESPONSE);
-            }
-        }
-
-
-        inline tuple<error_code, Response> Cache::do_extend(Command cmd, ItemPtr piece) noexcept {
+        inline Response Cache::do_extend(Command cmd, ItemPtr piece) {
             if (cmd == APPEND) {
                 STAT_INCR(cache.cmd_append, 1);
             } else {
@@ -418,48 +393,41 @@ namespace cachelot {
             }
             bool found; iterator at;
             Response response = NOT_A_RESPONSE;
-            error_code error = error::success;
-            try {
-                tie(found, at) = retrieve_item(piece->key(), piece->hash());
-                if (found) {
-                    auto old_item = at.value();
-                    const auto new_value_size = old_item->value().length() + piece->value().length();
-                    // do not evict existing items to avoid accidentally free the `piece` or the `old_item`
-                    auto memory = m_allocator.alloc_or_evict(Item::CalcSizeRequired(old_item->key(), new_value_size), false, [=](void *){});
-                    if (memory != nullptr) {
-                        auto new_item = new (memory) Item(old_item->key(), old_item->hash(), new_value_size, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
-                        if (cmd == APPEND) {
-                            new_item->assign_compose(old_item->value(), piece->value());
-                            STAT_INCR(cache.append_hits, 1);
-                        } else {
-                            debug_assert(cmd == PREPEND);
-                            new_item->assign_compose(piece->value(), old_item->value());
-                            STAT_INCR(cache.prepend_hits, 1);
-                        }
-                        replace_item_at(at, new_item);
-                        response = STORED;
-                    } else {
-                        throw std::bad_alloc();
-                    }
-                } else {
+            tie(found, at) = retrieve_item(piece->key(), piece->hash());
+            if (found) {
+                auto old_item = at.value();
+                const auto new_value_size = old_item->value().length() + piece->value().length();
+                // do not evict existing items to avoid accidentally free the `piece` or the `old_item`
+                auto memory = m_allocator.alloc_or_evict(Item::CalcSizeRequired(old_item->key(), new_value_size), false, [=](void *){});
+                if (memory != nullptr) {
+                    auto new_item = new (memory) Item(old_item->key(), old_item->hash(), new_value_size, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
                     if (cmd == APPEND) {
-                        STAT_INCR(cache.append_misses, 1);
+                        new_item->assign_compose(old_item->value(), piece->value());
+                        STAT_INCR(cache.append_hits, 1);
                     } else {
                         debug_assert(cmd == PREPEND);
-                        STAT_INCR(cache.prepend_misses, 1);
+                        new_item->assign_compose(piece->value(), old_item->value());
+                        STAT_INCR(cache.prepend_hits, 1);
                     }
-                    response = NOT_FOUND;
+                    replace_item_at(at, new_item);
+                    response = STORED;
+                } else {
+                    throw system_error(error::out_of_memory);
                 }
-            } catch (const std::bad_alloc &) {
-                error = error::out_of_memory;
-                response = NOT_A_RESPONSE;
+            } else {
+                if (cmd == APPEND) {
+                    STAT_INCR(cache.append_misses, 1);
+                } else {
+                    debug_assert(cmd == PREPEND);
+                    STAT_INCR(cache.prepend_misses, 1);
+                }
+                response = NOT_FOUND;
             }
-            destroy_item(piece);
-            return make_tuple(error, response);
+            return response;
         }
 
 
-        inline tuple<error_code, Response> Cache::do_delete(const bytes key, const hash_type hash) noexcept {
+        inline Response Cache::do_delete(const bytes key, const hash_type hash) noexcept {
             STAT_INCR(cache.cmd_delete, 1);
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
@@ -468,16 +436,16 @@ namespace cachelot {
                 m_dict.remove(at);
                 destroy_item(item);
                 STAT_INCR(cache.delete_hits, 1);
-                return make_tuple(error::success, DELETED);
+                return DELETED;
             } else {
                 STAT_INCR(cache.delete_misses, 1);
-                return make_tuple(error::success, NOT_FOUND);
+                return NOT_FOUND;
             }
 
         }
 
 
-        inline tuple<error_code, Response> Cache::do_touch(const bytes key, const hash_type hash, seconds expires) noexcept {
+        inline Response Cache::do_touch(const bytes key, const hash_type hash, seconds expires) noexcept {
             STAT_INCR(cache.cmd_touch, 1);
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
@@ -486,74 +454,65 @@ namespace cachelot {
                 m_allocator.touch(item); // mark item as recent in LRU list
                 item->touch(time_from(expires)); // update lifetime
                 STAT_INCR(cache.touch_hits, 1);
-                return make_tuple(error::success, TOUCHED);
+                return TOUCHED;
             } else {
                 STAT_INCR(cache.touch_misses, 1);
-                return make_tuple(error::success, NOT_FOUND);
+                return NOT_FOUND;
             }
         }
 
 
-        inline tuple<error_code, Response, uint64> Cache::do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta) noexcept {
+        inline tuple<Response, uint64> Cache::do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta) {
             if (cmd == INCR) {
                 STAT_INCR(cache.cmd_incr, 1);
             } else {
                 debug_assert(cmd == DECR);
                 STAT_INCR(cache.cmd_decr, 1);
             }
-            try {
-                bool found; iterator at;
-                tie(found, at) = retrieve_item(key, hash);
-                if (not found) {
-                    if (cmd == INCR) {
-                        STAT_INCR(cache.incr_misses, 1);
-                    } else {
-                        debug_assert(cmd == DECR);
-                        STAT_INCR(cache.decr_misses, 1);
-                    }
-                    return make_tuple(error::success, NOT_FOUND, 0ull);
-                }
-                // retrieve item value stored as an ASCII string
-                auto old_item = at.value();
-                auto old_ascii_value = at.value()->value();
-                auto old_int_value = str_to_int<uint64>(old_ascii_value.begin(), old_ascii_value.end());
-                // process arithmetic command
-                uint64 new_int_value = 0;
+            bool found; iterator at;
+            tie(found, at) = retrieve_item(key, hash);
+            if (not found) {
                 if (cmd == INCR) {
-                    new_int_value = old_int_value + delta;
-                    STAT_INCR(cache.incr_hits, 1);
+                    STAT_INCR(cache.incr_misses, 1);
                 } else {
                     debug_assert(cmd == DECR);
-                    new_int_value = (old_int_value >= delta) ? old_int_value - delta : 0;
-                    STAT_INCR(cache.decr_hits, 1);
+                    STAT_INCR(cache.decr_misses, 1);
                 }
-                // store new value as an ASCII string
-                AsciiIntegerBuffer new_ascii_value;
-                const auto new_ascii_value_length = int_to_str(new_int_value, new_ascii_value);
-                if (new_ascii_value_length <= old_ascii_value.length()) {
-                    // re-assign value inplace
-                    at.value()->assign_value(bytes(new_ascii_value, new_ascii_value_length));
-                    at.value()->new_version_of(at.value()); // increase version
-                } else {
-                    // create new item to hold value including zero terminator
-                    error_code error; ItemPtr new_item;
-                    tie(error, new_item) = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
-                    if (error) {
-                        throw system_error(error);
-                    }
-                    new_item->assign_value(bytes(new_ascii_value, new_ascii_value_length));
-                    replace_item_at(at, new_item);
-                }
-                return make_tuple(error::success, STORED, new_int_value);
-            } catch(const system_error & e) {
-                return make_tuple(e.code(), NOT_A_RESPONSE, 0ull);
-            } catch(const std::bad_alloc &) {
-                return make_tuple(error::out_of_memory, NOT_A_RESPONSE, 0ull);
+                return make_tuple(NOT_FOUND, 0ull);
             }
+            // retrieve item value stored as an ASCII string
+            auto old_item = at.value();
+            auto old_ascii_value = at.value()->value();
+            auto old_int_value = str_to_int<uint64>(old_ascii_value.begin(), old_ascii_value.end());
+            // process arithmetic command
+            uint64 new_int_value = 0;
+            if (cmd == INCR) {
+                new_int_value = old_int_value + delta;
+                STAT_INCR(cache.incr_hits, 1);
+            } else {
+                debug_assert(cmd == DECR);
+                new_int_value = (old_int_value >= delta) ? old_int_value - delta : 0;
+                STAT_INCR(cache.decr_hits, 1);
+            }
+            // store new value as an ASCII string
+            AsciiIntegerBuffer new_ascii_value;
+            const auto new_ascii_value_length = int_to_str(new_int_value, new_ascii_value);
+            if (new_ascii_value_length <= old_ascii_value.length()) {
+                // re-assign value inplace
+                at.value()->assign_value(bytes(new_ascii_value, new_ascii_value_length));
+                at.value()->new_version_of(at.value()); // increase version
+            } else {
+                // create new item to hold value including zero terminator
+                ItemPtr new_item;
+                new_item = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
+                new_item->assign_value(bytes(new_ascii_value, new_ascii_value_length));
+                replace_item_at(at, new_item);
+            }
+            return make_tuple(STORED, new_int_value);
         }
 
 
-        inline tuple<error_code, ItemPtr> Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type version) noexcept {
+        inline ItemPtr Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type version) {
             void * memory;
             const size_t size_required = Item::CalcSizeRequired(key, value_length);
             static const auto on_delete = [=](void * ptr) noexcept -> void {
@@ -564,9 +523,9 @@ namespace cachelot {
             memory = m_allocator.alloc_or_evict(size_required, m_evictions_enabled, on_delete);
             if (memory != nullptr) {
                 auto item = new (memory) Item(key, hash, value_length, flags, expiration, version);
-                return make_tuple(error::success, item);
+                return item;
             } else {
-                return make_tuple(error::out_of_memory, nullptr);
+                throw system_error(error::out_of_memory);
             }
         }
 

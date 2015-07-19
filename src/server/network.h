@@ -36,7 +36,7 @@
 
 /**
  * @defgroup net Networking and Connectivity
- * TCP/IP, UDP, Unix Sockets asynchronous IO based on Boost.Asio
+ * TCP, UDP, Unix Sockets asynchronous IO based on Boost.Asio
  * @{
  */
 
@@ -45,24 +45,38 @@ namespace cachelot {
     /// @ref net
     namespace net {
 
-    namespace asio = boost::asio;
-    namespace ip = boost::asio::ip;
-    namespace local = boost::asio::local;
+        // shortcuts
+        namespace asio = boost::asio;
+        namespace ip = boost::asio::ip;
+        using ip::tcp;
+        using ip::udp;
+        namespace local = boost::asio::local;
+        using asio::io_service;
 
-    using asio::io_service;
-    using ip::tcp;
-    using ip::udp;
+        namespace io_error = asio::error;
 
-    //typedef asio::basic_waitable_timer<chrono::steady_clock> waitable_timer;
+        enum ConversationReply {
+            READ_MORE,
+            SEND_REPLY_AND_READ,
+            CLOSE_IMMEDIATELY
+        };
 
-    namespace placeholders = asio::placeholders;
+        /// Unified TCP/UDP/Local converation interface
+        class basic_conversation {
+        protected:
+            /// main interface function of the conversation called upon async receive completion
+            /// Implementation shall read data from the `recv_buf` and write reply to the `send_buf`
+            /// @return one of the possible replies to instruct what to do with the connection next
+            virtual ConversationReply handle_data(io_buffer & recv_buf, io_buffer & send_buf) noexcept = 0;
 
-    // completition conditions
-    using asio::transfer_all;
-    using asio::transfer_at_least;
-    using asio::transfer_exactly;
+        public:
+            basic_conversation() = default;
+            virtual ~basic_conversation() {}
+        };
 
-}} // namespace cachelot::net
+    } // namespace net
+
+} // namespace cachelot::net
 
 /// @}
 

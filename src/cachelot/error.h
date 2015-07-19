@@ -20,19 +20,23 @@ namespace cachelot {
 
     // Application level errors defined here
     // Note: all error codes declared in `error` namespace, so use as `error::unknown_error`
-    #define CACHELOT_ERROR_ENUM(x) \
-        x(unknown_error, "Unknown error") \
-        x(out_of_memory, "Out of memory") \
-        x(numeric_convert, "Numeric conversion error") \
-        x(numeric_overflow, "Numeric value is out of range") \
-        x(not_implemented, "Not implemented")
+    #define CACHELOT_ERROR_ENUM(x)                                  \
+        x(unknown_error,        "Unknown error")                    \
+        x(out_of_memory,        "Out of memory")                    \
+        x(numeric_convert,      "Numeric conversion error")         \
+        x(numeric_overflow,     "Numeric value is out of range")    \
+        x(not_implemented,      "Operation does not supported")     \
+        x(incomplete_request,   "Request packet is incomplete")     \
+        x(broken_request,       "Request packet is broken")
 
     /// system error handling
     using boost::system::error_code;      // boost::error is used rather than std's because it is used by boost::asio
     using boost::system::error_category;
     using boost::system::system_error;
 
-    /// application-specific error codes
+
+    /// @defgroup error Error codes definition
+    /// @{
     namespace error {
 
         /// error_code identifies no error
@@ -45,6 +49,7 @@ namespace cachelot {
             CACHELOT_ERROR_ENUM(CACHELOT_ERROR_ENUM_CODE)
             #undef CACHELOT_ERROR_ENUM_CODE
         };
+
 
         namespace internal {
 
@@ -67,16 +72,23 @@ namespace cachelot {
 
         } // namespace internal
 
+
         inline const error_category & get_cachelot_error_category() noexcept {
             static const internal::cachelot_error_category category_instance {};
             return category_instance;
         }
 
+
         inline error_code make_error_code(cachelot_error_code ec) noexcept {
             return error_code(static_cast<int>(ec), get_cachelot_error_category());
         }
 
+
     } // namespace error
+
+    using error::get_cachelot_error_category;
+
+    /// @}
 
 } // namespace cachelot
 
