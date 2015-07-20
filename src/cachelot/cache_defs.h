@@ -35,7 +35,7 @@ namespace cachelot {
         x(TOUCH)                \
         x(QUIT)                 \
         x(VERSION)              \
-        x(FLUSH)                \
+        x(FLUSH_ALL)            \
         x(UNDEFINED)
 
         /**

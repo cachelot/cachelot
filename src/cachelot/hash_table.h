@@ -91,9 +91,7 @@ namespace cachelot {
             debug_assert(the_capacity > 0);
             debug_assert(ispow2(the_capacity));
             if (ok()) {
-                for (size_type pos = 0; pos < capacity(); ++pos) {
-                    m_hashes[pos] = 0;
-                }
+                clear();
             }
         }
 
@@ -129,7 +127,7 @@ namespace cachelot {
             }
         }
 
-        /// removes existing entry
+        /// remove existing entry
         ///
         /// @return true if value was deleted and false if value was not found
         bool del(key_type key, hash_type hash) noexcept {
@@ -142,6 +140,21 @@ namespace cachelot {
                 return true;
             } else {
                 return false;
+            }
+        }
+
+
+        /// remove all entries that satisfy given condifion
+        ///
+        /// @tparam ConditionFun ```bool do_remove(mapped_type)```
+        template <typename ConditionFun>
+        void remove_if(ConditionFun predicate) noexcept {
+            for (size_type pos = 0; pos < capacity(); ++pos) {
+                if (not empty_at(pos)) {
+                    if (predicate(entry_at(pos).value())) {
+                        remove(pos);
+                    }
+                }
             }
         }
 
@@ -214,6 +227,15 @@ namespace cachelot {
                 following_position = inc_pos(following_position);
             }
         }
+
+        /// clear the hash table
+        void clear() noexcept {
+            for (size_type pos = 0; pos < capacity(); ++pos) {
+                m_hashes[pos] = 0;
+            }
+            m_size = 0;
+        }
+
 
         /// return hash value of an entry at `pos`
         hash_type hash_at(const size_type pos) const noexcept {

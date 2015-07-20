@@ -127,14 +127,16 @@ def basic_expiration_test(mc):
     v = random_value()
     mc.set(k, v, 1)
     time.sleep(1)
+    mc.flush_all()
     CHECK_EQ( mc.get(k), None )
-    mc.set(k, v, 3)
+    mc.set(k, v, 4)
     time.sleep(1)
     mc.touch(k, 5)
     time.sleep(2)
     CHECK_EQ( mc.get(k), v)
     time.sleep(4)
     CHECK_EQ( mc.get(k), None)
+    mc.flush_all()
     log.info("success")
 
 

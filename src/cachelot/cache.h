@@ -203,6 +203,11 @@ namespace cachelot {
             Response do_touch(const bytes key, const hash_type hash, seconds expires) noexcept;
 
             /**
+             * `flush_all` - invalidate every item in the cache (remove expired items)
+             */
+            void do_flush_all() noexcept;
+
+            /**
              * `incr` or `decr` value by `delta`
              * On arithmetic operations value is treaten as an decimal ASCII encoded unsigned 64-bit integer
              * Decrement operation handle underflow and set value to zero if `delta` is greater than item value
@@ -459,6 +464,12 @@ namespace cachelot {
                 STAT_INCR(cache.touch_misses, 1);
                 return NOT_FOUND;
             }
+        }
+
+
+        inline void Cache::do_flush_all() noexcept {
+            STAT_INCR(cache.cmd_flush, 1);
+            m_dict.remove_if([=](ItemPtr item) -> bool { return item->is_expired(); });
         }
 
 

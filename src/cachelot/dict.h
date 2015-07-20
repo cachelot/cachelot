@@ -192,6 +192,16 @@ namespace cachelot {
             return table->remove(where.m_pos);
         }
 
+
+        /// @copydoc hash_table::remove_if
+        template <typename ConditionFun>
+        void remove_if(ConditionFun predicate) noexcept {
+            if (m_secondary_tbl) {
+                m_secondary_tbl->remove_if(predicate);
+            }
+            m_primary_tbl->remove_if(predicate);
+        }
+
         /// @copydoc hash_table::contains
         bool contains(key_type key, hash_type hash) const noexcept {
             if (not is_expanding()) {
@@ -223,6 +233,12 @@ namespace cachelot {
 
         /// indicates that dict is in progress of moving items to the new hash_table
         bool is_expanding() const noexcept { return m_secondary_tbl != nullptr; }
+
+        /// empty the dictionary
+        void clear() noexcept {
+            m_secondary_tbl.reset(nullptr);
+            m_primary_tbl->clear();
+        }
 
     private:
         static iterator iter(std::unique_ptr<hash_table_type> & table, size_type pos_in_table) {

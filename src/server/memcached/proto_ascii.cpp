@@ -13,6 +13,7 @@ namespace cachelot {
         constexpr bytes NOREPLY = bytes::from_literal("noreply");
         constexpr bytes STAT = bytes::from_literal("STAT");
         constexpr bytes VERSION =  bytes::from_literal("VERSION");
+        constexpr bytes OK =  bytes::from_literal("OK");
 
         /// Memcached error types
         constexpr bytes ERROR = bytes::from_literal("ERROR"); ///< unknown command
@@ -41,7 +42,7 @@ namespace cachelot {
         net::ConversationReply handle_version_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `flush` command
-        net::ConversationReply handle_flush_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_flush_all_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Write one of the cache responses if `noreply` is not specified, none otherwise
         net::ConversationReply reply_with_response(io_buffer & send_buf, cache::Response response, bool noreply);
@@ -54,7 +55,7 @@ namespace cachelot {
         tuple<bytes, bytes> parse_key(bytes args);
 
         /// parse optional `noreply` clause
-        bool parse_noreply(const bytes buffer);
+        bool maybe_noreply(const bytes buffer);
 
         // hash function
         inline cache::hash_type calc_hash(const bytes key) noexcept {
@@ -178,8 +179,8 @@ namespace cachelot {
                 case cache::VERSION:
                     reply = handle_version_command(command, args, send_buf, cache_api);
                     break;
-                case cache::FLUSH:
-                    reply = handle_flush_command(command, args, send_buf, cache_api);
+                case cache::FLUSH_ALL:
+                    reply = handle_flush_all_command(command, args, send_buf, cache_api);
                     break;
                 // terminate session
                 case cache::QUIT:
@@ -242,7 +243,7 @@ namespace cachelot {
         }
 
 
-        inline bool parse_noreply(const bytes args) {
+        inline bool maybe_noreply(const bytes args) {
             if (args.empty()) {
                 return false;
             } else if (args == NOREPLY) {
@@ -288,7 +289,7 @@ namespace cachelot {
                 tie(parsed, args) = args.split(SPACE);
                 cas_unique = str_to_int<cache::version_type>(parsed.begin(), parsed.end());
             }
-            bool noreply = parse_noreply(args);
+            bool noreply = maybe_noreply(args);
             // read <value>\r\n
             if (recv_buf.non_read() < datalen + CRLF.length()) {
                 // help buffer to grow up to the necessary size
@@ -317,7 +318,7 @@ namespace cachelot {
 
         inline net::ConversationReply handle_delete_command(cache::Command, bytes args, io_buffer & send_buf, cache::Cache & cache_api) {
             bytes key; tie(key, args) = parse_key(args);
-            bool noreply = parse_noreply(args);
+            bool noreply = maybe_noreply(args);
             auto response = cache_api.do_delete(key, calc_hash(key));
             return reply_with_response(send_buf, response, noreply);
         }
@@ -328,7 +329,7 @@ namespace cachelot {
             bytes parsed;
             tie(parsed, args) = args.split(SPACE);
             auto delta = str_to_int<uint64>(parsed.begin(), parsed.end());
-            bool noreply = parse_noreply(args);
+            bool noreply = maybe_noreply(args);
             cache::Response response; uint64 new_value;
             tie(response, new_value) = cache_api.do_arithmetic(cmd, key, calc_hash(key), delta);
             if (noreply) {
@@ -348,7 +349,7 @@ namespace cachelot {
             bytes parsed;
             tie(parsed, args) = args.split(SPACE);
             cache::seconds keep_alive_duration(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.end()));
-            bool noreply = parse_noreply(args);
+            bool noreply = maybe_noreply(args);
             auto response = cache_api.do_touch(key, calc_hash(key), keep_alive_duration);
             return reply_with_response(send_buf, response, noreply);
         }
@@ -385,8 +386,14 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_flush_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api) {
-            throw system_error(error::not_implemented);
+        inline net::ConversationReply handle_flush_all_command(cache::Command, bytes args, io_buffer & send_buf, cache::Cache & cache_api) {
+            bool noreply = maybe_noreply(args);
+            cache_api.do_flush_all();
+            if (noreply) {
+                return net::READ_MORE;
+            }
+            send_buf << OK << CRLF;
+            return net::SEND_REPLY_AND_READ;
         }
 
 
@@ -428,7 +435,6 @@ namespace cachelot {
                     }
                 case 5:
                     switch (first_char) {
-                    case 'f': return is_5("flush", command) ? cache::FLUSH : cache::UNDEFINED;
                     case 't': return is_5("touch", command) ? cache::TOUCH : cache::UNDEFINED;
                     case 's': return is_5("stats", command) ? cache::STATS : cache::UNDEFINED;
                     default : return cache::UNDEFINED;
@@ -446,6 +452,8 @@ namespace cachelot {
                     case 'v': return is_7("version", command) ? cache::VERSION : cache::UNDEFINED;
                     default : return cache::UNDEFINED;
                     }
+                case 9:
+                    return std::strncmp("flush_all", command.begin(), 9) == 0 ? cache::FLUSH_ALL : cache::UNDEFINED;
                 default :
                     return cache::UNDEFINED;
                 }
