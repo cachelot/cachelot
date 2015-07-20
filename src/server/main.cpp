@@ -41,22 +41,23 @@ namespace  {
 
     /// Command line arguments parser
     int parse_cmdline(int argc, const char * const argv[]) {
-        po::options_description desc("Allowed options");
+        po::options_description desc("Cachelot is lightning fast in-memory caching system\n"
+                                     "visit http://cachelot.io for support");
         desc.add_options()
-            ("help,h",                                                  "produce this help message")
+            ("help,h",                                                  "Produce this help message")
+            ("version,V",                                               "Print version and exit")
             ("tcp-port,p", po::value<uint16>()->default_value(11211),   "TCP port number to listen on (0 to disable TCP)")
             ("udp-port,U", po::value<uint16>()->default_value(11211),   "UDP port number to listen on (0 to disable UDP)")
-            ("socket,s",   po::value<string>(),                         "unix socket path to listen on (disabled by default)")
-            ("socket_access,a", po::value<unsigned>(),                  "access mask for the unix socket, in octal (default: 0700)")
-            ("listen,l",   po::value<std::vector<string>>(),            "interface to listen on (default: INADDR_ANY - all addresses)\n"
+            ("socket,s",   po::value<string>(),                         "Unix socket path to listen on (disabled by default)")
+            ("socket_access,a", po::value<unsigned>(),                  "Access mask for the unix socket, in octal (default: 0700)")
+            ("listen,l",   po::value<std::vector<string>>(),            "Interface to listen on (default: INADDR_ANY - all addresses)\n"
                                                                         "<arg> may be specified as host:port. If you don't specify a port number,"
                                                                         "the value you specified with -p or -U is used."
                                                                         "You may specify multiple addresses separated by comma or by using -l multiple times")
-            ("daemon,d",   po::bool_switch()->default_value(false),     "run as a daemon")
-            ("OUM-error,M", po::bool_switch()->default_value(false),    "return error on memory exhausted (rather than removing items)")
-            ("no-cas,C",   po::bool_switch()->default_value(false),     "disable use of CAS (memory economy)")
-            ("memory,m",   po::value<unsigned>(),                       "max memory to use for items in megabytes (default: 64 MB)")
-
+            ("daemon,d",   po::bool_switch()->default_value(false),     "Run as a daemon")
+            ("OUM-error,M", po::bool_switch()->default_value(false),    "Return error on memory exhausted (rather than removing items)")
+            ("no-cas,C",   po::bool_switch()->default_value(false),     "Disable use of CAS (memory economy)")
+            ("memory,m",   po::value<unsigned>(),                       "Max memory to use for items in megabytes (default: 64 MB)")
         ;
 
         po::variables_map varmap;
@@ -65,7 +66,11 @@ namespace  {
         po::notify(varmap);
 
         if (varmap.count("help")) {
-            cerr << desc << "\n";
+            cerr << desc << endl;
+            return EXIT_FAILURE;
+        }
+        if (varmap.count("version")) {
+            cerr << CACHELOT_VERSION_STRING << endl;
             return EXIT_FAILURE;
         }
         if (varmap.count("tcp-port") == 1) {

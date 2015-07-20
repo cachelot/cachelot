@@ -165,6 +165,15 @@ class Client(object):
             response = self.__receive_line()
         self.__expect(response, 'END')
 
+    def version(self):
+        self.__send('version\r\n')
+        response = self.__receive_line()
+        self.__raise_if_errors(response)
+        if response.startswith('VERSION '):
+            return response.lstrip('VERSION ')
+        else:
+            self.__expect('VERSION')
+
     def __retrieve(self, command, keys):
         assert command in ['get', 'gets'],  'unsupported command: ' + command
         command_str = command + ' ' + ' '.join(keys) + '\r\n'

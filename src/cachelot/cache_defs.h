@@ -34,6 +34,8 @@ namespace cachelot {
         x(STATS)                \
         x(TOUCH)                \
         x(QUIT)                 \
+        x(VERSION)              \
+        x(FLUSH)                \
         x(UNDEFINED)
 
         /**

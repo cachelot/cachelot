@@ -113,8 +113,8 @@ namespace cachelot {
         inline void datagram_server<SocketType>::async_send_all(const typename protocol_type::endpoint to) noexcept {
             auto need_to_send = m_send_buf.non_read();
             m_socket.async_send_to(asio::buffer(m_send_buf.begin_read(), need_to_send), to,
-                [=](error_code error, size_t bytes_sent) {
-                    // TODO: How to handle errors
+                [=](error_code /*error*/, size_t /*bytes_sent*/) {
+                    // we empty send buffer even data was not sent completely
                     m_send_buf.complete_read(need_to_send);
                 });
         }

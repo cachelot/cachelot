@@ -11,12 +11,13 @@
 /// @defgroup common Generic code
 /// @{
 
+
 #if defined(__GNUC__)
 #  pragma GCC system_header  // suppress warnings from the following headers
 #endif
 
 // assertion
-#ifdef DEBUG
+#if defined(DEBUG)
 #  include <cassert>
 #  define debug_only(expr) expr
 #  define debug_assert(expr) assert(expr)
@@ -54,6 +55,8 @@
 #else
 #  define enable_memory_debug()
 #endif
+
+#include <cachelot/version.h>
 
 namespace cachelot {
 

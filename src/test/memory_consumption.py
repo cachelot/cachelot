@@ -26,14 +26,14 @@ MEMCACHED = '/usr/bin/memcached'
 KEY_ALPHABET = string.ascii_letters + string.digits
 
 VALUE_RANGES = { 'small': (10, 250),
-                 'medium': (250, 1024), 
+                 'medium': (250, 1024),
                  'large' :(1024, 100000),
                  'all': (10, 100000)}
 
 MAX_DICT_MEM = 1024 * 1024 * 64  # 64Mb
 
 
-INTERESTING_STATS = frozenset([ 
+INTERESTING_STATS = frozenset([
     'hash_capacity',
     'curr_items',
     'hash_is_expanding',
@@ -99,7 +99,7 @@ def setup_logging():
 def random_key():
     length = random.randint(10, 35)
     return ''.join(random.choice(KEY_ALPHABET) for _ in range(length))
-    
+
 
 def random_value(minlen, maxlen):
     length = random.randint(minlen, maxlen)
@@ -132,7 +132,7 @@ def create_kv_data(range_name):
     took_time = time.time() - start_time
     log.debug('  Took: %.2f sec', took_time)
     log.info('Local effective memory: %d (%d items).', current_dict_mem, len(in_memory_kv))
-    
+
     return in_memory_kv
 
 
@@ -162,7 +162,7 @@ def execute_test(mc, kv_data):
                 log.fatal('local value:\n%s', b64(local_val))
                 log.fatal('external value:\n%s', b64(external_val))
                 sys.exit(1)
-            
+
         log.info('External effective memory: %d (%d items).', effective_memory, num_items)
         log.debug('  Took: %.2f sec', time.time() - start_time)
 

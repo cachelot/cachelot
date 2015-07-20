@@ -43,7 +43,7 @@ KEY_ALPHABET = string.ascii_letters + string.digits
 def random_key():
     length = random.randint(10, 250)
     return ''.join(random.choice(KEY_ALPHABET) for _ in range(length))
-    
+
 
 def random_value():
     length = random.randint(1, 100000)
@@ -77,7 +77,7 @@ def basic_storage_test(mc):
     v = v1 + v
     CHECK_EQ( mc.get(k), v )
     log.info("success")
-   
+
 
 def basic_cas_test(mc):
     log.info("cas (compare and swap) command")
@@ -171,6 +171,8 @@ def run_fuzzy_test(mc):
 
 def main():
     mc = memcached.connect_tcp('localhost', 11211)
+    ver = mc.version()
+    log.info("Test cachelot version '%s'", ver)
     run_smoke_test(mc)
 
 

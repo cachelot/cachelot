@@ -21,6 +21,7 @@ set (CACHELOT_SOURCES
     cache_defs.h
     stats.h
     stats.cpp
+    version.h
 )
 
 add_library (cachelot STATIC ${CACHELOT_SOURCES})
