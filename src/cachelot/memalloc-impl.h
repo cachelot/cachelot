@@ -1023,6 +1023,9 @@ namespace cachelot {
     inline void * memalloc::alloc_or_evict_impl(const size_t size, bool evict_if_necessary, ForeachFreed on_free_block) {
         debug_assert(size <= block::max_size);
         debug_assert(size > 0);
+        #if defined(ADDRESS_SANITIZER)
+        return std::malloc(size);
+        #endif
         const uint32 nsize = size > block::min_size ? static_cast<uint32>(size) : block::min_size;
         debug_only(free_blocks->test_bit_index_integrity_check());
         debug_only(used_blocks->test_bit_index_integrity_check());
@@ -1130,6 +1133,9 @@ namespace cachelot {
 
 
     inline void * memalloc::realloc_inplace(void * ptr, const size_t new_size) noexcept {
+        #if defined(ADDRESS_SANITIZER)
+        return nullptr;
+        #endif
         debug_assert(valid_addr(ptr));
         debug_only(free_blocks->test_bit_index_integrity_check());
         debug_only(used_blocks->test_bit_index_integrity_check());
@@ -1174,6 +1180,9 @@ namespace cachelot {
 
 
     inline void memalloc::free(void * ptr) noexcept {
+        #if defined(ADDRESS_SANITIZER)
+        std::free(ptr); return;
+        #endif
         debug_assert(valid_addr(ptr));
         debug_only(free_blocks->test_bit_index_integrity_check());
         debug_only(used_blocks->test_bit_index_integrity_check());
