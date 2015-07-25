@@ -47,8 +47,6 @@ typedef std::tuple<string, string> kv_type;
 typedef std::vector<kv_type> array_type;
 typedef array_type::const_iterator iterator;
 
-const auto forever = cache::expiration_time_point::max();
-
 class CacheWrapper {
 public:
     CacheWrapper() : m_cache(cache_memory, hash_initial, true) {}
@@ -58,7 +56,7 @@ public:
         bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
         cache::ItemPtr item = nullptr;
         try {
-            item = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, forever, /*CAS*/0);
+            item = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, cache::keepalive_forever, /*CAS*/0);
             item->assign_value(v);
             m_cache.do_set(item);
             bench_stats.num_set += 1;

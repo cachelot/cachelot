@@ -278,7 +278,6 @@ namespace cachelot {
             cache::opaque_flags_type flags = str_to_int<cache::opaque_flags_type>(parsed.begin(), parsed.end());
             tie(parsed, args) = args.split(SPACE);
             auto keep_alive_duration = cache::seconds(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.end()));
-            auto realtime_expiration = expiration_time_point(keep_alive_duration);
             tie(parsed, args) = args.split(SPACE);
             uint32 datalen = str_to_int<uint32>(parsed.begin(), parsed.end());
             if (datalen > settings.cache.max_value_size) {
@@ -304,7 +303,7 @@ namespace cachelot {
                 throw system_error(error::value_crlf_expected);
             }
             // create new item and execute the cache API
-            auto new_item = cache_api.create_item(key, calc_hash(key), value.length(), flags, realtime_expiration, cas_unique);
+            auto new_item = cache_api.create_item(key, calc_hash(key), value.length(), flags, keep_alive_duration, cas_unique);
             new_item->assign_value(value);
             try {
                 auto response = cache_api.do_storage(cmd, new_item);

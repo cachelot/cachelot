@@ -49,16 +49,6 @@ namespace cachelot {
             }
         }
 
-
-        /// Convert expiration duration to the expiration time point from now
-        inline cache::clock::time_point expiration_time_point(cache::seconds keep_alive_duration) {
-            if (keep_alive_duration == cache::seconds(0)) {
-                return cache::expiration_time_point::max();
-            } else {
-                return cache::clock::now() + keep_alive_duration;
-            }
-        }        
-
 } } // namespace cachelot::memcached
 
 /// @}

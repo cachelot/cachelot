@@ -64,6 +64,9 @@ namespace cachelot {
         /// Maximum key length in bytes
         static constexpr auto max_key_length = Item::max_key_length;
 
+        /// Maximum key length in bytes
+        static constexpr auto keepalive_forever = seconds(0);
+
         /// Item has both - the key and the value. This is wrapper to use Item pointer as a dict entry
         class ItemDictEntry {
         public:
@@ -193,6 +196,20 @@ namespace cachelot {
             Response do_extend(Command cmd, ItemPtr item);
 
             /**
+             * `append` - append the data of the existing item
+             *
+             * @copydoc doxygen_store_command
+             */
+            Response do_append(ItemPtr item) { return do_extend(APPEND, item); }
+
+            /**
+             * `prepend` - prepend the data of the existing item
+             *
+             * @copydoc doxygen_store_command
+             */
+            Response do_prepend(ItemPtr item) { return do_extend(PREPEND, item); }
+
+            /**
              * `delete` - delete existing item
              */
             Response do_delete(const bytes key, const hash_type hash) noexcept;
@@ -200,7 +217,7 @@ namespace cachelot {
             /**
              * `touch` - validate item and prolong its lifetime
              */
-            Response do_touch(const bytes key, const hash_type hash, seconds expires) noexcept;
+            Response do_touch(const bytes key, const hash_type hash, seconds keepalive) noexcept;
 
             /**
              * `flush_all` - invalidate every item in the cache (remove expired items)
@@ -216,9 +233,23 @@ namespace cachelot {
             tuple<Response, uint64> do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta);
 
             /**
+             * `incr` - increment counter
+             */
+             tuple<Response, uint64> do_incr(const bytes key, const hash_type hash, uint64 delta) {
+                return do_arithmetic(INCR, key, hash, delta);
+             }
+
+            /**
+             * `decr` - decrement counter
+             */
+             tuple<Response, uint64> do_decr(const bytes key, const hash_type hash, uint64 delta) {
+                return do_arithmetic(DECR, key, hash, delta);
+             }
+
+            /**
              * Create new Item using memalloc
              */
-            ItemPtr create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type version);
+            ItemPtr create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds keepalive, version_type version);
 
             /**
              * Free existing Item and return memory to the memalloc
@@ -237,7 +268,7 @@ namespace cachelot {
             static expiration_time_point time_from(seconds expire_after) {
                 // TODO: !Important check that duration will not overflow
                 //if (std::numeric_limits<seconds::rep>::max() - expire_after.count() )
-                return expire_after == seconds(0) ? expiration_time_point::max() : clock::now() + expire_after;
+                return expire_after == keepalive_forever ? expiration_time_point::max() : clock::now() + expire_after;
             }
 
             /**
@@ -376,7 +407,7 @@ namespace cachelot {
             if (found) {
                 if (item->version() == at.value()->version()) {
                     replace_item_at(at, item);
-                    STAT_INCR(cache.cas_hits, 1);
+                    STAT_INCR(cache.cas_stored, 1);
                     return STORED;
                 } else {
                     STAT_INCR(cache.cas_badval, 1);
@@ -408,11 +439,11 @@ namespace cachelot {
                     auto new_item = new (memory) Item(old_item->key(), old_item->hash(), new_value_size, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
                     if (cmd == APPEND) {
                         new_item->assign_compose(old_item->value(), piece->value());
-                        STAT_INCR(cache.append_hits, 1);
+                        STAT_INCR(cache.append_stored, 1);
                     } else {
                         debug_assert(cmd == PREPEND);
                         new_item->assign_compose(piece->value(), old_item->value());
-                        STAT_INCR(cache.prepend_hits, 1);
+                        STAT_INCR(cache.prepend_stored, 1);
                     }
                     replace_item_at(at, new_item);
                     response = STORED;
@@ -515,7 +546,8 @@ namespace cachelot {
             } else {
                 // create new item to hold value including zero terminator
                 ItemPtr new_item;
-                new_item = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
+                seconds new_keepalive = old_item->expiration_time() == expiration_time_point::max() ? keepalive_forever : old_item->expiration_time() - clock::now();
+                new_item = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), new_keepalive, old_item->version() + 1);
                 new_item->assign_value(bytes(new_ascii_value, new_ascii_value_length));
                 replace_item_at(at, new_item);
             }
@@ -523,7 +555,7 @@ namespace cachelot {
         }
 
 
-        inline ItemPtr Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, expiration_time_point expiration, version_type version) {
+        inline ItemPtr Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, cache::seconds keepalive, version_type version) {
             void * memory;
             const size_t size_required = Item::CalcSizeRequired(key, value_length);
             static const auto on_delete = [=](void * ptr) noexcept -> void {
@@ -533,7 +565,7 @@ namespace cachelot {
             };
             memory = m_allocator.alloc_or_evict(size_required, m_evictions_enabled, on_delete);
             if (memory != nullptr) {
-                auto item = new (memory) Item(key, hash, value_length, flags, expiration, version);
+                auto item = new (memory) Item(key, hash, value_length, flags, time_from(keepalive), version);
                 return item;
             } else {
                 throw system_error(error::out_of_memory);
