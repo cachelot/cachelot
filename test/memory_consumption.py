@@ -13,14 +13,13 @@ import time
 import logging
 import atexit
 import memcached
-import base64
 
 
 log = logging.getLogger()
 
-
 SELF, _ = os.path.splitext(os.path.basename(sys.argv[0]))
-CACHELOTD = './bin/cachelotd'
+BASEDIR = os.path.normpath(os.path.dirname(os.path.abspath(sys.argv[0])) + '/..')
+CACHELOTD = os.path.join(BASEDIR, 'bin/cachelotd')
 MEMCACHED = '/usr/bin/memcached'
 
 KEY_ALPHABET = string.ascii_letters + string.digits
@@ -30,7 +29,7 @@ VALUE_RANGES = { 'small': (10, 250),
                  'large' :(1024, 100000),
                  'all': (10, 100000)}
 
-MAX_DICT_MEM = 1024 * 1024 * 64  # 64Mb
+MAX_DICT_MEM = 1024 * 1024 * 128  # 128Mb
 
 
 INTERESTING_STATS = frozenset([
@@ -154,14 +153,6 @@ def execute_test(mc, kv_data):
                 continue
             num_items += 1
             effective_memory += len(k) + len(local_val)
-
-            # Sanity check: values must be equal
-            if external_val != local_val:
-                b64 = base64.b64encode
-                log.fatal('*** Data corruption: [%s]\n', k)
-                log.fatal('local value:\n%s', b64(local_val))
-                log.fatal('external value:\n%s', b64(external_val))
-                sys.exit(1)
 
         log.info('External effective memory: %d (%d items).', effective_memory, num_items)
         log.debug('  Took: %.2f sec', time.time() - start_time)
