@@ -12,6 +12,8 @@ namespace cachelot {
     std::cout << CACHELOT_PP_STR(stat_group) << ':' << std::setfill('.') << std::setw(40) << std::left << CACHELOT_PP_STR(stat_name) << std::setfill(' ')  << ' ' << std::setw(14) << STAT_GET(stat_group, stat_name) << stat_description << '\n';
 
     void PrintStats() noexcept {
+    // variable tracking size limit exceeded in ASAN build
+    #ifndef ADDRESS_SANITIZER
         try {
             #define PRINT_CACHE_STAT(stat_type, stat_name, stat_description) PRINT_STAT(cache, stat_type, stat_name, stat_description)
             CACHE_STATS(PRINT_CACHE_STAT)
@@ -25,6 +27,7 @@ namespace cachelot {
 
             std::cout << std::endl;
         } catch (const std::exception &) { /* DO NOTHING */ }
+    #endif // ADDRESS_SANITIZER
     }
 
     #undef PRINT_STAT

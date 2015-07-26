@@ -983,6 +983,9 @@ namespace cachelot {
 
 
     inline size_t memalloc::reveal_actual_size(void * ptr) const noexcept {
+        #if defined(ADDRESS_SANITIZER)
+        return 0;
+        #endif
         debug_assert(valid_addr(ptr));
         block * blk = block::from_user_ptr(ptr);
         debug_assert(blk->is_used());
@@ -991,6 +994,9 @@ namespace cachelot {
 
 
     inline void memalloc::touch(void * ptr) noexcept {
+        #if defined(ADDRESS_SANITIZER)
+        return;
+        #endif
         debug_assert(valid_addr(ptr));
         block * blk = block::from_user_ptr(ptr);
         // ensure we're not touching the dead
