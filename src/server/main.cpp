@@ -76,18 +76,15 @@ namespace  {
         if (varmap.count("tcp-port") == 1) {
             settings.net.TCP_port = varmap["tcp-port"].as<uint16>();
         }
+        settings.net.has_TCP = settings.net.TCP_port != 0;
         if (varmap.count("udp-port") == 1) {
             settings.net.UDP_port = varmap["udp-port"].as<uint16>();
-            if (settings.net.UDP_port != 0) {
-                settings.net.has_UDP = true;
-            } else {
-                settings.net.has_UDP = false;
-            }
         }
+        settings.net.has_UDP = settings.net.UDP_port != 0;
         if (varmap.count("socket") == 1) {
             settings.net.unix_socket = varmap["socket"].as<string>();
-            settings.net.has_unix_socket = true;
         }
+        settings.net.has_unix_socket = not settings.net.unix_socket.empty();
         settings.cache.has_evictions = not varmap["OUM-error"].as<bool>();
         settings.cache.has_CAS = not varmap["no-cas"].as<bool>();
 
