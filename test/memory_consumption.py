@@ -60,8 +60,6 @@ FILTER_STATS = frozenset([
     'num_used_table_merges',
     'num_used_table_weak_hits',
     'reclaimed',
-    'replace_not_stored',
-    'replace_stored',
     'set_existing',
     'set_new',
     'total_items',
