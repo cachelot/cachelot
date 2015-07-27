@@ -41,8 +41,7 @@ namespace cachelot {
      *  - mark N bytes as filled by calling confirm_write()
      */
     class io_buffer {
-        typedef std::unique_ptr<char[]> underlying_array_type;
-
+        // savepoint types
         enum class write_state_type : size_t { DUMMY };
         enum class read_state_type : size_t { DUMMY };
     public:
@@ -51,14 +50,17 @@ namespace cachelot {
 
         /// constructor
         explicit io_buffer(const size_t initial_size, const size_t max_size)
-            : m_max_size(max_size) {
+            : m_max_size(max_size)
+            , m_data(nullptr) {
             if (initial_size > 0) {
                 ensure_capacity(initial_size);
             }
         }
 
         // dtor
-        ~io_buffer() = default;
+        ~io_buffer() {
+            std::free(m_data);
+        }
         // disallowed copy and aasignment
         io_buffer(const io_buffer & ) = delete;
         io_buffer & operator= (const io_buffer & ) = delete;
@@ -78,13 +80,13 @@ namespace cachelot {
         /// position in the buffer to read from
         const char * begin_read() const noexcept {
             debug_assert(m_read_pos <= m_write_pos);
-            return m_data.get() + m_read_pos;
+            return m_data + m_read_pos;
         }
 
         /// mark `num_bytes` as read
         bytes confirm_read(const size_t num_bytes) noexcept {
             debug_assert((m_read_pos + num_bytes) <= m_write_pos);
-            bytes result(m_data.get() + m_read_pos, num_bytes);
+            bytes result(m_data + m_read_pos, num_bytes);
             m_read_pos += num_bytes;
             return result;
         }
@@ -109,7 +111,7 @@ namespace cachelot {
         /// search for `terminator` and return bytes ending on `terminator` on success or empty bytes otherwise
         bytes try_read_until(const bytes terminator) noexcept {
             debug_assert(terminator); debug_assert(m_read_pos <= m_write_pos);
-            bytes search_range(m_data.get() + m_read_pos, non_read());
+            bytes search_range(m_data + m_read_pos, non_read());
             const bytes found = search_range.search(terminator);
             if (found) {
                 bytes result(search_range.begin(), found.end());
@@ -123,7 +125,7 @@ namespace cachelot {
         char * begin_write(const size_t at_least = default_min_buffer_size / 4) {
             // TODO: Better buffer growth heuristic
             ensure_capacity(at_least);
-            return m_data.get() + m_write_pos;
+            return m_data + m_write_pos;
         }
 
         /// mark `num_bytes` as written
@@ -153,30 +155,28 @@ namespace cachelot {
             m_write_pos = 0u;
         }
 
-        /// free read data to give space to the new data
-        void cleanup() noexcept {
-            if (m_read_pos == m_write_pos) {
-                m_read_pos = 0u;
-                m_write_pos = 0u;
-            } else {
-                debug_assert(m_read_pos < m_write_pos);
-                size_t left_unread = m_write_pos - m_read_pos;
-                std::memmove(m_data.get(), m_data.get() + m_read_pos, left_unread);
-                m_read_pos = 0u;
-                m_write_pos = left_unread;
-            }
-        }
-
         /// ensure that buffer is capable to store `at_least` bytes; resize if neccessary
         void ensure_capacity(const size_t at_least) {
             debug_assert(at_least > 0);
-            if (at_least > available()) {
-                const size_t new_capacity = capacity_advice(at_least);
-                if (new_capacity - size() >= at_least) {
-                    grow_to(new_capacity);
+            if (available() >= at_least) {
+                return; // we have enough space
+            }
+            // try to compact data
+            compact();
+            if (available() >= at_least) {
+                return;
+            }
+            // grow buffer
+            const size_t new_capacity = capacity_advice(at_least);
+            if (new_capacity - size() >= at_least) {
+                m_data = reinterpret_cast<char *>(std::realloc(m_data, new_capacity));
+                if (m_data != nullptr) {
+                    m_capacity = new_capacity;
                 } else {
-                    throw std::length_error("maximal IO buffer capacity exceeded");
+                    throw std::bad_alloc();
                 }
+            } else {
+                throw std::length_error("maximal IO buffer capacity exceeded");
             }
         }
 
@@ -186,20 +186,23 @@ namespace cachelot {
             return std::min(capacity() + grow_factor, m_max_size);
         }
 
-        void grow_to(const size_t new_capacity) {
-            if (new_capacity > capacity()) {
-                underlying_array_type new_data(new char[new_capacity]);
-                if (size() > 0) {
-                    std::memcpy(new_data.get(), m_data.get(), size());
-                }
-                m_data.swap(new_data);
-                m_capacity = new_capacity;
+        // discard all data that was read
+        void compact() noexcept {
+            if (m_read_pos == m_write_pos) {
+                m_read_pos = 0u;
+                m_write_pos = 0u;
+            } else {
+                debug_assert(m_read_pos < m_write_pos);
+                size_t left_unread = m_write_pos - m_read_pos;
+                std::memmove(m_data, m_data + m_read_pos, left_unread);
+                m_read_pos = 0u;
+                m_write_pos = left_unread;
             }
         }
 
     private:
         const size_t m_max_size;
-        underlying_array_type m_data;
+        char * m_data;
         size_t m_capacity = 0;
         size_t m_read_pos = 0;
         size_t m_write_pos = 0;

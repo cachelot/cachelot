@@ -103,7 +103,8 @@ namespace cachelot {
                             return;
                         }
                     }
-                    m_recv_buf.reset();
+                    // we expect only one packet per datagram
+                    m_recv_buf.read_all();
                     this->async_receive();
                 });
         }

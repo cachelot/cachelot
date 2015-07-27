@@ -190,7 +190,6 @@ namespace cachelot {
                     throw system_error(error::broken_request);
                 }
                 // receive buffer is processed at this point
-                recv_buf.cleanup();
                 return reply;
 
             } catch (const system_error & syserr) {
