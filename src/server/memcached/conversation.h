@@ -86,7 +86,7 @@ namespace cachelot {
                     return handle_received_data(recv_buf, send_buf, cache_api);
                 } catch (const std::exception & exc) {
                     send_buf.discard_written(w_savepoint);
-                    return net::CLOSE_IMMEDIATELY;
+                    return net::READ_MORE;
                 }
             }
 
@@ -103,7 +103,7 @@ namespace cachelot {
                     throw system_error(error::udp_header_size);
                 }
                 bytes raw = bytes(recv_buf.begin_read(), udp_frame_header_size);
-                recv_buf.complete_read(udp_frame_header_size);
+                recv_buf.confirm_read(udp_frame_header_size);
 
                 uint16 sequence_no = ntohs(*reinterpret_cast<const uint16 *>(raw.begin() + sizeof(uint16) * 1));
                 uint16 packets_in_msg = ntohs(*reinterpret_cast<const uint16 *>(raw.begin() + sizeof(uint16) * 2));
@@ -118,7 +118,7 @@ namespace cachelot {
                 // write UDP header back to the response
                 auto dest = send_buf.begin_write(raw.length());
                 std::memcpy(dest, raw.begin(), raw.length());
-                send_buf.complete_write(raw.length());
+                send_buf.confirm_write(raw.length());
             }
 
         private:

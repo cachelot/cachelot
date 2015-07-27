@@ -15,7 +15,7 @@ BOOST_AUTO_TEST_CASE(test_io_buffer_basic) {
     // write test pattern
     char * ptr = buf.begin_write(sizeof(pattern));
     std::sprintf(ptr, pattern);
-    buf.complete_write(sizeof(pattern));
+    buf.confirm_write(sizeof(pattern));
     BOOST_CHECK_EQUAL(buf.non_read(), sizeof(pattern));
     // read from buffer
     bytes read = buf.try_read_until(bytes::from_literal("\0"));
@@ -28,12 +28,12 @@ BOOST_AUTO_TEST_CASE(test_io_buffer_basic) {
     // write 16 bytes of nothing and discard it immediately
     auto w_savepoint = buf.write_savepoint();
     ptr = buf.begin_write(16);
-    buf.complete_write(16);
+    buf.confirm_write(16);
     buf.discard_written(w_savepoint);
     // write 16 bytes of 'X'
     ptr = buf.begin_write(16);
     std::memset(ptr, 'X', 16);
-    buf.complete_write(16);
+    buf.confirm_write(16);
     // read and check
     read = buf.try_read_until(bytes::from_literal("XXXXXXXXXXXXXXXX"));
     BOOST_CHECK_EQUAL(read.length(), 16);

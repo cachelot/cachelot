@@ -68,7 +68,7 @@ namespace cachelot {
         inline io_buffer & operator<<(io_buffer & buf, const bytes value) {
             auto dest = buf.begin_write(value.length());
             std::memcpy(dest, value.begin(), value.length());
-            buf.complete_write(value.length());
+            buf.confirm_write(value.length());
             return buf;
         }
 
@@ -84,7 +84,7 @@ namespace cachelot {
         inline io_buffer & operator<<(io_buffer & buf, const char value) {
             auto dest = buf.begin_write(sizeof(char));
             *dest = value;
-            buf.complete_write(sizeof(char));
+            buf.confirm_write(sizeof(char));
             return buf;
         }
 
@@ -111,7 +111,7 @@ namespace cachelot {
         inline io_buffer & serialize_integer(io_buffer & buf, const IntType x) {
             auto dest = buf.begin_write(internal::numeric<IntType>::max_str_length);
             size_t written = int_to_str(x, dest);
-            buf.complete_write(written);
+            buf.confirm_write(written);
             return buf;
         }
         #define __DO_SERIALIZE_INTEGER_ASCII(IntType)                           \
@@ -212,7 +212,7 @@ namespace cachelot {
                         return net::READ_MORE;
                     case error::broken_request:
                         // ill-formed packet, swallow recv_buf data
-                        recv_buf.reset();
+                        recv_buf.read_all();
                         send_buf << ERROR << CRLF;
                         return net::SEND_REPLY_AND_READ;
                     case error::numeric_convert:
@@ -298,7 +298,7 @@ namespace cachelot {
             auto value = bytes(recv_buf.begin_read(), datalen + CRLF.length());
             if (value.endswith(CRLF)) {
                 value = value.rtrim_n(CRLF.length()); // strip trailing \r\n
-                recv_buf.complete_read(datalen + CRLF.length());
+                recv_buf.confirm_read(datalen + CRLF.length());
             } else {
                 throw system_error(error::value_crlf_expected);
             }

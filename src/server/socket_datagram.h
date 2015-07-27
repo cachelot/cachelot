@@ -90,8 +90,8 @@ namespace cachelot {
             typename protocol_type::endpoint remote_endpoint;
             m_socket.async_receive_from(asio::buffer(m_recv_buf.begin_write(), m_recv_buf.available()), remote_endpoint,
                 [=] (const error_code error, size_t bytes_recvd) noexcept {
+                    m_recv_buf.confirm_write(bytes_recvd);
                     if (not error) {
-                        m_recv_buf.complete_write(bytes_recvd);
                         try {
                             if (handle_data(m_recv_buf, m_send_buf) == SEND_REPLY_AND_READ) {
                                 async_send_all(remote_endpoint);
@@ -114,8 +114,8 @@ namespace cachelot {
             auto need_to_send = m_send_buf.non_read();
             m_socket.async_send_to(asio::buffer(m_send_buf.begin_read(), need_to_send), to,
                 [=](error_code /*error*/, size_t /*bytes_sent*/) {
-                    // we empty send buffer even data was not sent completely
-                    m_send_buf.complete_read(need_to_send);
+                    // even data was not sent completely
+                    m_send_buf.confirm_read(need_to_send);
                 });
         }
 

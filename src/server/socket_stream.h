@@ -153,7 +153,7 @@ namespace cachelot {
                 [=](const error_code error, const size_t bytes_received) {
                     bytes receive_result;
                     if (not error) {
-                        m_recv_buf.complete_write(bytes_received);
+                        m_recv_buf.confirm_write(bytes_received);
                         ConversationReply reply = handle_data(m_recv_buf, m_send_buf);
                         switch (reply) {
                         case SEND_REPLY_AND_READ:
@@ -168,7 +168,7 @@ namespace cachelot {
                         }
                     } else {
                         if (error == io_error::message_size) {
-                            m_recv_buf.complete_write(bytes_received);
+                            m_recv_buf.confirm_write(bytes_received);
                             async_receive_some();
                         } else {
                             suicide();
@@ -185,7 +185,7 @@ namespace cachelot {
                 [=](error_code error, size_t bytes_sent) {
                     if (not error) {
                         debug_assert(m_send_buf.non_read() == bytes_sent);
-                        m_send_buf.complete_read(bytes_sent);
+                        m_send_buf.confirm_read(bytes_sent);
                         m_send_buf.cleanup();
                     } else {
                         suicide();

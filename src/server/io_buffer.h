@@ -34,11 +34,11 @@ namespace cachelot {
      * read:
      *  - get size in bytes of non_read data with non_read()
      *  - get pointer to the beginning of unread data with begin_read()
-     *  - mark N bytes as read by calling complete_read()
+     *  - mark N bytes as read by calling confirm_read()
      *
      * write:
      *  - get write pointer in buffer by calling begin_write() and
-     *  - mark N bytes as filled by calling complete_write()
+     *  - mark N bytes as filled by calling confirm_write()
      */
     class io_buffer {
         typedef std::unique_ptr<char[]> underlying_array_type;
@@ -82,7 +82,7 @@ namespace cachelot {
         }
 
         /// mark `num_bytes` as read
-        bytes complete_read(const size_t num_bytes) noexcept {
+        bytes confirm_read(const size_t num_bytes) noexcept {
             debug_assert((m_read_pos + num_bytes) <= m_write_pos);
             bytes result(m_data.get() + m_read_pos, num_bytes);
             m_read_pos += num_bytes;
@@ -103,7 +103,7 @@ namespace cachelot {
 
         /// read all the non-read data
         bytes read_all() noexcept {
-            return complete_read(non_read());
+            return confirm_read(non_read());
         }
 
         /// search for `terminator` and return bytes ending on `terminator` on success or empty bytes otherwise
@@ -127,7 +127,7 @@ namespace cachelot {
         }
 
         /// mark `num_bytes` as written
-        void complete_write(const size_t num_bytes) noexcept {
+        void confirm_write(const size_t num_bytes) noexcept {
             debug_assert(m_write_pos + num_bytes <= m_capacity);
             m_write_pos += num_bytes;
         }
