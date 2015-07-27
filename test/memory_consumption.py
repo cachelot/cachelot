@@ -32,29 +32,48 @@ VALUE_RANGES = { 'small': (10, 250),
 MAX_DICT_MEM = 1024 * 1024 * 128  # 128Mb
 
 
-INTERESTING_STATS = frozenset([
-    'hash_capacity',
+FILTER_STATS = frozenset([
+    'bytes',
+    'bytes_read',
+    'bytes_written',
+    'cmd_get',
+    'cmd_set',
     'curr_items',
-    'hash_is_expanding',
-    'num_malloc',
-    'num_free',
-    'num_realloc',
+    'evicted_unfetched',
+    'evictions',
+    'expired_unfetched',
+    'get_hits',
+    'get_misses',
+    'hash_bytes',
+    'hash_capacity',
+    'hash_power_level',
+    'limit_maxbytes',
     'num_alloc_errors',
+    'num_free',
+    'num_free_table_hits',
+    'num_free_table_merges',
+    'num_free_table_weak_hits',
+    'num_malloc',
+    'num_realloc',
     'num_realloc_errors',
-    'total_requested',
-    'total_served',
-    'total_unserved',
+    'num_used_table_hits',
+    'num_used_table_merges',
+    'num_used_table_weak_hits',
+    'reclaimed',
+    'replace_not_stored',
+    'replace_stored',
+    'set_existing',
+    'set_new',
+    'total_items',
     'total_realloc_requested',
     'total_realloc_served',
     'total_realloc_unserved',
-    'num_free_table_hits',
-    'num_free_table_weak_hits',
-    'num_free_table_merges',
-    'num_used_table_hits',
-    'num_used_table_weak_hits',
-    'num_used_table_merges',
-    'limit_maxbytes',
-    'evictions' ])
+    'total_requested',
+    'total_served',
+    'total_unserved',
+    'uptime',
+    'version'
+])
 
 
 def setup_logging():
@@ -67,7 +86,7 @@ def setup_logging():
     logging_console_format = '%(levelname)s: %(message)s'
     logging_file_enable = True
     logging_file_format = '%(asctime)s:%(levelname)s: %(message)s'
-    logging_file_date_format = '%Y %b %d %H:%M:%S'
+    logging_file_date_format = '%Y-%m-%d %H:%M:%S'
     logging_file_dir = './'
     logging_file_name = SELF + time.strftime('_%Y%b%d-%H%M%S') + '.log'
 
@@ -107,8 +126,8 @@ def random_value(minlen, maxlen):
 
 def log_stats(mc):
     for stat, value in mc.stats():
-        #if stat in INTERESTING_STATS:
-            log.info('%30s:  %s' % (stat, value))
+        if stat in FILTER_STATS:
+            log.debug('%30s:  %s' % (stat, value))
 
 
 def shell_exec(command):
@@ -190,7 +209,7 @@ def execute_test_for_values_range(range_name):
 
 
 def main():
-    for range in ['small', 'medium', 'large', 'all']:
+    for range in ['medium', 'small', 'large', 'all']:
       execute_test_for_values_range(range)
 
 
