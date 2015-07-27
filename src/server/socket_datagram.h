@@ -72,6 +72,7 @@ namespace cachelot {
             socket_type m_socket;
             io_buffer m_recv_buf;
             io_buffer m_send_buf;
+            typename protocol_type::endpoint m_remote_endpoint;
         };
 
 
@@ -87,14 +88,13 @@ namespace cachelot {
 
         template <class SocketType>
         inline void datagram_server<SocketType>::async_receive() noexcept {
-            typename protocol_type::endpoint remote_endpoint;
-            m_socket.async_receive_from(asio::buffer(m_recv_buf.begin_write(), m_recv_buf.available()), remote_endpoint,
+            m_socket.async_receive_from(asio::buffer(m_recv_buf.begin_write(), m_recv_buf.available()), m_remote_endpoint,
                 [=] (const error_code error, size_t bytes_recvd) noexcept {
                     m_recv_buf.confirm_write(bytes_recvd);
                     if (not error) {
                         try {
                             if (handle_data(m_recv_buf, m_send_buf) == SEND_REPLY_AND_READ) {
-                                async_send_all(remote_endpoint);
+                                async_send_all(m_remote_endpoint);
                             }
                         } catch (const std::exception &) { /* swallow exception */ }
                     } else {
