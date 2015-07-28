@@ -88,6 +88,10 @@ namespace cachelot {
             debug_assert((m_read_pos + num_bytes) <= m_write_pos);
             bytes result(m_data + m_read_pos, num_bytes);
             m_read_pos += num_bytes;
+            if (m_read_pos == m_write_pos) {
+                m_read_pos = 0u;
+                m_write_pos = 0u;
+            }
             return result;
         }
 
@@ -115,7 +119,7 @@ namespace cachelot {
             const bytes found = search_range.search(terminator);
             if (found) {
                 bytes result(search_range.begin(), found.end());
-                m_read_pos += result.length();
+                confirm_read(result.length());
                 return result;
             }
             return bytes();
@@ -161,11 +165,6 @@ namespace cachelot {
             if (available() >= at_least) {
                 return; // we have enough space
             }
-            // try to compact data
-            compact();
-            if (available() >= at_least) {
-                return;
-            }
             // grow buffer
             const size_t new_capacity = capacity_advice(at_least);
             if (new_capacity - size() >= at_least) {
@@ -184,20 +183,6 @@ namespace cachelot {
         size_t capacity_advice(size_t at_least) const noexcept {
             const size_t grow_factor = std::max(at_least, std::max(capacity() * 2 - available(), default_min_buffer_size));
             return std::min(capacity() + grow_factor, m_max_size);
-        }
-
-        // discard all data that was read
-        void compact() noexcept {
-            if (m_read_pos == m_write_pos) {
-                m_read_pos = 0u;
-                m_write_pos = 0u;
-            } else {
-                debug_assert(m_read_pos < m_write_pos);
-                size_t left_unread = m_write_pos - m_read_pos;
-                std::memmove(m_data, m_data + m_read_pos, left_unread);
-                m_read_pos = 0u;
-                m_write_pos = left_unread;
-            }
         }
 
     private:
