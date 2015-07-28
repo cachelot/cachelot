@@ -12,6 +12,9 @@ static constexpr size_t NUM_REPEAT = 50;
 static constexpr size_t MIN_ALLOC_SIZE = 4;
 static constexpr size_t MAX_ALLOC_SIZE = 1024 * 1024;
 
+// there is no memalloc in the AddressSanitizer build
+#ifndef ADDRESS_SANITIZER
+
 BOOST_AUTO_TEST_SUITE(test_memalloc)
 
 BOOST_AUTO_TEST_CASE(test_block_list) {
@@ -156,6 +159,8 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
 
 
 BOOST_AUTO_TEST_SUITE_END()
+
+#endif // ifndef ADDRESS_SANITIZER
 
 } // anonymouse namespace
 
