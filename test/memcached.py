@@ -60,11 +60,11 @@ class Client(object):
     def connect(self):
         assert self.__memcache_interface, 'Not configured'
         try:
-            log.info('Connecting to "%s"...', self.__memcache_interface)
+            log.debug('Connecting to "%s"...', self.__memcache_interface)
             self._sock = socket.socket(self.__socket_family, self.__socket_type)
             self._socket_buffer = ''
             self._sock.connect(self.__memcache_interface)
-            log.info('Connected successfully')
+            log.debug('Connected successfully')
         except:
             self._sock = None
             raise
@@ -75,10 +75,10 @@ class Client(object):
     def close(self):
         try:
             if self.is_connected():
-                log.info('Closing connection to memcached ...')
+                log.debug('Closing connection to memcached ...')
                 self._sock.shutdown()
                 self._sock.close()
-                log.info('Connection was closed')
+                log.debug('Connection was closed')
         except Exception as e:
             log.error('Failed to properly close connection to memcached: (%s)', str(e))
         finally:

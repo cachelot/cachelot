@@ -1,10 +1,10 @@
 #!/bin/sh
 
-REMOTE_SSH="192.168.14.3"
-SERVER_ADDR="192.168.14.3"
+REMOTE_SSH="192.168.14.2"
+SERVER_ADDR="192.168.14.2"
 #MEMSLAP="${HOME}/workspace/libmemcached-1.0.18/clients/memslap"
 MEMSLAP="/usr/bin/memslap"
-CACHELOT="/home/rider/workspace/cachelot/bin/release/cachelot"
+CACHELOT="/home/rider/cachelot/bin/cachelotd"
 MEMCACHED="/usr/bin/memcached"
 NUM_ITEMS=100000
 NUM_WARMUP_ITERATIONS=2
