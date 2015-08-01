@@ -41,12 +41,11 @@ namespace cachelot {
      *  - mark N bytes as filled by calling confirm_write()
      */
     class io_buffer {
-        // savepoint types
-        enum class write_state_type : size_t { DUMMY };
-        enum class read_state_type : size_t { DUMMY };
+        enum class internal_write_transaction_type : size_t { __DUMMY__ };
+        enum class internal_read_transaction_type : size_t { __DUMMY__ };
     public:
-        typedef write_state_type write_state;
-        typedef read_state_type read_state;
+        typedef internal_write_transaction_type write_transaction_type;
+        typedef internal_read_transaction_type read_transaction_type;
 
         /// constructor
         explicit io_buffer(const size_t initial_size, const size_t max_size)
@@ -96,15 +95,26 @@ namespace cachelot {
         }
 
         /// get the read position to be able to discard one or more reads in the future
-        read_state read_savepoint() const noexcept {
-            return static_cast<read_state>(m_read_pos);
+        read_transaction_type begin_read_transaction() noexcept {
+            debug_assert(not m_read_transaction);
+            m_read_transaction = true;
+            return static_cast<read_transaction_type>(m_read_pos);
         }
 
         /// make bytes unred again up to `savepoint`
-        void discard_read(const read_state savepoint) noexcept {
+        void rollback_read_transaction(const read_transaction_type savepoint) noexcept {
+            debug_assert(m_read_transaction);
+            m_read_transaction = false;
             debug_assert(static_cast<size_t>(savepoint) <= m_read_pos);
             m_read_pos = static_cast<size_t>(savepoint);
             debug_assert(m_read_pos <= m_write_pos);
+        }
+
+        /// close read transaction
+        void commit_read_transaction(const read_transaction_type) noexcept {
+            debug_assert(m_read_transaction);
+            m_read_transaction = false;
+            compact();
         }
 
         /// read all the non-read data
@@ -139,15 +149,25 @@ namespace cachelot {
         }
 
         /// get the write position to be able to discard one or more writes in the future
-        write_state write_savepoint() const noexcept {
-            return static_cast<write_state>(m_write_pos);
+        write_transaction_type begin_write_transaction() noexcept {
+            debug_assert(not m_write_transaction);
+            m_write_transaction = true;
+            return static_cast<write_transaction_type>(m_write_pos);
         }
 
         /// forget written data above the `savepoint`
-        void discard_written(const write_state savepoint) noexcept {
+        void rollback_write_transaction(const write_transaction_type savepoint) noexcept {
+            debug_assert(m_write_transaction);
+            m_write_transaction = false;
             debug_assert(static_cast<size_t>(savepoint) <= m_write_pos);
             m_write_pos = static_cast<size_t>(savepoint);
             debug_assert(m_write_pos >= m_read_pos);
+        }
+
+        /// close write transaction
+        void commit_write_transaction(const write_transaction_type) noexcept {
+            debug_assert(m_write_transaction);
+            m_write_transaction = false;
         }
 
         /// number of unfilled bytes in buffer
@@ -185,12 +205,29 @@ namespace cachelot {
             return std::min(capacity() + grow_factor, m_max_size);
         }
 
+        // discard all data that was read
+        void compact() noexcept {
+            if (m_read_pos == m_write_pos) {
+                m_read_pos = 0u;
+                m_write_pos = 0u;
+            } else {
+                debug_assert(m_read_pos < m_write_pos);
+                size_t left_unread = m_write_pos - m_read_pos;
+                std::memmove(m_data, m_data + m_read_pos, left_unread);
+                m_read_pos = 0u;
+                m_write_pos = left_unread;
+            }
+        }
+
+
     private:
         const size_t m_max_size;
         char * m_data;
         size_t m_capacity = 0;
         size_t m_read_pos = 0;
         size_t m_write_pos = 0;
+        bool m_read_transaction = false;
+        bool m_write_transaction = false;
     };
 
 } // namespace cachelot

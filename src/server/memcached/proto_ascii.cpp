@@ -127,8 +127,8 @@ namespace cachelot {
 
 
         net::ConversationReply handle_received_data(io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api) noexcept {
-            auto r_savepoint = recv_buf.read_savepoint();
-            auto w_savepoint = send_buf.write_savepoint();
+            auto r_savepoint = recv_buf.begin_read_transaction();
+            auto w_savepoint = send_buf.begin_write_transaction();
             try {
                 // read command header <cmd> <key> <args...>\r\n
                 bytes header = recv_buf.try_read_until(CRLF);
@@ -190,11 +190,13 @@ namespace cachelot {
                     throw system_error(error::broken_request);
                 }
                 // receive buffer is processed at this point
+                recv_buf.commit_read_transaction(r_savepoint);
+                send_buf.commit_write_transaction(w_savepoint);
                 return reply;
 
             } catch (const system_error & syserr) {
                 // discard any written data to write error message instead
-                send_buf.discard_written(w_savepoint);
+                send_buf.rollback_write_transaction(w_savepoint);
                 const auto errmsg = syserr.code().message();
                 if (syserr.code().category() == get_protocol_error_category()) {
                     // protocol error
@@ -207,7 +209,7 @@ namespace cachelot {
                     switch (syserr.code().value()) {
                     case error::incomplete_request:
                         // rollback read position, start over when more data will come
-                        recv_buf.discard_read(r_savepoint);
+                        recv_buf.rollback_read_transaction(r_savepoint);
                         return net::READ_MORE;
                     case error::broken_request:
                         // ill-formed packet, swallow recv_buf data
@@ -227,7 +229,7 @@ namespace cachelot {
                 }
             } catch (const std::exception & exc) {
                 // discard any written data to write error message instead
-                send_buf.discard_written(w_savepoint);
+                send_buf.rollback_write_transaction(w_savepoint);
                 send_buf << SERVER_ERROR << SPACE << exc.what() << CRLF;
                 return net::SEND_REPLY_AND_READ;
             }
