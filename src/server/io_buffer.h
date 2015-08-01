@@ -87,10 +87,6 @@ namespace cachelot {
             debug_assert((m_read_pos + num_bytes) <= m_write_pos);
             bytes result(m_data + m_read_pos, num_bytes);
             m_read_pos += num_bytes;
-            if (m_read_pos == m_write_pos) {
-                m_read_pos = 0u;
-                m_write_pos = 0u;
-            }
             return result;
         }
 
