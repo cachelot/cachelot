@@ -18,18 +18,18 @@ static constexpr size_t MAX_ALLOC_SIZE = 1024 * 1024;
 BOOST_AUTO_TEST_SUITE(test_memalloc)
 
 BOOST_AUTO_TEST_CASE(test_block_list) {
-    const size_t blocks_mem_size = (memalloc::block::min_size + memalloc::block::meta_size) * 5;
+    const size_t blocks_mem_size = (memalloc::block::min_size + memalloc::block::header_size) * 5;
     std::unique_ptr<uint8[]> blocks_layout(new uint8[blocks_mem_size]);
     uint8 * layout_ptr = blocks_layout.get();
     memalloc::block * left_border = new (layout_ptr) memalloc::block();
-    layout_ptr += left_border->size_with_meta();
+    layout_ptr += left_border->size_with_header();
 
     memalloc::block * b1 = new (layout_ptr) memalloc::block(memalloc::block::min_size, left_border);
-    layout_ptr += b1->size_with_meta();
+    layout_ptr += b1->size_with_header();
     memalloc::block * b2 = new (layout_ptr) memalloc::block(memalloc::block::min_size, b1);
-    layout_ptr += b2->size_with_meta();
+    layout_ptr += b2->size_with_header();
     memalloc::block * b3 = new (layout_ptr) memalloc::block(memalloc::block::min_size, b2);
-    layout_ptr += b3->size_with_meta();
+    layout_ptr += b3->size_with_header();
 
     memalloc::block * right_border = new (layout_ptr) memalloc::block(0, b3);
     memalloc::block::checkout(left_border);

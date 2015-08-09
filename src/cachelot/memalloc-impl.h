@@ -114,9 +114,9 @@ namespace cachelot {
         /// value of block alignment
         constexpr static const uint32 alignment = alignof(decltype(block::meta));
         /// size of block metadata
-        constexpr static const uint32 meta_size = sizeof(meta) + sizeof(link_type);
+        constexpr static const uint32 header_size = sizeof(meta) + sizeof(link_type);
         /// minimal block size left after split (this prevents from creating too small blocks to decrease fragmentation)
-        constexpr static const uint32 split_threshold = meta_size + 64;
+        constexpr static const uint32 split_threshold = header_size + 64;
 
         /// @name constructors
         ///@{
@@ -146,7 +146,7 @@ namespace cachelot {
             debug_only(std::memset(memory_, DBG_FILLER, the_size));
             meta.size = the_size;
             meta.used = false;
-            meta.left_adjacent_offset = left_adjacent_block->size_with_meta();
+            meta.left_adjacent_offset = left_adjacent_block->size_with_header();
             // check previous block for consistency
             debug_only(left_adjacent_block->test_check());
         }
@@ -158,7 +158,7 @@ namespace cachelot {
         uint32 size() const noexcept { return meta.size; }
 
         /// amount of memory including metadata
-        uint32 size_with_meta() const noexcept { return size() + meta_size; }
+        uint32 size_with_header() const noexcept { return size() + header_size; }
 
         /// modify size stored in block metadata
         void set_size(const uint32 new_size) noexcept {
@@ -196,7 +196,7 @@ namespace cachelot {
             // this must be either non-technical or left border block
             debug_assert(not is_right_border());
             auto this_ = reinterpret_cast<const uint8 *>(this);
-            const block * right = reinterpret_cast<const block *>(this_ + size_with_meta());
+            const block * right = reinterpret_cast<const block *>(this_ + size_with_header());
             debug_only(right->test_check());
             return const_cast<block *>(right);
         }
@@ -219,11 +219,11 @@ namespace cachelot {
             debug_only(     if (not is_left_border()) {                                                             );
             debug_only(         auto left = reinterpret_cast<const block *>(this_ - meta.left_adjacent_offset)      );
             debug_assert(       left->meta.dbg_marker == DBG_MARKER                                                 );
-            debug_assert(       reinterpret_cast<const uint8 *>(left) + left->size_with_meta() == this_             );
+            debug_assert(       reinterpret_cast<const uint8 *>(left) + left->size_with_header() == this_           );
             debug_only(     }                                                                                       );
                             // check right
             debug_only(     if (not is_right_border()) {                                                            );
-            debug_only(         auto right = reinterpret_cast<const block *>(this_ + size_with_meta())              );
+            debug_only(         auto right = reinterpret_cast<const block *>(this_ + size_with_header())            );
             debug_assert(       right->meta.dbg_marker == DBG_MARKER                                                );
             debug_assert(       reinterpret_cast<const uint8 *>(right) - right->meta.left_adjacent_offset == this_  );
             debug_only(     }                                                                                       );
@@ -266,11 +266,11 @@ namespace cachelot {
                 const uint32 old_size = blk->size();
                 memalloc::block * block_after_next = blk->right_adjacent();
                 blk->set_size(new_round_size);
-                debug_assert(old_size - new_round_size > block::meta_size + block::alignment);
+                debug_assert(old_size - new_round_size > block::header_size + block::alignment);
                 // temporary block to pass integrity check
-                debug_only(new (reinterpret_cast<uint8 *>(blk) + blk->size_with_meta()) block(0, blk));
-                leftover = new (blk->right_adjacent()) memalloc::block(old_size - new_round_size - memalloc::block::meta_size, blk);
-                block_after_next->meta.left_adjacent_offset = leftover->size_with_meta();
+                debug_only(new (reinterpret_cast<uint8 *>(blk) + blk->size_with_header()) block(0, blk));
+                leftover = new (blk->right_adjacent()) memalloc::block(old_size - new_round_size - memalloc::block::header_size, blk);
+                block_after_next->meta.left_adjacent_offset = leftover->size_with_header();
                 debug_only(leftover->test_check());
             }
             debug_only(blk->test_check());
@@ -286,11 +286,11 @@ namespace cachelot {
             debug_assert(right_block->left_adjacent() == left_block);
             debug_assert(left_block->right_adjacent() == right_block);
             debug_assert(left_block->is_free()); debug_assert(right_block->is_free());
-            debug_assert(left_block->size() + right_block->size_with_meta() <= block::max_size);
+            debug_assert(left_block->size() + right_block->size_with_header() <= block::max_size);
             memalloc::block * block_after_right = right_block->right_adjacent();
-            left_block->set_size(left_block->size() + right_block->size_with_meta());
+            left_block->set_size(left_block->size() + right_block->size_with_header());
             //debug_only(std::memset(right_block, DBG_FILLER, sizeof(block)));
-            block_after_right->meta.left_adjacent_offset = left_block->size_with_meta();
+            block_after_right->meta.left_adjacent_offset = left_block->size_with_header();
             return left_block;
         }
 
@@ -659,11 +659,9 @@ namespace cachelot {
                 if (not size_class.empty()) {
                     // TODO: What smaller block is doing here????
                     blk = size_class.pop_front();
-                    debug_only( if (blk != nullptr) {               );
-                    debug_only(     blk->test_check()               );
-                    debug_only(     pos.test_size_check(blk->size()));
-                    debug_assert(   blk->size() >= requested_size   );
-                    debug_only( }                                   );
+                    debug_only(   blk->test_check()               );
+                    debug_only(   pos.test_size_check(blk->size()));
+                    debug_assert( blk->size() >= requested_size   );
                 }
                 if (size_class.empty()) {
                     bit_index_mark_empty(pos);
@@ -884,33 +882,33 @@ namespace cachelot {
         // left technical border block to prevent block merge underflow
         available += unaligned_bytes(available, block::alignment); // alignment
         block * left_border = new (available) block();
-        available += left_border->size_with_meta();
+        available += left_border->size_with_header();
         // leave space to 'right border' that will prevent block merge overflow
-        EOM -= block::meta_size;
+        EOM -= block::header_size;
         EOM -= unaligned_bytes(EOM, block::alignment);
 
         // allocate blocks of maximal size first further they could be split
         block * prev_allocated_block = left_border;
-        while (static_cast<size_t>(EOM - available) >= block::max_size + block::meta_size) {
+        while (static_cast<size_t>(EOM - available) >= block::max_size + block::header_size) {
             block * huge_block = new (available) block(block::max_size, prev_allocated_block);
             // temporarily create block on the right to pass block consistency test
-            debug_only(new (reinterpret_cast<uint8 *>(huge_block) + huge_block->size_with_meta()) block(0, huge_block));
+            debug_only(new (reinterpret_cast<uint8 *>(huge_block) + huge_block->size_with_header()) block(0, huge_block));
             // store block at max pos of table
             free_blocks->put_biggest_block(huge_block);
-            available += huge_block->size_with_meta();
+            available += huge_block->size_with_header();
             debug_assert(available < EOM);
             prev_allocated_block = huge_block;
         }
         // allocate space what's left
-        uint32 leftover_size = EOM - available - block::meta_size;
+        uint32 leftover_size = EOM - available - block::header_size;
         leftover_size -= unaligned_bytes(leftover_size, block::alignment);
         if (leftover_size >= block::split_threshold) {
             block * leftover_block = new (available) block(leftover_size, prev_allocated_block);
             // temporarily create block on the right to pass block consistency test
-            debug_only(new (reinterpret_cast<uint8 *>(leftover_block) + leftover_block->size_with_meta()) block(0, leftover_block));
+            debug_only(new (reinterpret_cast<uint8 *>(leftover_block) + leftover_block->size_with_header()) block(0, leftover_block));
             free_blocks->put_block(leftover_block);
             prev_allocated_block = leftover_block;
-            EOM = available + leftover_block->size_with_meta();
+            EOM = available + leftover_block->size_with_header();
         } else {
             EOM = available;
         }
@@ -921,14 +919,14 @@ namespace cachelot {
         block::checkout(left_border);
         block::checkout(right_border);
         // remember how much memory left to user
-        user_available_memory_size = reinterpret_cast<char *>(right_border) - reinterpret_cast<char *>(left_border) - block::meta_size;
+        user_available_memory_size = reinterpret_cast<char *>(right_border) - reinterpret_cast<char *>(left_border) - block::header_size;
     }
 
 
     inline memalloc::block * memalloc::merge_unused(memalloc::block * blk) noexcept {
         // merge left until used block or max_block_size
         while ((blk->size() < block::max_size) && blk->left_adjacent()->is_free()) {
-            if (blk->size() + blk->left_adjacent()->size_with_meta() <= block::max_size) {
+            if (blk->size() + blk->left_adjacent()->size_with_header() <= block::max_size) {
                 block_list::unlink(blk->left_adjacent());
                 blk = block::merge(blk->left_adjacent(), blk);
             } else {
@@ -937,7 +935,7 @@ namespace cachelot {
         }
         // merge right until used block or max_block_size
         while ((blk->size() < block::max_size) && blk->right_adjacent()->is_free()) {
-            if (blk->size() + blk->right_adjacent()->size_with_meta() <= block::max_size) {
+            if (blk->size() + blk->right_adjacent()->size_with_header() <= block::max_size) {
                 block_list::unlink(blk->right_adjacent());
                 blk = block::merge(blk, blk->right_adjacent());
             } else {
@@ -1164,7 +1162,7 @@ namespace cachelot {
         auto right = blk->right_adjacent();
         // check if we have enough space first
         while (available < new_size && right->is_free()) {
-            available += right->size_with_meta();
+            available += right->size_with_header();
             right = right->right_adjacent();
         }
         if (available >= new_size) {
