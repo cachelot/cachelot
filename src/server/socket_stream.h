@@ -155,6 +155,7 @@ namespace cachelot {
                     if (not error) {
                         m_recv_buf.confirm_write(bytes_received);
                         ConversationReply reply = handle_data(m_recv_buf, m_send_buf);
+                        m_recv_buf.compact();
                         switch (reply) {
                         case SEND_REPLY_AND_READ:
                             async_send_all();
@@ -186,6 +187,7 @@ namespace cachelot {
                     if (not error) {
                         debug_assert(m_send_buf.non_read() == bytes_sent);
                         m_send_buf.confirm_read(bytes_sent);
+                        m_send_buf.compact();
                     } else {
                         suicide();
                     }

@@ -80,10 +80,9 @@ namespace cachelot {
 
         protected:
             net::ConversationReply handle_data(io_buffer & recv_buf, io_buffer & send_buf) noexcept override {
-                auto w_savepoint = send_buf.begin_write_transaction();
+                auto w_savepoint = send_buf.write_savepoint();
                 try {
                     handle_udp_frame_header(recv_buf, send_buf);
-                    send_buf.commit_write_transaction(w_savepoint);
                     return handle_received_data(recv_buf, send_buf, cache_api);
                 } catch (const std::exception & exc) {
                     send_buf.rollback_write_transaction(w_savepoint);

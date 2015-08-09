@@ -127,8 +127,8 @@ namespace cachelot {
 
 
         net::ConversationReply handle_received_data(io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api) noexcept {
-            auto r_savepoint = recv_buf.begin_read_transaction();
-            auto w_savepoint = send_buf.begin_write_transaction();
+            auto r_savepoint = recv_buf.read_savepoint();
+            auto w_savepoint = send_buf.write_savepoint();
             try {
                 // read command header <cmd> <key> <args...>\r\n
                 bytes header = recv_buf.try_read_until(CRLF);
@@ -189,9 +189,6 @@ namespace cachelot {
                 default:
                     throw system_error(error::broken_request);
                 }
-                // receive buffer is processed at this point
-                recv_buf.commit_read_transaction(r_savepoint);
-                send_buf.commit_write_transaction(w_savepoint);
                 return reply;
 
             } catch (const system_error & syserr) {

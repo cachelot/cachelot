@@ -41,11 +41,11 @@ namespace cachelot {
      *  - mark N bytes as filled by calling confirm_write()
      */
     class io_buffer {
-        enum class internal_write_transaction_type : size_t { __DUMMY__ };
-        enum class internal_read_transaction_type : size_t { __DUMMY__ };
+        enum class internal_write_savepoint_type : size_t { __DUMMY__ };
+        enum class internal_read_savepoint_type : size_t { __DUMMY__ };
     public:
-        typedef internal_write_transaction_type write_transaction_type;
-        typedef internal_read_transaction_type read_transaction_type;
+        typedef internal_write_savepoint_type write_savepoint_type;
+        typedef internal_read_savepoint_type read_savepoint_type;
 
         /// constructor
         explicit io_buffer(const size_t initial_size, const size_t max_size)
@@ -91,26 +91,15 @@ namespace cachelot {
         }
 
         /// get the read position to be able to discard one or more reads in the future
-        read_transaction_type begin_read_transaction() noexcept {
-            debug_assert(not m_read_transaction);
-            m_read_transaction = true;
-            return static_cast<read_transaction_type>(m_read_pos);
+        read_savepoint_type read_savepoint() noexcept {
+            return static_cast<read_savepoint_type>(m_read_pos);
         }
 
         /// make bytes unred again up to `savepoint`
-        void rollback_read_transaction(const read_transaction_type savepoint) noexcept {
-            debug_assert(m_read_transaction);
-            m_read_transaction = false;
+        void rollback_read_transaction(const read_savepoint_type savepoint) noexcept {
             debug_assert(static_cast<size_t>(savepoint) <= m_read_pos);
             m_read_pos = static_cast<size_t>(savepoint);
             debug_assert(m_read_pos <= m_write_pos);
-        }
-
-        /// close read transaction
-        void commit_read_transaction(const read_transaction_type) noexcept {
-            debug_assert(m_read_transaction);
-            m_read_transaction = false;
-            compact();
         }
 
         /// read all the non-read data
@@ -145,25 +134,15 @@ namespace cachelot {
         }
 
         /// get the write position to be able to discard one or more writes in the future
-        write_transaction_type begin_write_transaction() noexcept {
-            debug_assert(not m_write_transaction);
-            m_write_transaction = true;
-            return static_cast<write_transaction_type>(m_write_pos);
+        write_savepoint_type write_savepoint() noexcept {
+            return static_cast<write_savepoint_type>(m_write_pos);
         }
 
         /// forget written data above the `savepoint`
-        void rollback_write_transaction(const write_transaction_type savepoint) noexcept {
-            debug_assert(m_write_transaction);
-            m_write_transaction = false;
+        void rollback_write_transaction(const write_savepoint_type savepoint) noexcept {
             debug_assert(static_cast<size_t>(savepoint) <= m_write_pos);
             m_write_pos = static_cast<size_t>(savepoint);
             debug_assert(m_write_pos >= m_read_pos);
-        }
-
-        /// close write transaction
-        void commit_write_transaction(const write_transaction_type) noexcept {
-            debug_assert(m_write_transaction);
-            m_write_transaction = false;
         }
 
         /// number of unfilled bytes in buffer
@@ -195,12 +174,6 @@ namespace cachelot {
             }
         }
 
-    private:
-        size_t capacity_advice(size_t at_least) const noexcept {
-            const size_t grow_factor = std::max(at_least, std::max(capacity() * 2 - available(), default_min_buffer_size));
-            return std::min(capacity() + grow_factor, m_max_size);
-        }
-
         // discard all data that was read
         void compact() noexcept {
             if (m_read_pos == m_write_pos) {
@@ -215,6 +188,11 @@ namespace cachelot {
             }
         }
 
+    private:
+        size_t capacity_advice(size_t at_least) const noexcept {
+            const size_t grow_factor = std::max(at_least, std::max(capacity() * 2 - available(), default_min_buffer_size));
+            return std::min(capacity() + grow_factor, m_max_size);
+        }
 
     private:
         const size_t m_max_size;
@@ -222,8 +200,6 @@ namespace cachelot {
         size_t m_capacity = 0;
         size_t m_read_pos = 0;
         size_t m_write_pos = 0;
-        bool m_read_transaction = false;
-        bool m_write_transaction = false;
     };
 
 } // namespace cachelot

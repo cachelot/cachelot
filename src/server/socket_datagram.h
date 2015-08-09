@@ -23,7 +23,7 @@ namespace cachelot {
 
         /**
          * datagram_server is an acceptor and connection manager for the `SOCK_DGRAM` sockets (UDP/IP and local unix datagram socket)
-         * 
+         *
          * @tparam SocketType is a datagram socket from the boost::asio library
          * @tparam ConversationType is an implementation of the protocol handler
          */
@@ -96,6 +96,7 @@ namespace cachelot {
                             if (handle_data(m_recv_buf, m_send_buf) == SEND_REPLY_AND_READ) {
                                 async_send_all(m_remote_endpoint);
                             }
+                            m_recv_buf.compact();
                         } catch (const std::exception &) { /* swallow exception */ }
                     } else {
                         if (error == io_error::operation_aborted) {
@@ -117,6 +118,7 @@ namespace cachelot {
                 [=](error_code /*error*/, size_t /*bytes_sent*/) {
                     // even data was not sent completely
                     m_send_buf.confirm_read(need_to_send);
+                    m_send_buf.compact();
                 });
         }
 

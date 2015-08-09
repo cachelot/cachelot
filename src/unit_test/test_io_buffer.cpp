@@ -41,7 +41,7 @@ BOOST_AUTO_TEST_CASE(test_io_buffer_read_write) {
 BOOST_AUTO_TEST_CASE(test_io_buffer_savepoint) {
     io_buffer buf(0, 16);
     // write 16 bytes of nothing and discard it immediately
-    auto w_savepoint = buf.begin_write_transaction();
+    auto w_savepoint = buf.write_savepoint();
     buf.begin_write(16);
     BOOST_CHECK_EQUAL(buf.non_read(), 0);
     buf.confirm_write(16);
@@ -54,7 +54,7 @@ BOOST_AUTO_TEST_CASE(test_io_buffer_savepoint) {
     BOOST_CHECK_EQUAL(buf.non_read(), 0);
     buf.confirm_write(16);
     BOOST_CHECK_EQUAL(buf.non_read(), 16);
-    auto r_savepoint = buf.begin_read_transaction();
+    auto r_savepoint = buf.read_savepoint();
     buf.begin_read();
     buf.confirm_read(1);
     BOOST_CHECK_EQUAL(buf.non_read(), 15);
