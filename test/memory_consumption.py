@@ -155,11 +155,11 @@ def create_kv_data(range_name):
 def execute_test(mc, kv_data):
     for run_no in range(5):
         start_time = time.time()
-        log.info('Fill-in caching server ...')
+        log.debug('Fill-in caching server ...')
         for k, v in kv_data:
             mc.set(k, v)
         log.debug('  Took: %.2f sec', time.time() - start_time)
-        log.info('Checking caching server ...')
+        log.debug('Checking caching server ...')
         num_items = 0
         effective_memory = 0
         start_time = time.time()
