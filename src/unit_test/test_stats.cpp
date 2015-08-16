@@ -10,10 +10,10 @@ BOOST_AUTO_TEST_SUITE(test_stats)
 
 static auto calc_hash = fnv1a<cache::Cache::hash_type>::hasher();
 
-cache::ItemPtr CreateItem(cache::Cache & c, const string k, const string v, cache::opaque_flags_type flags = 0, cache::seconds keepalive = cache::keepalive_forever, cache::version_type ver = 0) {
+cache::ItemPtr CreateItem(cache::Cache & c, const string k, const string v, cache::opaque_flags_type flags = 0, cache::seconds keepalive = cache::keepalive_forever ) {
     const auto key = bytes(k.c_str(), k.length());
     const auto value = bytes(v.c_str(), v.length());
-    auto item = c.create_item(key, calc_hash(key), value.length(), flags, keepalive, ver);
+    auto item = c.create_item(key, calc_hash(key), value.length(), flags, keepalive);
     item->assign_value(value);
     return item;
 }
@@ -76,20 +76,21 @@ BOOST_AUTO_TEST_CASE(test_cache_commands) {
     // cas
     {
         const auto item1 = CreateItem(the_cache, "CAS_Key1", "Value1");
-        BOOST_CHECK_EQUAL(the_cache.do_cas(item1), cache::NOT_FOUND);
+        const auto item1_timestamp = item1->timestamp();
+        BOOST_CHECK_EQUAL(the_cache.do_cas(item1, 0), cache::NOT_FOUND);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_cas), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_misses), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_stored), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_badval), 0);
         BOOST_CHECK_EQUAL(the_cache.do_set(item1), cache::STORED);
         const auto item1_2 = CreateItem(the_cache, "CAS_Key1", "Value2");
-        BOOST_CHECK_EQUAL(the_cache.do_cas(item1_2), cache::STORED);
+        BOOST_CHECK_EQUAL(the_cache.do_cas(item1_2, item1_timestamp), cache::STORED);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_cas), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_misses), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_stored), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_badval), 0);
         const auto item1_3 = CreateItem(the_cache, "CAS_Key1", "Value3");
-        BOOST_CHECK_EQUAL(the_cache.do_cas(item1_3), cache::EXISTS);
+        BOOST_CHECK_EQUAL(the_cache.do_cas(item1_3, item1_timestamp), cache::EXISTS);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_cas), 3);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_misses), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_stored), 1);

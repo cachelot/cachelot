@@ -48,12 +48,12 @@ namespace cachelot {
             typedef uint16 opaque_flags_type;
             typedef ExpirationClock clock;
             typedef clock::time_point expiration_time_point;
-            typedef uint64 version_type;
+            typedef uint64 timestamp_type;
             static constexpr uint8 max_key_length = 250; // ! key size is limited to uint8
             static constexpr uint32 max_value_length = std::numeric_limits<uint32>::max(); // ! value size is limited to uint32
         private:
             // Important! declaration order affects item size
-            version_type m_version; // version of this item
+            const timestamp_type m_timestamp; // timestamp of this item
             const hash_type m_hash; // hash value
             uint32 m_value_length; // length of value [0..MAX_VALUE_LENGTH]
             expiration_time_point m_expiration_time; // when it expires
@@ -71,7 +71,7 @@ namespace cachelot {
             Item & operator= (Item &&) = delete;
         public:
             /// constructor
-            explicit Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration_time, version_type the_version) noexcept;
+            explicit Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration_time, timestamp_type the_timestamp) noexcept;
 
             /// Destroy existing Item
             static void Destroy(Item * item) noexcept;
@@ -94,11 +94,8 @@ namespace cachelot {
             /// user defined flags
             opaque_flags_type opaque_flags() const noexcept { return m_opaque_flags; }
 
-            /// retrieve version of this item
-            version_type version() const noexcept { return m_version; }
-
-            /// mark this item as a new version of item `i`
-            void new_version_of(const Item * i) noexcept { m_version = i->version() + 1; }
+            /// retrieve timestamp of this item
+            timestamp_type timestamp() const noexcept { return m_timestamp; }
 
             /// retrieve expiration time of this item
             expiration_time_point expiration_time() const noexcept { return m_expiration_time; }
@@ -119,8 +116,8 @@ namespace cachelot {
         };
 
 
-        inline Item::Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration, version_type the_version) noexcept
-                : m_version(the_version)
+        inline Item::Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration, timestamp_type the_timestamp) noexcept
+                : m_timestamp(the_timestamp)
                 , m_hash(the_hash)
                 , m_value_length(value_length)
                 , m_expiration_time(expiration)

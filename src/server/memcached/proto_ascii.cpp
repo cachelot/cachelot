@@ -259,7 +259,7 @@ namespace cachelot {
                 if (i) {
                     send_buf << VALUE << SPACE << i->key() << SPACE << i->opaque_flags() << SPACE << static_cast<uint32>(i->value().length());
                     if (cmd == cache::GETS) {
-                        send_buf << SPACE << i->version();
+                        send_buf << SPACE << i->timestamp();
                     }
                     send_buf << CRLF << i->value() << CRLF;
                 }
@@ -281,10 +281,10 @@ namespace cachelot {
             if (datalen > settings.cache.max_value_size) {
                 throw system_error(error::value_length);
             }
-            cache::version_type cas_unique = 0;
+            cache::timestamp_type cas_unique = 0;
             if (cmd == cache::CAS) {
                 tie(parsed, args) = args.split(SPACE);
-                cas_unique = str_to_int<cache::version_type>(parsed.begin(), parsed.end());
+                cas_unique = str_to_int<cache::timestamp_type>(parsed.begin(), parsed.end());
             }
             bool noreply = maybe_noreply(args);
             // read <value>\r\n
@@ -301,10 +301,31 @@ namespace cachelot {
                 throw system_error(error::value_crlf_expected);
             }
             // create new item and execute the cache API
-            auto new_item = cache_api.create_item(key, calc_hash(key), value.length(), flags, keep_alive_duration, cas_unique);
+            auto new_item = cache_api.create_item(key, calc_hash(key), value.length(), flags, keep_alive_duration);
             new_item->assign_value(value);
             try {
-                auto response = cache_api.do_storage(cmd, new_item);
+                auto response = cache::NOT_A_RESPONSE;
+                switch (cmd) {
+                case cache::SET:
+                    response = cache_api.do_set(new_item);
+                    break;
+                case cache::ADD:
+                    response = cache_api.do_add(new_item);
+                    break;
+                case cache::REPLACE:
+                    response = cache_api.do_replace(new_item);
+                    break;
+                case cache::CAS:
+                    response = cache_api.do_cas(new_item, cas_unique);
+                    break;
+                case cache::APPEND:
+                case cache::PREPEND:
+                    response = cache_api.do_extend(cmd, new_item);
+                    break;
+                default:
+                    debug_assert(false);
+                    throw system_error(error::unknown_error);
+                }
                 return reply_with_response(send_buf, response, noreply);
             } catch (...) {
                 cache_api.destroy_item(new_item);
@@ -378,7 +399,7 @@ namespace cachelot {
             if (not args.empty()) {
                 throw system_error(error::crlf_expected);
             }
-            send_buf << VERSION << ' ' << CACHELOT_VERSION_STRING << CRLF;
+            send_buf << VERSION << SPACE << CACHELOT_VERSION_STRING << CRLF;
             return net::SEND_REPLY_AND_READ;
         }
 

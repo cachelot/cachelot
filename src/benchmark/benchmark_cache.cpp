@@ -56,7 +56,7 @@ public:
         bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
         cache::ItemPtr item = nullptr;
         try {
-            item = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, cache::keepalive_forever, /*CAS*/0);
+            item = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, cache::keepalive_forever);
             item->assign_value(v);
             m_cache.do_set(item);
             bench_stats.num_set += 1;

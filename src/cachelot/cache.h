@@ -59,7 +59,7 @@ namespace cachelot {
         typedef Item::opaque_flags_type opaque_flags_type;
 
         /// Value type of CAS operation
-        typedef Item::version_type version_type;
+        typedef Item::timestamp_type timestamp_type;
 
         /// Maximum key length in bytes
         static constexpr auto max_key_length = Item::max_key_length;
@@ -154,13 +154,6 @@ namespace cachelot {
 
 
             /**
-             * execute on of the storage command: `set` / `add` / `replace` / `cas` / `prepend` / `append`
-             *
-             * @copydoc doxygen_store_command
-             */
-            Response do_storage(Command cmd, ItemPtr item);
-
-            /**
              * `set` - store item unconditionally
              *
              * @copydoc doxygen_store_command
@@ -186,7 +179,7 @@ namespace cachelot {
              *
              * @copydoc doxygen_store_command
              */
-            Response do_cas(ItemPtr item);
+            Response do_cas(ItemPtr item, timestamp_type cas_unique);
 
             /**
              * Extend (`prepend` or `append`) existing item with the new data
@@ -249,7 +242,7 @@ namespace cachelot {
             /**
              * Create new Item using memalloc
              */
-            ItemPtr create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds keepalive, version_type version);
+            ItemPtr create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds keepalive);
 
             /**
              * Free existing Item and return memory to the memalloc
@@ -287,6 +280,8 @@ namespace cachelot {
             memalloc m_allocator;
             dict_type m_dict;
             const bool m_evictions_enabled;
+            timestamp_type m_oldest_timestamp;
+            timestamp_type m_newest_timestamp;
         };
 
 
@@ -294,7 +289,9 @@ namespace cachelot {
             : memory_arena(new uint8[memory_limit])
             , m_allocator(raw_pointer(memory_arena), memory_limit)
             , m_dict(initial_dict_size)
-            , m_evictions_enabled(enable_evictions) {
+            , m_evictions_enabled(enable_evictions)
+            , m_oldest_timestamp(std::numeric_limits<timestamp_type>::max())
+            , m_newest_timestamp(std::numeric_limits<timestamp_type>::min()) {
         }
 
 
@@ -332,27 +329,6 @@ namespace cachelot {
                 return ItemPtr(nullptr);
             }
         }
-
-
-        inline Response Cache::do_storage(Command cmd, ItemPtr item) {
-            switch (cmd) {
-            case SET:
-                return do_set(item);
-            case ADD:
-                return do_add(item);
-            case REPLACE:
-                return do_replace(item);
-            case CAS:
-                return do_cas(item);
-            case APPEND:
-            case PREPEND:
-                return do_extend(cmd, item);
-            default:
-                debug_assert(false);
-                throw system_error(error::unknown_error);
-            }
-        }
-
 
 
         inline Response Cache::do_set(ItemPtr item) {
@@ -400,12 +376,12 @@ namespace cachelot {
         }
 
 
-        inline Response Cache::do_cas(ItemPtr item) {
+        inline Response Cache::do_cas(ItemPtr item, timestamp_type cas_unique) {
             bool found; iterator at;
             STAT_INCR(cache.cmd_cas, 1);
             tie(found, at) = retrieve_item(item->key(), item->hash());
             if (found) {
-                if (item->version() == at.value()->version()) {
+                if (cas_unique == at.value()->timestamp()) {
                     replace_item_at(at, item);
                     STAT_INCR(cache.cas_stored, 1);
                     return STORED;
@@ -436,7 +412,7 @@ namespace cachelot {
                 // do not evict existing items to avoid accidentally free the `piece` or the `old_item`
                 auto memory = m_allocator.alloc_or_evict(Item::CalcSizeRequired(old_item->key(), new_value_size), false, [=](void *){});
                 if (memory != nullptr) {
-                    auto new_item = new (memory) Item(old_item->key(), old_item->hash(), new_value_size, old_item->opaque_flags(), old_item->expiration_time(), old_item->version() + 1);
+                    auto new_item = new (memory) Item(old_item->key(), old_item->hash(), new_value_size, old_item->opaque_flags(), old_item->expiration_time(), old_item->timestamp() + 1);
                     if (cmd == APPEND) {
                         new_item->assign_compose(old_item->value(), piece->value());
                         STAT_INCR(cache.append_stored, 1);
@@ -539,23 +515,17 @@ namespace cachelot {
             // store new value as an ASCII string
             AsciiIntegerBuffer new_ascii_value;
             const auto new_ascii_value_length = int_to_str(new_int_value, new_ascii_value);
-            if (new_ascii_value_length <= old_ascii_value.length()) {
-                // re-assign value inplace
-                at.value()->assign_value(bytes(new_ascii_value, new_ascii_value_length));
-                at.value()->new_version_of(at.value()); // increase version
-            } else {
-                // create new item to hold value including zero terminator
-                ItemPtr new_item;
-                seconds new_keepalive = old_item->expiration_time() == expiration_time_point::max() ? keepalive_forever : old_item->expiration_time() - clock::now();
-                new_item = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), new_keepalive, old_item->version() + 1);
-                new_item->assign_value(bytes(new_ascii_value, new_ascii_value_length));
-                replace_item_at(at, new_item);
-            }
+            // create new item to hold value including zero terminator
+            ItemPtr new_item;
+            seconds new_keepalive = old_item->expiration_time() == expiration_time_point::max() ? keepalive_forever : old_item->expiration_time() - clock::now();
+            new_item = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), new_keepalive);
+            new_item->assign_value(bytes(new_ascii_value, new_ascii_value_length));
+            replace_item_at(at, new_item);
             return make_tuple(STORED, new_int_value);
         }
 
 
-        inline ItemPtr Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, cache::seconds keepalive, version_type version) {
+        inline ItemPtr Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, cache::seconds keepalive) {
             void * memory;
             const size_t size_required = Item::CalcSizeRequired(key, value_length);
             static const auto on_delete = [=](void * ptr) noexcept -> void {
@@ -565,7 +535,7 @@ namespace cachelot {
             };
             memory = m_allocator.alloc_or_evict(size_required, m_evictions_enabled, on_delete);
             if (memory != nullptr) {
-                auto item = new (memory) Item(key, hash, value_length, flags, time_from(keepalive), version);
+                auto item = new (memory) Item(key, hash, value_length, flags, time_from(keepalive), ++m_newest_timestamp);
                 return item;
             } else {
                 throw system_error(error::out_of_memory);
@@ -581,7 +551,6 @@ namespace cachelot {
         inline void Cache::replace_item_at(const iterator at, ItemPtr new_item) noexcept {
             auto old_item = at.value();
             debug_assert(old_item->hash() == new_item->hash() && old_item->key() == new_item->key());
-            new_item->new_version_of(old_item);
             destroy_item(old_item);
             m_dict.remove(at);
             m_dict.insert(at, new_item->key(), new_item->hash(), new_item);
