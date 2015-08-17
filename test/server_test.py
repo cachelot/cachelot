@@ -9,8 +9,14 @@ import random
 import string
 import memcached
 import time
+import os
+import subprocess
 
 log = logging.getLogger('Test cachelotd')
+
+SELF, _ = os.path.splitext(os.path.basename(sys.argv[0]))
+BASEDIR = os.path.normpath(os.path.dirname(os.path.abspath(sys.argv[0])) + '/..')
+CACHELOTD = os.path.join(BASEDIR, 'bin/cachelotd')
 
 
 class TestFailedError(Exception):
@@ -172,11 +178,16 @@ def run_fuzzy_test(mc):
 
 
 def main():
-    mc = memcached.connect_tcp('localhost', 11211)
-    ver = mc.version()
-    log.info("Test cachelot version '%s'", ver)
-    run_smoke_test(mc)
-
+    devnull = open(os.devnull, 'w')
+    cachelot_proc = subprocess.Popen(args=CACHELOTD, stdout=devnull, stderr=devnull)
+    time.sleep(1)
+    try:
+        mc = memcached.connect_tcp('localhost', 11211)
+        ver = mc.version()
+        log.info("Test cachelot version '%s'", ver)
+        run_smoke_test(mc)
+    finally:
+        cachelot_proc.terminate()
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
