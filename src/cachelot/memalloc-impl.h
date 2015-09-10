@@ -53,7 +53,7 @@ namespace cachelot {
 // This will speedup many lookups
 
 
-//////// constants //////////////////////////////////
+////////////////////////////////// constants //////////////////////////////////
 
 
     namespace const_ {
@@ -85,7 +85,7 @@ namespace cachelot {
     }
 
 
-//////// block //////////////////////////////////////
+////////////////////////////////// block //////////////////////////////////////
 
 
     /// single allocation chunk with metadata
@@ -299,7 +299,7 @@ namespace cachelot {
     };
 
 
-//////// block_list /////////////////////////////////
+////////////////////////////////// block_list /////////////////////////////////
 
     /// double linked circular list of blocks
     /// It allows to insert uninited nodes and remove nodes outside of list (@see block_list::unlink())
@@ -437,7 +437,7 @@ namespace cachelot {
     };
 
 
-//////// group_by_size ///////////////////////////
+////////////////////////////////// group_by_size ///////////////////////////
 
     /**
      * @section group_by_size Segregation
@@ -849,7 +849,7 @@ namespace cachelot {
         friend class memalloc;
     };
 
-//////// memalloc //////////////////////////////////////
+////////////////////////////////// memalloc //////////////////////////////////////
 
     inline memalloc::memalloc(void * arena, const size_t arena_size) noexcept {
         STAT_SET(mem.limit_maxbytes, arena_size);

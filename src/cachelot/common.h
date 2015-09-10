@@ -16,6 +16,10 @@
 #  pragma GCC system_header  // suppress warnings from the following headers
 #endif
 
+#if HAVE_CONFIG_H
+#  include "config.h"
+#endif
+
 // assertion
 #if defined(DEBUG)
 #  include <cassert>
@@ -93,9 +97,25 @@ namespace cachelot {
 
     /// get raw pointer on type from a smart pointer such as std::unique_ptr
     template <class SmartPointer>
-    auto raw_pointer(const SmartPointer & ptr) -> decltype(ptr.get()) {
+    inline auto raw_pointer(const SmartPointer & ptr) -> decltype(ptr.get()) {
         return ptr.get();
     }
+
+    // workaround aligned_alloc
+    #if !defined(HAVE_ALIGNED_ALLOC)
+    inline void * aligned_alloc(size_t alignment, size_t size) noexcept {
+    #if HAVE_POSIX_MEMALIGN
+        void * ptr;
+        if (posix_memalign(&ptr, alignment, size) == 0) {
+            return ptr;
+        } else {
+            return nullptr;
+        }
+    #else
+    #  error "aligned_alloc function not found"
+    #endif
+    }
+    #endif // aligned_alloc
 
     constexpr size_t cpu_l1d_cache_line = 64;
     constexpr int the_answer_to_life_the_universe_and_everything = 42;

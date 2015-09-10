@@ -8,7 +8,7 @@ else ()
     # Unix Makefiles support only single build configuration - release by default
     if (NOT "$CMAKE_BUILD_TYPE")
         set (CMAKE_BUILD_TYPE RelWithDebugInfo)
-    endif()
+    endif ()
 endif ()
 project (cachelot)
 cmake_minimum_required (VERSION 2.8.3)
@@ -27,9 +27,8 @@ else ()
 endif ()
 message (STATUS "Platform: ${CMAKE_SYSTEM_NAME} x${CACHELOT_PLATFORM_BITS}")
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    add_definition(-D_WIN32_WINNT=0x05010000) # set NTDDI_WINXP as a target win version
+    add_definition (-D_WIN32_WINNT=0x05010000) # set NTDDI_WINXP as a target win version
 endif ()
-
 
 ###########################################################################
 #       Compiler setup
@@ -94,6 +93,15 @@ else ()
     message (FATAL_ERROR "unknown compiler")
 endif ()
 
+###########################################################################
+#       config.h
+###########################################################################
+include(CheckSymbolExists)
+check_symbol_exists (aligned_alloc stdlib.h HAVE_ALIGNED_ALLOC)
+check_symbol_exists (posix_memalign stdlib.h HAVE_POSIX_MEMALIGN)
+
+configure_file (src/cachelot/config.h.in src/cachelot/config.h)
+add_definitions (-DHAVE_CONFIG_H=1)
 
 ###########################################################################
 #       3rd party libraries
