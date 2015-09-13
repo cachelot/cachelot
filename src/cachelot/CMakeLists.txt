@@ -14,7 +14,7 @@ set (CACHELOT_SOURCES
     random.h
     debug_trace.h
     memalloc.h
-    memalloc-impl.h
+    memalloc-inl.h
     item.h
     cache.h
     cache.cpp
