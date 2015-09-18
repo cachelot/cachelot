@@ -120,6 +120,9 @@ namespace cachelot {
     constexpr size_t cpu_l1d_cache_line = 64;
     constexpr int the_answer_to_life_the_universe_and_everything = 42;
 
+    constexpr size_t Kilobyte = 1024;
+    constexpr size_t Megabyte = 1024 * 1024;
+
 } // namespace cachelot
 
 /// @}
