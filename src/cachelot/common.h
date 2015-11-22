@@ -31,20 +31,20 @@
 #endif
 
 // STL
+#include <array>    // array
 #include <memory>   // unique_ptr
-#include <string>   // std::string / std::wstring
-#include <vector>   // std::vector
+#include <string>   // string / wstring
+#include <vector>   // vector
 #include <cstdint>  // fixed-size integral types
-#include <limits>   // std::numeric_limits
+#include <limits>   // numeric_limits
 #include <type_traits> // is_base_of, result_of etc.
 #include <iostream> // stream IO
 #include <algorithm>// min / max
-#include <cmath>    // log, ceil
 #include <cstdlib>  // strtol, strtoul
 #include <stdexcept>// exception / runtime_error, etc
-#include <tuple>    // std::tuple
-#include <thread>   // std::thread std::this_thread
-#include <cstring>  // std::memmove
+#include <tuple>    // tuple
+#include <thread>   // thread std::this_thread
+#include <cstring>  // memmove
 
 #define __CACHELOT_PP_STR1(X) #X
 #define CACHELOT_PP_STR(X) __CACHELOT_PP_STR1(X)
@@ -104,7 +104,7 @@ namespace cachelot {
     // workaround aligned_alloc
     #if !defined(HAVE_ALIGNED_ALLOC)
     inline void * aligned_alloc(size_t alignment, size_t size) noexcept {
-    #if HAVE_POSIX_MEMALIGN
+    #if defined(HAVE_POSIX_MEMALIGN)
         void * ptr;
         if (posix_memalign(&ptr, alignment, size) == 0) {
             return ptr;
@@ -115,13 +115,17 @@ namespace cachelot {
     #  error "aligned_alloc function not found"
     #endif
     }
+
+    inline void aligned_free(void * ptr) noexcept {
+        std::free(ptr);
+    }
     #endif // aligned_alloc
 
     constexpr size_t cpu_l1d_cache_line = 64;
     constexpr int the_answer_to_life_the_universe_and_everything = 42;
 
     constexpr size_t Kilobyte = 1024;
-    constexpr size_t Megabyte = 1024 * 1024;
+    constexpr size_t Megabyte = Kilobyte * 1024;
 
 } // namespace cachelot
 

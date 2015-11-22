@@ -16,7 +16,8 @@ using std::chrono::minutes;
 using std::chrono::hours;
 
 constexpr size_t num_items = 1000000;
-constexpr size_t cache_memory = 64 * 1024 * 1024;
+constexpr size_t cache_memory = 64 * Megabyte;
+constexpr size_t page_size = 4 * Megabyte;
 constexpr size_t hash_initial = 131072;
 constexpr uint8 min_key_len = 14;
 constexpr uint8 max_key_len = 40;
@@ -49,7 +50,7 @@ typedef array_type::const_iterator iterator;
 
 class CacheWrapper {
 public:
-    CacheWrapper() : m_cache(cache_memory, hash_initial, true) {}
+    CacheWrapper() : m_cache(cache_memory, page_size, hash_initial, true) {}
 
     void set(iterator it) {
         bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());

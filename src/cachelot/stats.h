@@ -32,6 +32,7 @@ namespace cachelot {
         X(uint64, num_used_table_weak_hits, "Number of times when memory allocated from the bigger cell of used blocks table")  \
         X(uint64, num_used_table_merges,    "Number of times when used blocks have merged into one to satisfy new allocation") \
         X(uint64, limit_maxbytes,           "Maximum amount of memory to use for the storage") \
+        X(uint64, page_size,                "Size of allocator page") \
         X(uint64, evictions,                "Description of the stat")
 
     #define CACHE_STATS(X) \

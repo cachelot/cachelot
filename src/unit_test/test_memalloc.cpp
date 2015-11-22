@@ -7,6 +7,7 @@ namespace {
 using namespace cachelot;
 
 static constexpr size_t MEMSIZE = 1024 * 1024 * 4; // 4Mb
+static constexpr size_t PAGESIZE = 1024 * 4; // 4Kb
 static constexpr size_t NUM_ALLOC = 100000;
 static constexpr size_t NUM_REPEAT = 50;
 static constexpr size_t MIN_ALLOC_SIZE = 4;
@@ -16,73 +17,6 @@ static constexpr size_t MAX_ALLOC_SIZE = 1024 * 1024;
 #ifndef ADDRESS_SANITIZER
 
 BOOST_AUTO_TEST_SUITE(test_memalloc)
-
-BOOST_AUTO_TEST_CASE(test_block_list) {
-    const size_t blocks_mem_size = (memalloc::block::min_size + memalloc::block::header_size) * 5;
-    std::unique_ptr<uint8[]> blocks_layout(new uint8[blocks_mem_size]);
-    uint8 * layout_ptr = blocks_layout.get();
-    memalloc::block * left_border = new (layout_ptr) memalloc::block();
-    layout_ptr += left_border->size_with_header();
-
-    memalloc::block * b1 = new (layout_ptr) memalloc::block(memalloc::block::min_size, left_border);
-    layout_ptr += b1->size_with_header();
-    memalloc::block * b2 = new (layout_ptr) memalloc::block(memalloc::block::min_size, b1);
-    layout_ptr += b2->size_with_header();
-    memalloc::block * b3 = new (layout_ptr) memalloc::block(memalloc::block::min_size, b2);
-    layout_ptr += b3->size_with_header();
-
-    memalloc::block * right_border = new (layout_ptr) memalloc::block(0, b3);
-    memalloc::block::checkout(left_border);
-    memalloc::block::checkout(right_border);
-
-
-    memalloc::block_list the_list;
-    BOOST_CHECK(the_list.empty());
-    // single item basic operations
-    the_list.push_front(b1);
-    BOOST_CHECK(not the_list.empty());
-    BOOST_CHECK_EQUAL(the_list.front(), b1);
-    BOOST_CHECK_EQUAL(the_list.back(), b1);
-    BOOST_CHECK(the_list.is_head(b1));
-    BOOST_CHECK(the_list.is_tail(b1));
-    BOOST_CHECK_EQUAL(the_list.pop_back(), b1);
-    BOOST_CHECK(the_list.empty());
-    the_list.push_back(b1);
-    BOOST_CHECK_EQUAL(the_list.back(), b1);
-    BOOST_CHECK_EQUAL(the_list.front(), b1);
-    BOOST_CHECK(the_list.is_head(b1));
-    BOOST_CHECK(the_list.is_tail(b1));
-    BOOST_CHECK_EQUAL(the_list.pop_front(), b1);
-    BOOST_CHECK(the_list.empty());
-
-    // multiple item operations
-    the_list.push_front(b1);
-    the_list.push_front(b2);
-    the_list.push_back(b3);
-    BOOST_CHECK(not the_list.empty());
-    BOOST_CHECK_EQUAL(the_list.front(), b2);
-    BOOST_CHECK_EQUAL(the_list.back(), b3);
-    BOOST_CHECK(the_list.is_head(b2));
-    BOOST_CHECK(the_list.is_tail(b3));
-    // remove one item
-    memalloc::block_list::unlink(b1);
-    BOOST_CHECK(not the_list.empty());
-    BOOST_CHECK_EQUAL(the_list.front(), b2);
-    BOOST_CHECK_EQUAL(the_list.back(), b3);
-    BOOST_CHECK(the_list.is_head(b2));
-    BOOST_CHECK(the_list.is_tail(b3));
-    // remove second element
-    BOOST_CHECK_EQUAL(the_list.pop_front(), b2);
-    BOOST_CHECK(not the_list.empty());
-    BOOST_CHECK_EQUAL(the_list.front(), b3);
-    BOOST_CHECK_EQUAL(the_list.back(), b3);
-    BOOST_CHECK(the_list.is_head(b3));
-    BOOST_CHECK(the_list.is_tail(b3));
-    // remove last element
-    memalloc::block_list::unlink(b3);
-    BOOST_CHECK(the_list.empty());
-}
-
 
 // return `true` with probability of given `persents`
 inline bool probably(unsigned persents) noexcept {
@@ -103,8 +37,7 @@ typename Container::iterator random_choise(Container & c) noexcept {
 //
 BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
     // setup
-    std::unique_ptr<char[]> _g_memory(new char[MEMSIZE] );
-    memalloc allocator(_g_memory.get(), MEMSIZE);
+    memalloc allocator(MEMSIZE, PAGESIZE);
     random_int<size_t> random_size(MIN_ALLOC_SIZE, MAX_ALLOC_SIZE);
     std::vector<void * > allocations;
     allocations.reserve(NUM_ALLOC);

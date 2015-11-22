@@ -11,16 +11,15 @@ using namespace cachelot;
 
 
 static const int num_runs = 10;
-static const size_t buffer_size = 1024*1024*1024;
-static const size_t user_available_memory = buffer_size - buffer_size * .2; // 80%
+static const size_t memory_limit = 1024 * Megabyte;
+static const size_t page_size = 4 * Megabyte;
+static const size_t user_available_memory = memory_limit - memory_limit * .2; // 80%
 static const size_t min_allocation_size = 4;
-static const size_t max_allocation_size = 4096;
-static const size_t max_allocations_num = buffer_size / min_allocation_size;
+static const size_t max_allocation_size = page_size;
+static const size_t max_allocations_num = memory_limit / min_allocation_size;
 typedef std::chrono::high_resolution_clock hires_clock;
 
 int main() {
-    std::unique_ptr<uint8[]> arena(new uint8[buffer_size]);
-
     size_t total_allocated = 0;
     size_t num_allocations = 0;
     std::vector<std::pair<size_t, void *>> allocations;
@@ -39,9 +38,9 @@ int main() {
     std::cout << "## memalloc   ";
 ////////////////////////////////////////////////////////////////
     {
-        memalloc ma(arena.get(), buffer_size);
+        memalloc ma(memory_limit, page_size);
         total_allocated = 0;
-        num_allocations = 0;
+        num_allocations = 1;
         allocations.clear();
 
         auto start = hires_clock::now();
@@ -70,7 +69,7 @@ int main() {
 ////////////////////////////////////////////////////////////////
     {
         total_allocated = 0;
-        num_allocations = 0;
+        num_allocations = 1;
         allocations.clear();
 
         auto start = hires_clock::now();
@@ -99,9 +98,10 @@ int main() {
 ////////////////////////////////////////////////////////////////
     {
         total_allocated = 0;
-        num_allocations = 0;
+        num_allocations = 1;
         allocations.clear();
-        init_memory_pool(buffer_size, arena.get());
+        std::unique_ptr<uint8[]> arena(new uint8 [memory_limit]);
+        init_memory_pool(memory_limit, arena.get());
 
         auto start = hires_clock::now();
         for (auto alloc_size : allocation_sizes) {

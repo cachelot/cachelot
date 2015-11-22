@@ -7,12 +7,20 @@
 //  Distributed under the terms of Simplified BSD License
 //  see LICENSE file
 
+#ifndef CACHELOT_COMMON_H_INCLUDED
+#  include <cachelot/common.h>
+#endif
+#ifndef CACHELOT_BITS_H_INCLUDED
+#  include <cachelot/bits.h> // pow2 utils
+#endif
+#ifndef CACHELOT_STATS_H_INCLUDED
+#  include <cachelot/stats.h>
+#endif
+#include <boost/intrusive/list.hpp>
+
 
 /// @ingroup common
 /// @{
-
-// test case forward declaration to allow test access private memalloc members
-namespace { namespace test_memalloc { struct test_block_list; } }
 
 namespace cachelot {
 
@@ -37,17 +45,23 @@ namespace cachelot {
     */
     class memalloc {
         class block;
-        class block_list;
-        class group_by_size;
+        class free_blocks_by_size;
+        struct page_info;
+        class page_manager;
     public:
-        /// user must provide contiguous volume of memory to work with
-        /// @p arena - pointer to memory to work with
-        /// @p arena_size - size of `arena` in bytes
-        /// @p evictions - enable / disable evictions of allocated blocks
-        explicit memalloc(void * arena, const size_t arena_size) noexcept;
+        /// constructor
+        /// @p arena_size - amount of memory in bytes to work with
+        /// @p page_size - size of internal allocator page.
+        ///                Page size limits single allocation size.
+        ///                The less page is, the less items would be evicted when allocator ran out of free memory
+        explicit memalloc(const size_t memory_limit, const size_t page_size);
 
         /// Try to allocate `size` bytes, return `nullptr` on fail
-        void * alloc(const size_t size) {
+        /// Returned memory is guaranteed to be aligned to the `sizeof(void *)`
+        ///
+        /// @note it's impossible to allocate more than `page_size`
+        /// @see memalloc::memalloc
+        void * alloc(size_t size) {
             return alloc_or_evict(size, false, [=](void *) -> void {});
         }
 
@@ -57,7 +71,7 @@ namespace cachelot {
         /// @p on_free_block - in case of eviction call this function for each freed block
         /// @tparam ForeachFreed - `void on_free(void * ptr)`
         template <typename ForeachFreed>
-        void * alloc_or_evict(const size_t size, bool evict_if_necessary = false,
+        void * alloc_or_evict(size_t size, bool evict_if_necessary = false,
                               ForeachFreed on_free_block = [](void *) -> void {});
 
         /// try to extend previously allocated memory up to `new_size`, return `nullptr` on fail
@@ -76,7 +90,7 @@ namespace cachelot {
         /// check whether given `ptr` whithin arena bounaries and block information can be retrieved from it
         inline bool valid_addr(void * ptr) const noexcept;
 
-        /// coalesce adjacent unused blocks (up to `const_::max_block_size`) and return resulting block
+        /// coalesce adjacent unused blocks up to max block size and return resulting block
         block * merge_unused(block * block) noexcept;
 
         /// mark block as non-used and coalesce it with adjacent unused blocks
@@ -90,23 +104,20 @@ namespace cachelot {
         memalloc & operator=(const memalloc &) = delete;
 
         template <typename ForeachFreed>
-        void * alloc_or_evict_impl(const size_t size, bool evict_if_necessary = false,
+        void * alloc_or_evict_impl(size_t size, bool evict_if_necessary = false,
                                    ForeachFreed on_free_block = [](void *) -> void {});
 
     private:
-        // global arena boundaries
-        uint8 const * arena_begin;
-        uint8 const * arena_end;
-        size_t user_available_memory_size;  // amount of memory excluding internal memalloc structures
-        // all memory blocks are located in table, grouped by block size
-        group_by_size * free_blocks; // free blocks are stored here
-        group_by_size * used_blocks; // used for block eviction
-
-    private:
-        // unit tests
-        friend struct test_memalloc::test_block_list;
+        // total amount of memory
+        const size_t arena_size;
+        // size of the single page
+        const uint32 page_size;
+        // pointer to the memory arena
+        std::unique_ptr<void, decltype(&aligned_free)> arena;
+        //
+        // free memory blocks are placed in the table, grouped by block size
+        std::unique_ptr<free_blocks_by_size> free_blocks;
     };
-
 
 } // namespace cachelot
 

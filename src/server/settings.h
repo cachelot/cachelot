@@ -16,6 +16,7 @@ namespace cachelot {
     struct settings {
         struct {
             size_t memory_limit = 64 * 1024 * 1024; // 64Mb
+            size_t page_size =  4 * 1024 * 1024; // 4Mb
             size_t initial_hash_table_size = 65536; //
             size_t max_value_size = 4 * 1024 * 1024; // 4Mb
             bool has_CAS = true;

@@ -130,10 +130,11 @@ namespace cachelot {
              * constructor
              *
              * @param memory_limit - amount of memory available for storage use
+             * @param mem_page_size - size of the allocator memory page
              * @param initial_dict_size - number of reserved items in dictionary
              * @param enable_evictions - evict existing items in order to store new ones
              */
-            explicit Cache(size_t memory_limit, size_t initial_dict_size, bool enable_evictions);
+            explicit Cache(size_t memory_limit, size_t mem_page_size, size_t initial_dict_size, bool enable_evictions);
 
 
             /**
@@ -276,7 +277,6 @@ namespace cachelot {
             tuple<bool, dict_type::iterator> retrieve_item(const bytes key, const hash_type hash, bool readonly = false);
 
         private:
-            std::unique_ptr<uint8[]> memory_arena;
             memalloc m_allocator;
             dict_type m_dict;
             const bool m_evictions_enabled;
@@ -285,9 +285,8 @@ namespace cachelot {
         };
 
 
-        inline Cache::Cache(size_t memory_limit, size_t initial_dict_size, bool enable_evictions)
-            : memory_arena(new uint8[memory_limit])
-            , m_allocator(raw_pointer(memory_arena), memory_limit)
+        inline Cache::Cache(size_t memory_limit, size_t mem_page_size, size_t initial_dict_size, bool enable_evictions)
+            : m_allocator(memory_limit, mem_page_size)
             , m_dict(initial_dict_size)
             , m_evictions_enabled(enable_evictions)
             , m_oldest_timestamp(std::numeric_limits<timestamp_type>::max())

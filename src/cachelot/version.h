@@ -12,9 +12,9 @@
 #define CACHELOT_VERSION_MINOR 8
 #define CACHELOT_VERSION_STATUS "alpha"
 // TODO: cmake
-#define CACHELOT_GIT_REVSION "{cachelot_git_revision}"
-#define CACHELOT_COMPILER_INFO "{cachelot_compiler_info}"
-#define CACHELOT_COMPILER_FLAGS "{cachelot_compiler_flags}"
+#define CACHELOT_GIT_REVSION "@cachelot_git_revision@"
+#define CACHELOT_COMPILER_INFO "@cachelot_compiler_info@"
+#define CACHELOT_COMPILER_FLAGS "@cachelot_compiler_flags@"
 
 #if defined(DEBUG)
 #  define CACHELOT_VERSION_DBG_SUFFIX "dbg"
