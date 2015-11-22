@@ -13,6 +13,7 @@ set (CACHELOT_SOURCES
     hash_fnv1a.h
     random.h
     debug_trace.h
+    intrusive_list.h
     memalloc.h
     memalloc-inl.h
     item.h
