@@ -22,6 +22,8 @@
 /// @ingroup common
 /// @{
 
+namespace { namespace test_memalloc { struct test_free_blocks_by_size; } }
+
 namespace cachelot {
 
    /**
@@ -117,6 +119,9 @@ namespace cachelot {
         //
         // free memory blocks are placed in the table, grouped by block size
         std::unique_ptr<free_blocks_by_size> free_blocks;
+    private:
+        // Test cases
+        friend struct test_memalloc::test_free_blocks_by_size;
     };
 
 } // namespace cachelot

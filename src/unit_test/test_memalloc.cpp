@@ -6,12 +6,12 @@ namespace {
 
 using namespace cachelot;
 
-static constexpr size_t MEMSIZE = 1024 * 1024 * 4; // 4Mb
-static constexpr size_t PAGESIZE = 1024 * 4; // 4Kb
+static constexpr size_t MEMSIZE = 4 * Megabyte;
+static constexpr size_t PAGESIZE = 4 * Kilobyte;
 static constexpr size_t NUM_ALLOC = 100000;
 static constexpr size_t NUM_REPEAT = 50;
 static constexpr size_t MIN_ALLOC_SIZE = 4;
-static constexpr size_t MAX_ALLOC_SIZE = 1024 * 1024;
+static constexpr size_t MAX_ALLOC_SIZE = PAGESIZE - 64;
 
 // there is no memalloc in the AddressSanitizer build
 #ifndef ADDRESS_SANITIZER
@@ -30,6 +30,70 @@ template <class Container>
 typename Container::iterator random_choise(Container & c) noexcept {
     random_int<> random_offset(0, c.size() - 1);
     return c.begin() + random_offset();
+}
+
+
+BOOST_AUTO_TEST_CASE(test_free_blocks_by_size) {
+    constexpr size_t page_size = 4*Kilobyte;
+	memalloc::free_blocks_by_size fixture(page_size);
+    // Test position_from_size
+    if (memalloc::free_blocks_by_size::first_power_of_2 == 8) {
+        // Small blocks (zero cell)
+        auto pos = fixture.position_from_size(64);
+        BOOST_CHECK_EQUAL(pos.pow_index, 0); BOOST_CHECK_EQUAL(pos.sub_index, 8);
+        pos = fixture.position_from_size(63);
+        BOOST_CHECK_EQUAL(pos.pow_index, 0); BOOST_CHECK_EQUAL(pos.sub_index, 7);
+        pos = fixture.position_from_size(65);
+        BOOST_CHECK_EQUAL(pos.pow_index, 0); BOOST_CHECK_EQUAL(pos.sub_index, 8);
+        pos = fixture.position_from_size(71);
+        BOOST_CHECK_EQUAL(pos.pow_index, 0); BOOST_CHECK_EQUAL(pos.sub_index, 8);
+        pos = fixture.position_from_size(255);
+        BOOST_CHECK_EQUAL(pos.pow_index, 0); BOOST_CHECK_EQUAL(pos.sub_index, 31);
+        // Normal blocks
+        pos = fixture.position_from_size(256);
+        BOOST_CHECK_EQUAL(pos.pow_index, 1); BOOST_CHECK_EQUAL(pos.sub_index, 0);
+        pos = fixture.position_from_size(MAX_ALLOC_SIZE);
+        BOOST_CHECK_EQUAL(pos.pow_index, 4); BOOST_CHECK_EQUAL(pos.sub_index, 31);
+        pos = fixture.position_from_size(1024);
+        BOOST_CHECK_EQUAL(pos.pow_index, 3); BOOST_CHECK_EQUAL(pos.sub_index, 0);
+        pos = fixture.position_from_size(1023);
+        BOOST_CHECK_EQUAL(pos.pow_index, 2); BOOST_CHECK_EQUAL(pos.sub_index, 31);
+        pos = fixture.position_from_size(2345);
+        BOOST_CHECK_EQUAL(pos.pow_index, 4); BOOST_CHECK_EQUAL(pos.sub_index, 4);
+    } else if (memalloc::free_blocks_by_size::first_power_of_2 == 7) {
+        // TODO: Tests for 32-bit platform
+    } else {
+        BOOST_ERROR("Unexpected free_blocks_by_size::first_power_of_2");
+    }
+    // Test try_get_block / next_non_empty
+    {
+        uint8 _blk1_mem[sizeof(memalloc::block)]; uint8 _blk2_mem[sizeof(memalloc::block)];
+        memalloc::block * blk1 = new (_blk1_mem) memalloc::block();
+        memalloc::block * blk2 = new (_blk2_mem) memalloc::block();
+        memalloc::block * result_block;
+        // small blocks
+        blk1->meta.size = 255; fixture.put_block(blk1);
+        result_block = fixture.try_get_block(255);
+        BOOST_CHECK(result_block == blk1);
+
+        blk1->meta.size = 255; fixture.put_block(blk1);
+        blk2->meta.size = 256; fixture.put_block(blk2);
+        result_block = fixture.try_get_block(256);
+        BOOST_CHECK(result_block == blk2);
+        result_block = fixture.try_get_block(123);
+        BOOST_CHECK(result_block == blk1);
+
+        blk1->meta.size = 255; fixture.put_block(blk1);
+        blk2->meta.size = 1120; fixture.put_block(blk2);
+        result_block = fixture.try_get_block(1121);
+        BOOST_CHECK(result_block == nullptr);
+        result_block = fixture.try_get_block(255);
+        BOOST_CHECK(result_block == blk1);
+        result_block = fixture.try_get_block(255);
+        BOOST_CHECK(result_block == blk2);
+        result_block = fixture.try_get_block(255);
+        BOOST_CHECK(result_block == nullptr);
+    }
 }
 
 // allocate and free blocks of a random size
