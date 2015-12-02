@@ -46,10 +46,9 @@ namespace cachelot {
     * @see @ref memalloc (memalloc-inl.h) for implementation details
     */
     class memalloc {
+        class pages;
         class block;
         class free_blocks_by_size;
-        struct page_info;
-        class page_manager;
     public:
         /// constructor
         /// @p arena_size - amount of memory in bytes to work with
@@ -115,10 +114,11 @@ namespace cachelot {
         // size of the single page
         const uint32 page_size;
         // pointer to the memory arena
-        std::unique_ptr<void, decltype(&aligned_free)> arena;
-        //
+        std::unique_ptr<void, decltype(&aligned_free)> m_arena;
+        // logical pages
+        std::unique_ptr<pages> m_pages;
         // free memory blocks are placed in the table, grouped by block size
-        std::unique_ptr<free_blocks_by_size> free_blocks;
+        std::unique_ptr<free_blocks_by_size> m_free_blocks;
     private:
         // Test cases
         friend struct test_memalloc::test_free_blocks_by_size;

@@ -68,8 +68,8 @@ BOOST_AUTO_TEST_CASE(test_free_blocks_by_size) {
     // Test try_get_block / next_non_empty
     {
         uint8 _blk1_mem[sizeof(memalloc::block)]; uint8 _blk2_mem[sizeof(memalloc::block)];
-        memalloc::block * blk1 = new (_blk1_mem) memalloc::block();
-        memalloc::block * blk2 = new (_blk2_mem) memalloc::block();
+        memalloc::block * blk1 = new (_blk1_mem) memalloc::block(128, 0);
+        memalloc::block * blk2 = new (_blk2_mem) memalloc::block(128, 0);
         memalloc::block * result_block;
         // small blocks
         blk1->meta.size = 255; fixture.put_block(blk1);
