@@ -22,7 +22,11 @@
 /// @ingroup common
 /// @{
 
-namespace { namespace test_memalloc { struct test_free_blocks_by_size; } }
+/// internal (ignore while generating documentation)
+namespace { namespace test_memalloc {
+    struct test_free_blocks_by_size;
+    struct test_pages;
+} }
 
 namespace cachelot {
 
@@ -122,6 +126,7 @@ namespace cachelot {
     private:
         // Test cases
         friend struct test_memalloc::test_free_blocks_by_size;
+        friend struct test_memalloc::test_pages;
     };
 
 } // namespace cachelot

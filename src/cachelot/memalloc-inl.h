@@ -73,33 +73,42 @@ namespace cachelot {
             lru_link_type lru_link;
         };
     public:
-        const size_t page_size;
-        const uint8 * const arena_begin;
-        const uint8 * const arena_end;
-        const size_t num_pages;
-        pages(const size_t the_page_size, const uint8 * const the_arena_begin, const uint8 * const the_arena_end)
+        /// Size of the page
+        const uint32 page_size;
+        /// Total number of pages in arena
+        const uint32 num_pages;
+        /// Pointer to the arena begin
+        uint8 * const arena_begin;
+        /// Pointer to the arena end
+        uint8 * const arena_end;
+
+        /// constructor
+        pages(const size_t the_page_size, uint8 * const the_arena_begin, uint8 * const the_arena_end)
             : page_size(the_page_size)
+            , num_pages((the_arena_end - the_arena_begin) / the_page_size)
             , arena_begin(the_arena_begin)
             , arena_end(the_arena_end)
-            , num_pages((the_arena_end - the_arena_begin) / the_page_size)
+            , log2_page_size(log2u(the_page_size))
             , all_pages(num_pages) {
-            debug_assert(ispow2(page_size));
-            debug_assert(ispow2(num_pages));
+            debug_assert(ispow2(page_size)); debug_assert(page_size > 1);
+            debug_assert(ispow2(num_pages)); debug_assert(num_pages > 1);
             // base_addr must be properly aligned
             debug_assert(unaligned_bytes(arena_begin, page_size) == 0);
             // memory amount must be divisible by the page size
             debug_assert((arena_end - arena_begin) % the_page_size == 0);
             // place all pages in the LRU list
             for (size_t page_no = 0; page_no < num_pages; ++page_no) {
-                lru_pages.push_back(all_pages[page_no]);
+                lru_pages.push_front(all_pages[page_no]);
             }
         }
 
+        /// retrieve metadata of the page containing address specified
         page_info * page_info_from_addr(const void * const ptr) noexcept {
             const auto page_no = page_no_from_addr(ptr);
             return &all_pages[page_no];
         }
 
+        /// retrieve boundaries of the page containing address specified
         tuple<const uint8 * const, const uint8 * const> page_boundaries_from_addr(const void * const ptr) noexcept {
             const auto page_no = page_no_from_addr(ptr);
             const uint8 * const page_begin = arena_begin + (page_no * page_size);
@@ -107,13 +116,36 @@ namespace cachelot {
             return make_tuple(page_begin, page_end);
         }
 
+        /// increase chances to survive eviction for the page containing address specified
         void touch(const void * const ptr) noexcept {
-            const auto page_no = page_no_from_addr(ptr);
-            all_pages[page_no].num_hits += 1;
-            all_pages[page_no].lru_link.unlink();
-            lru_pages.push_front(all_pages[page_no]);
+            const auto page = page_info_from_addr(ptr);
+            page->num_hits += 1;
+            // move closer to front
+            if (page != &lru_pages.front()) {
+                auto iter = lru_pages.iterator_to(*page);
+                --iter;
+                page->lru_link.swap_nodes(iter->lru_link);
+            }
         }
 
+        /// retrieve the best candidate for eviction and reuse
+        tuple<uint8 *, uint8 *> page_to_reuse() {
+            page_info * least_used = &lru_pages.back();
+            least_used->num_evictions += 1;
+            // make it first to prolong its life
+            least_used->lru_link.swap_nodes(lru_pages.front().lru_link);
+            for (size_t page_no = 0; page_no < num_pages; ++page_no) {
+                if (least_used == &all_pages[page_no]) {
+                    uint8 * page_begin = arena_begin + (page_no * page_size);
+                    uint8 * page_end = page_begin + page_size;
+                    return make_tuple(page_begin, page_end);
+                }
+            }
+            debug_assert(false);
+            return tuple<uint8 *, uint8 *>(nullptr, nullptr);
+        }
+
+        /// check that address is within arena range
         bool valid_addr(const void * const ptr) {
             auto u8_ptr = reinterpret_cast<const uint8 * const>(ptr);
             return u8_ptr >= arena_begin && u8_ptr < arena_end;
@@ -123,14 +155,18 @@ namespace cachelot {
         unsigned page_no_from_addr(const void * const ptr) noexcept {
             debug_assert(valid_addr(ptr));
             auto ui8_ptr = reinterpret_cast<const uint8 * const>(ptr);
-            static const size_t log2u_page_size = log2u(page_size);
-            return (ui8_ptr - arena_begin) >> log2u_page_size;
+            unsigned page_no = static_cast<size_t>(ui8_ptr - arena_begin) >> log2_page_size;
+            debug_assert(page_no < num_pages);
+            return page_no;
         }
 
     private:
+        const size_t log2_page_size;
         std::vector<page_info> all_pages;
         typedef bi::member_hook<page_info, page_info::lru_link_type, &page_info::lru_link> page_member_link_type;
         bi::list<page_info, page_member_link_type, bi::constant_time_size<false>> lru_pages;
+    private:
+        friend struct test_memalloc::test_pages;
     };
 
 
@@ -157,6 +193,9 @@ namespace cachelot {
             /// pointer to actual memory given to the user
             uint8 memory_[1];
         };
+
+        // TODO: Make it proper
+        friend class memalloc;
 
     public:
         /// allocation alignment
@@ -239,6 +278,7 @@ namespace cachelot {
         static block * from_user_ptr(void * ptr) noexcept {
             uint8 * u8_ptr = reinterpret_cast<uint8 *>(ptr);
             memalloc::block * result = reinterpret_cast<memalloc::block *>(u8_ptr - offsetof(memalloc::block, memory_));
+            debug_assert(result->meta.dbg_marker == DBG_MARKER);
             return result;
         }
 
@@ -544,7 +584,7 @@ namespace cachelot {
         if (m_arena == nullptr) {
             throw std::bad_alloc();
         }
-        auto base_addr = reinterpret_cast<const uint8 * const>(m_arena.get());
+        auto base_addr = reinterpret_cast<uint8 * const>(m_arena.get());
         m_pages.reset(new pages(page_size, base_addr, base_addr + memory_limit));
         m_free_blocks.reset(new free_blocks_by_size(page_size));
         // pointer to currently non-used memory
@@ -662,11 +702,30 @@ namespace cachelot {
         {
             block * found_blk = m_free_blocks->try_get_block(requested_size);
             if (found_blk != nullptr) {
+                m_pages->touch(found_blk);
                 return checkout(found_blk, requested_size);
             }
         }
         // 2. Try to evict existing block to free some space
         if (evict_if_necessary) {
+            uint8 * page_begin, * page_end;
+            tie(page_begin, page_end) = m_pages->page_to_reuse();
+            auto blk = block::from_user_ptr(page_begin); // every page starts with the block
+            uint32 left_adjacent_block_offset = blk->meta.left_adjacent_offset;
+            do {
+                if (blk->is_used()) {
+                    // notify user that memory is evicted
+                    on_free_block(blk->memory());
+                } else {
+                    // remove block from the free blocks list
+                    blk->unlink();
+                }
+                blk = blk->right_adjacent();
+            } while (reinterpret_cast<uint8 *>(blk) + blk->size_with_header() < page_end);
+            blk->right_adjacent()->meta.left_adjacent_offset =
+                (uint8 *)blk->right_adjacent() - page_end;
+            auto whole_page_block = new (page_begin) block(page_size, left_adjacent_block_offset);
+            return checkout(whole_page_block, requested_size);
         }
         return nullptr;
     }

@@ -96,6 +96,36 @@ BOOST_AUTO_TEST_CASE(test_free_blocks_by_size) {
     }
 }
 
+
+BOOST_AUTO_TEST_CASE(test_pages) {
+    memalloc::pages fixture(4, (uint8 * const)0, (uint8 * const)16);
+    BOOST_CHECK_EQUAL(fixture.num_pages, 4);
+    // page_info_from_addr
+    auto page = fixture.page_info_from_addr((void *)0);
+    BOOST_CHECK(page == &fixture.all_pages[0]);
+    page = fixture.page_info_from_addr((void *)4);
+    BOOST_CHECK(page == &fixture.all_pages[1]);
+    page = fixture.page_info_from_addr((void *)7);
+    BOOST_CHECK(page == &fixture.all_pages[1]);
+    page = fixture.page_info_from_addr((void *)15);
+    BOOST_CHECK(page == &fixture.all_pages[3]);
+    // page_boundaries_from_addr
+    const uint8 * page_beg; const uint8 * page_end;
+    tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)0);
+    BOOST_CHECK(page_beg == (uint8 *)0);
+    BOOST_CHECK(page_end == (uint8 *)4);
+    tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)4);
+    BOOST_CHECK(page_beg == (uint8 *)4);
+    BOOST_CHECK(page_end == (uint8 *)8);
+    tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)14);
+    BOOST_CHECK(page_beg == (uint8 *)12);
+    BOOST_CHECK(page_end == (uint8 *)16);
+    tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)15);
+    BOOST_CHECK(page_beg == (uint8 *)12);
+    BOOST_CHECK(page_end == (uint8 *)16);
+    // touch
+}
+
 // allocate and free blocks of a random size
 // in case of the internal inconsistency, memalloc will trigger internal failure calling debug_assert
 //
