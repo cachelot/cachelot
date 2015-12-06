@@ -39,20 +39,14 @@
  *<br/>
  */
 
-namespace cachelot {
 
-// TODO: Make page_size configurable option
-// TODO: Left border block breaks page alignment
+namespace cachelot {
 
 // TODO: Use bit in left_adjacent_offset as "is left block free" marker
 // This may speedup many lookups
 
 
-    namespace bi = boost::intrusive;
-
-
 ////////////////////////////////// pages //////////////////////////////////////
-
 
     /**
      * Whole amount of memory is logicaly split by fixed-size pages
@@ -69,8 +63,7 @@ namespace cachelot {
             uint64 num_hits = 0;
             uint64 num_evictions = 0;
             // all pages are lined up by last access time
-            typedef bi::list_member_hook<bi::link_mode<bi::auto_unlink>> lru_link_type;
-            lru_link_type lru_link;
+            intrusive_list_node lru_link;
         };
     public:
         /// Size of the page
@@ -98,7 +91,7 @@ namespace cachelot {
             debug_assert((arena_end - arena_begin) % the_page_size == 0);
             // place all pages in the LRU list
             for (size_t page_no = 0; page_no < num_pages; ++page_no) {
-                lru_pages.push_front(all_pages[page_no]);
+                lru_pages.push_front(&all_pages[page_no]);
             }
         }
 
@@ -121,19 +114,17 @@ namespace cachelot {
             const auto page = page_info_from_addr(ptr);
             page->num_hits += 1;
             // move closer to front
-            if (page != &lru_pages.front()) {
-                auto iter = lru_pages.iterator_to(*page);
-                --iter;
-                page->lru_link.swap_nodes(iter->lru_link);
-            }
+            lru_pages.move_front(page);
         }
 
         /// retrieve the best candidate for eviction and reuse
         tuple<uint8 *, uint8 *> page_to_reuse() {
-            page_info * least_used = &lru_pages.back();
+            page_info * least_used = lru_pages.back();
             least_used->num_evictions += 1;
             // make it first to prolong its life
-            least_used->lru_link.swap_nodes(lru_pages.front().lru_link);
+            lru_pages.remove(least_used);
+            lru_pages.push_front(least_used);
+            // get
             for (size_t page_no = 0; page_no < num_pages; ++page_no) {
                 if (least_used == &all_pages[page_no]) {
                     uint8 * page_begin = arena_begin + (page_no * page_size);
@@ -163,8 +154,7 @@ namespace cachelot {
     private:
         const size_t log2_page_size;
         std::vector<page_info> all_pages;
-        typedef bi::member_hook<page_info, page_info::lru_link_type, &page_info::lru_link> page_member_link_type;
-        bi::list<page_info, page_member_link_type, bi::constant_time_size<false>> lru_pages;
+        intrusive_list<page_info, &page_info::lru_link> lru_pages;
     private:
         friend struct test_memalloc::test_pages;
     };
@@ -185,11 +175,9 @@ namespace cachelot {
             debug_only(uint64 dbg_marker;) /// debug constant marker to identify invalid blocks
         } meta;
 
-        typedef bi::list_member_hook<bi::link_mode<bi::auto_unlink>> _hook_type;
-
         union {
             /// link for circular list of blocks in free_blocks_by_size table
-            _hook_type group_by_size_link;
+            intrusive_list_node group_by_size_link;
             /// pointer to actual memory given to the user
             uint8 memory_[1];
         };
@@ -199,20 +187,19 @@ namespace cachelot {
 
     public:
         /// allocation alignment
-        constexpr static uint32 alignment = alignof(decltype(block::meta));
+        constexpr static uint32 alignment = alignof(void *);
         /// size of block metadata
-        constexpr static uint32 header_size = sizeof(meta) + sizeof(group_by_size_link);
+        constexpr static uint32 header_size = sizeof(meta);
         /// minimal amount of memory available to the user
         constexpr static uint32 min_memory = 64 - header_size;
         /// impossible to split block if less than `split_threshold` memory would left
         constexpr static uint32 split_threshold = header_size + min_memory;
-        /// link in the cell of same size class blocks
-        typedef bi::member_hook<memalloc::block, _hook_type, &memalloc::block::group_by_size_link> group_by_size_link_type;
 
         /// constructor
-        explicit block(const uint32 the_size, const uint32 left_adjacent_block_offset) noexcept
-            : group_by_size_link() {
-            static_assert(alignment >= alignof(void *), "alignment must be greater or equal to the pointer alignment");
+        explicit block(const uint32 the_size, const uint32 left_adjacent_block_offset) noexcept {
+            static_assert(alignment >= alignof(decltype(block::meta)) &&
+                          unaligned_bytes(alignment, alignof(decltype(block::meta))) == 0,
+                          "Block metadata must be properly aligned");
             static_assert(ispow2(alignment), "alignment must be a power of 2");
             static_assert(unaligned_bytes(min_memory, alignment) == 0, "Minimal allocation size is not properly aligned");
             // User memory must be properly aligned
@@ -241,11 +228,11 @@ namespace cachelot {
         /// check whether block is free
         bool is_free() const noexcept { return meta.used == false; }
 
-        /// mark block either as used `use=true` or as free `use=false`
-        void set_used(bool use) noexcept {
-            debug_assert(meta.used != use);
-            meta.used = use;
-        }
+        /// mark block as used
+        void set_used() noexcept { debug_assert(meta.used == false); meta.used = true; }
+
+        /// mark block as free
+        void set_free() noexcept { debug_assert(meta.used == true); meta.used = false; }
 
         /// return pointer to memory available to user
         void * memory() noexcept { return memory_; }
@@ -265,15 +252,6 @@ namespace cachelot {
             return const_cast<block *>(right);
         }
 
-        /// check whether block is linked into freelist
-        bool is_linked() const noexcept { return group_by_size_link.is_linked(); }
-
-        /// remove this block from the circular list of the free blocks
-        void unlink() noexcept {
-            debug_assert(is_linked());
-            group_by_size_link.unlink();
-        }
-
         /// get block structure back from pointer given to user
         static block * from_user_ptr(void * ptr) noexcept {
             uint8 * u8_ptr = reinterpret_cast<uint8 *>(ptr);
@@ -287,7 +265,7 @@ namespace cachelot {
             debug_assert(blk->is_free());
             const uint32 new_round_size = new_size > min_memory ? new_size + unaligned_bytes(blk->memory_ + new_size, alignment) : min_memory;
             memalloc::block * leftover = nullptr;
-            if (new_round_size < blk->size() && blk->size() - new_round_size > split_threshold) {
+            if (new_round_size < blk->size() && blk->size() - new_round_size >= split_threshold) {
                 const uint32 old_size = blk->size();
                 memalloc::block * block_after_next = blk->right_adjacent();
                 blk->set_size(new_round_size);
@@ -345,7 +323,7 @@ namespace cachelot {
      */
     class memalloc::free_blocks_by_size {
         // list of the same class size free blocks
-        typedef bi::list<memalloc::block, memalloc::block::group_by_size_link_type, bi::constant_time_size<false>> size_class_list;
+        typedef intrusive_list<memalloc::block, &memalloc::block::group_by_size_link> size_class_list;
         //
         // ! Important: the following constants affect alignment, min allocation size and more
         // Handle with care
@@ -373,7 +351,7 @@ namespace cachelot {
         // Last power of 2, all blocks are below this power
         const uint32 last_power_of_2;
         // Allocation limit depends on the page size
-        const uint32 allocation_limit;
+        const uint32 page_size;
         // Number of powers of 2 to serve
         const uint32 num_powers_of_2_plus_small_blocks_cell;
     private:
@@ -409,7 +387,7 @@ namespace cachelot {
 
         /// calculate size class by `requested_size` while inserting block
         position position_from_size(const uint32 requested_size) const noexcept {
-            debug_assert(requested_size <= allocation_limit);
+            debug_assert(requested_size <= (page_size - block::header_size));
             if (requested_size >= small_block_boundary) {
                 uint32 power2_idx = log2u(requested_size);
                 debug_assert(power2_idx >= first_power_of_2);
@@ -426,7 +404,7 @@ namespace cachelot {
 
         /// check if table cell at `pos` is non empty according to the bit index
         /// @return `true` cell is marked as non empty, `false` otherwise
-        constexpr bool bit_index_probe(position pos) const noexcept {
+        bool bit_index_probe(position pos) const noexcept {
             return bit::isset(first_level_bit_index, pos.pow_index) && bit::isset(second_level_bit_index[pos.pow_index], pos.sub_index);
         }
 
@@ -476,7 +454,7 @@ namespace cachelot {
         /// constructor
         free_blocks_by_size(const size_t the_page_size)
             : last_power_of_2(log2u(the_page_size))
-            , allocation_limit(the_page_size - block::header_size)
+            , page_size(the_page_size)
             , num_powers_of_2_plus_small_blocks_cell(last_power_of_2 - first_power_of_2 + 1)
             , first_level_bit_index(0u)
             , second_level_bit_index(num_powers_of_2_plus_small_blocks_cell, 0u)
@@ -485,7 +463,6 @@ namespace cachelot {
                         "Minimal block differense is too small for proper block alignment");
             static_assert(num_sub_cells_per_power <= sizeof(decltype(second_level_bit_index)::value_type) * 8,
                         "Not enough bits in second_level_bit_index to reflect num_sub_cells_per_power");
-            debug_assert(unaligned_bytes(allocation_limit, block::alignment) == 0);
         }
 
         /// try to get block of the requested `size`
@@ -495,15 +472,14 @@ namespace cachelot {
             bool has_bigger_block;
             uint32 attempt = 1;
             do {
-                // access indexes first, unset bits clearly indicate that corresponding size_class is empty
+                // access indexes first, unset bits guarantee that corresponding size_class is empty
                 if (bit_index_probe(pos)) {
                     block * blk = nullptr;
                     auto & size_class = size_classes_table[pos.absolute()];
                     if (not size_class.empty()) {
-                        debug_assert(attempt == 1 || size_class.front().size() >= size);
-                        if (size_class.front().size() >= size) {
-                            blk = &size_class.front();
-                            size_class.pop_front();
+                        debug_assert(attempt == 1 || size_class.front()->size() >= size);
+                        if (size_class.front()->size() >= size) {
+                            blk = size_class.pop_front();
                         }
                     }
                     if (size_class.empty()) { // Maybe we've just took the last element
@@ -532,27 +508,19 @@ namespace cachelot {
 
         /// store block `blk` at position corresponding to its size
         void put_block(block * blk) {
+            debug_assert(blk->is_free());
+            debug_assert(blk->size_with_header() <= page_size);
             position pos = position_from_size(blk->size());
             auto & size_class = size_classes_table[pos.absolute()];
-            size_class.push_front(*blk);
+            debug_only(blk->group_by_size_link.next = blk->group_by_size_link.prev = &blk->group_by_size_link);
+            size_class.push_front(blk);
             // unconditionally update bit index
             bit_index_mark_non_empty(pos);
         }
 
-
-        void test_bit_index_integrity_check() const noexcept {
-            for (size_t pow = 0; pow < num_powers_of_2_plus_small_blocks_cell; ++pow) {
-                if (second_level_bit_index[pow] > 0) {
-                    debug_assert(bit::isset(first_level_bit_index, pow));
-                } else {
-                    debug_assert(bit::isunset(first_level_bit_index, pow));
-                }
-                for (unsigned bit_in_subidx = 0; bit_in_subidx < 8; ++bit_in_subidx) {
-                    if (bit::isunset(second_level_bit_index[pow], bit_in_subidx)) {
-                        debug_assert(size_classes_table[position(pow, bit_in_subidx).absolute()].empty());
-                    }
-                }
-            }
+        /// remove block `blk` from the free blocks
+        void remove_block(block * blk) noexcept {
+            size_class_list::unlink(blk);
         }
 
     private:
@@ -584,23 +552,24 @@ namespace cachelot {
         if (m_arena == nullptr) {
             throw std::bad_alloc();
         }
-        auto base_addr = reinterpret_cast<uint8 * const>(m_arena.get());
-        m_pages.reset(new pages(page_size, base_addr, base_addr + memory_limit));
+        auto arena_begin = reinterpret_cast<uint8 *>(m_arena.get());
+        m_pages.reset(new pages(page_size, arena_begin, arena_begin + memory_limit));
         m_free_blocks.reset(new free_blocks_by_size(page_size));
         // pointer to currently non-used memory
-        uint8 * available = reinterpret_cast<uint8 *>(m_arena.get());
+        uint8 * available = arena_begin;
         // End-Of-Memory marker
         uint8 * EOM = available + arena_size;
 
         // split all arena on blocks and store them in free blocks table
 
         uint32 left_adjacent_block_offset = 0;
-        while (static_cast<size_t>(EOM - available) >= page_size) {
+        while (available < EOM) {
+            debug_assert(EOM - available >= page_size);
             block * huge_block = new (available) block(page_size - block::header_size, left_adjacent_block_offset);
             // store block at max pos of table
             m_free_blocks->put_block(huge_block);
-            available += huge_block->size_with_header();
-            left_adjacent_block_offset = huge_block->size_with_header();
+            available += page_size;
+            left_adjacent_block_offset = page_size;
         }
         debug_assert(available == EOM);
     }
@@ -614,7 +583,8 @@ namespace cachelot {
         const uint8 * left_block_boundary = reinterpret_cast<const uint8 * >(blk);
         while (left_block_boundary > page_begin && blk->left_adjacent()->is_free()) {
             auto left_blk = blk->left_adjacent();
-            left_blk->unlink();
+            debug_assert(left_blk->size_with_header() + blk->size_with_header() <= page_size);
+            m_free_blocks->remove_block(left_blk);
             blk = block::merge(left_blk, blk);
             left_block_boundary = reinterpret_cast<const uint8 * >(blk);
         }
@@ -622,7 +592,8 @@ namespace cachelot {
         const uint8 * right_block_boundary = reinterpret_cast<const uint8 * >(blk) + blk->size_with_header();
         while (right_block_boundary < page_end && blk->right_adjacent()->is_free()) {
             auto right_blk = blk->right_adjacent();
-            right_blk->unlink();
+            debug_assert(blk->size_with_header() + right_blk->size_with_header() <= page_size);
+            m_free_blocks->remove_block(right_blk);
             blk = block::merge(blk, right_blk);
             right_block_boundary = reinterpret_cast<const uint8 * >(blk) + blk->size_with_header();
         }
@@ -631,12 +602,15 @@ namespace cachelot {
 
 
     inline void * memalloc::checkout(block * blk, const size_t requested_size) noexcept {
+        debug_assert(reinterpret_cast<uint8*>(blk) >= reinterpret_cast<uint8*>(m_arena.get()));
+        debug_assert(reinterpret_cast<uint8*>(blk) + blk->size_with_header() <= reinterpret_cast<uint8*>(m_arena.get()) + arena_size);
         block * leftover;
         tie(blk, leftover) = block::split(blk, requested_size);
         if (leftover != nullptr) {
             m_free_blocks->put_block(leftover);
         }
-        blk->set_used(true);
+        STAT_INCR(mem.total_served, blk->size());
+        blk->set_used();
         return blk->memory();
     }
 
@@ -674,30 +648,14 @@ namespace cachelot {
 
 
     template <typename ForeachFreed>
-    inline void * memalloc::alloc_or_evict(size_t size, bool evict_if_necessary, ForeachFreed on_free_block) {
+    inline void * memalloc::alloc_or_evict(const size_t requested_size, bool evict_if_necessary, ForeachFreed on_free_block) {
+
         #if defined(ADDRESS_SANITIZER)
         return std::malloc(size);
         #endif
+
         STAT_INCR(mem.num_malloc, 1);
-        STAT_INCR(mem.total_requested, size);
-        auto free_block_incr_evictions = [=](void * ptr) noexcept {
-            STAT_INCR(mem.evictions, 1);
-            on_free_block(ptr);
-        };
-        auto memory = alloc_or_evict_impl<decltype(free_block_incr_evictions)>(size, evict_if_necessary, free_block_incr_evictions);
-        if (memory != nullptr) {
-            STAT_INCR(mem.total_served, reveal_actual_size(memory));
-        } else {
-            STAT_INCR(mem.num_alloc_errors, 1);
-            STAT_INCR(mem.total_unserved, size);
-        }
-        return memory;
-    }
-
-
-    template <typename ForeachFreed>
-    inline void * memalloc::alloc_or_evict_impl(const size_t requested_size, bool evict_if_necessary, ForeachFreed on_free_block) {
-        debug_only(m_free_blocks->test_bit_index_integrity_check());
+        STAT_INCR(mem.total_requested, requested_size);
         // 1. Search among the free blocks
         {
             block * found_blk = m_free_blocks->try_get_block(requested_size);
@@ -710,31 +668,42 @@ namespace cachelot {
         if (evict_if_necessary) {
             uint8 * page_begin, * page_end;
             tie(page_begin, page_end) = m_pages->page_to_reuse();
-            auto blk = block::from_user_ptr(page_begin); // every page starts with the block
-            uint32 left_adjacent_block_offset = blk->meta.left_adjacent_offset;
+            // for each block in the page
+            auto blk = reinterpret_cast<block *>(page_begin); // every page starts with the block
+            debug_assert(blk->meta.dbg_marker == block::DBG_MARKER);
+            const uint32 left_adjacent_block_offset = blk->meta.left_adjacent_offset;
             do {
                 if (blk->is_used()) {
                     // notify user that memory is evicted
                     on_free_block(blk->memory());
+                    STAT_INCR(mem.evictions, 1);
                 } else {
                     // remove block from the free blocks list
-                    blk->unlink();
+                    m_free_blocks->remove_block(blk);
                 }
                 blk = blk->right_adjacent();
-            } while (reinterpret_cast<uint8 *>(blk) + blk->size_with_header() < page_end);
-            blk->right_adjacent()->meta.left_adjacent_offset =
-                (uint8 *)blk->right_adjacent() - page_end;
-            auto whole_page_block = new (page_begin) block(page_size, left_adjacent_block_offset);
+            } while (reinterpret_cast<uint8 *>(blk) < page_end);
+            debug_assert(reinterpret_cast<uint8 *>(blk) == page_end);
+
+            // adjust the fist block in the next page
+            if (page_end < reinterpret_cast<uint8 *>(m_arena.get()) + arena_size) {
+                reinterpret_cast<block *>(page_end)->meta.left_adjacent_offset = page_size;
+            }
+            auto whole_page_block = new (page_begin) block(page_size - block::header_size, left_adjacent_block_offset);
+
             return checkout(whole_page_block, requested_size);
         }
+        // if we reach here ...
+        STAT_INCR(mem.num_alloc_errors, 1);
+        STAT_INCR(mem.total_unserved, requested_size);
         return nullptr;
     }
 
 
     inline void * memalloc::realloc_inplace(void * ptr, const size_t new_size) noexcept {
-//        #if defined(ADDRESS_SANITIZER)
-//        return nullptr;
-//        #endif
+        #if defined(ADDRESS_SANITIZER)
+        return nullptr;
+        #endif
 //        debug_assert(valid_addr(ptr));
 //        debug_only(m_free_blocks->test_bit_index_integrity_check());
 //        debug_only(used_blocks->test_bit_index_integrity_check());
@@ -779,17 +748,16 @@ namespace cachelot {
 
 
     inline void memalloc::free(void * ptr) noexcept {
+
         #if defined(ADDRESS_SANITIZER)
         std::free(ptr); return;
         #endif
+
         debug_assert(valid_addr(ptr));
-        debug_only(m_free_blocks->test_bit_index_integrity_check());
         STAT_INCR(mem.num_free, 1);
         block * blk = block::from_user_ptr(ptr);
-//        // remove from the free_blocks_by_size table
-//        block_list::unlink(blk);
-//        // merge and put into free list
-//        unuse(blk);
+        blk->set_free();
+        m_free_blocks->put_block(merge_unused(blk));
     }
 
 } // namespace cachelot

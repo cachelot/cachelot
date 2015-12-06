@@ -62,6 +62,7 @@ BOOST_AUTO_TEST_CASE(test_free_blocks_by_size) {
         BOOST_CHECK_EQUAL(pos.pow_index, 4); BOOST_CHECK_EQUAL(pos.sub_index, 4);
     } else if (memalloc::free_blocks_by_size::first_power_of_2 == 7) {
         // TODO: Tests for 32-bit platform
+        BOOST_ERROR("Not implemented");
     } else {
         BOOST_ERROR("Unexpected free_blocks_by_size::first_power_of_2");
     }
@@ -112,18 +113,49 @@ BOOST_AUTO_TEST_CASE(test_pages) {
     // page_boundaries_from_addr
     const uint8 * page_beg; const uint8 * page_end;
     tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)0);
-    BOOST_CHECK(page_beg == (uint8 *)0);
-    BOOST_CHECK(page_end == (uint8 *)4);
+    BOOST_CHECK_EQUAL(page_beg, (uint8 *)0);
+    BOOST_CHECK_EQUAL(page_end, (uint8 *)4);
     tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)4);
-    BOOST_CHECK(page_beg == (uint8 *)4);
-    BOOST_CHECK(page_end == (uint8 *)8);
+    BOOST_CHECK_EQUAL(page_beg, (uint8 *)4);
+    BOOST_CHECK_EQUAL(page_end, (uint8 *)8);
     tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)14);
-    BOOST_CHECK(page_beg == (uint8 *)12);
-    BOOST_CHECK(page_end == (uint8 *)16);
+    BOOST_CHECK_EQUAL(page_beg, (uint8 *)12);
+    BOOST_CHECK_EQUAL(page_end, (uint8 *)16);
     tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)15);
-    BOOST_CHECK(page_beg == (uint8 *)12);
-    BOOST_CHECK(page_end == (uint8 *)16);
+    BOOST_CHECK_EQUAL(page_beg, (uint8 *)12);
+    BOOST_CHECK_EQUAL(page_end, (uint8 *)16);
     // touch
+    BOOST_CHECK_EQUAL(fixture.all_pages[0].num_hits, 0);
+    BOOST_CHECK_EQUAL(fixture.all_pages[1].num_hits, 0);
+    BOOST_CHECK_EQUAL(fixture.all_pages[2].num_hits, 0);
+    BOOST_CHECK_EQUAL(fixture.all_pages[3].num_hits, 0);
+    BOOST_CHECK_EQUAL(fixture.all_pages[0].num_evictions, 0);
+    BOOST_CHECK_EQUAL(fixture.all_pages[1].num_evictions, 0);
+    BOOST_CHECK_EQUAL(fixture.all_pages[2].num_evictions, 0);
+    BOOST_CHECK_EQUAL(fixture.all_pages[3].num_evictions, 0);
+    fixture.touch((void *)0);
+    fixture.touch((void *)1);
+    BOOST_CHECK_EQUAL(fixture.all_pages[0].num_hits, 2);
+    fixture.touch((void *)15);
+    BOOST_CHECK_EQUAL(fixture.all_pages[3].num_hits, 1);
+    fixture.touch((void *)9);
+    BOOST_CHECK_EQUAL(fixture.all_pages[2].num_hits, 1);
+    // page_to_reuse
+    tie(page_beg, page_end) = fixture.page_to_reuse();
+    //      must be untouched page #1
+    BOOST_CHECK_EQUAL(page_beg, (uint8 *)4);
+    BOOST_CHECK_EQUAL(page_end, (uint8 *)8);
+    BOOST_CHECK_EQUAL(&fixture.all_pages[1], fixture.lru_pages.front());
+    BOOST_CHECK_EQUAL(fixture.all_pages[1].num_evictions, 1);
+    //      touch all pages except #0
+    for (size_t fake_addr = 4; fake_addr < 16; ++fake_addr) {
+        fixture.touch((void *)fake_addr);
+    }
+    tie(page_beg, page_end) = fixture.page_to_reuse();
+    BOOST_CHECK_EQUAL(page_beg, (uint8 *)0);
+    BOOST_CHECK_EQUAL(page_end, (uint8 *)4);
+    BOOST_CHECK_EQUAL(&fixture.all_pages[0], fixture.lru_pages.front());
+    BOOST_CHECK_EQUAL(fixture.all_pages[0].num_evictions, 1);
 }
 
 // allocate and free blocks of a random size
@@ -143,7 +175,8 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
         for (size_t allocation_no = 0; allocation_no < NUM_ALLOC; ++allocation_no) {
             // try to allocate new element
             // if we need to evict existing elements to free space, remove it from the allocations list
-            void * ptr = allocator.alloc_or_evict(random_size(), true,
+            auto allocation_size = random_size();
+            void * ptr = allocator.alloc_or_evict(allocation_size, true,
                 [&allocations](void * mem) {
                     for (size_t i = 0; i < allocations.size(); ++i) {
                         if (allocations[i] == mem) {
@@ -156,6 +189,7 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
                 });
             if (ptr != nullptr) {
                 allocations.push_back(ptr);
+                std::memset(ptr, 'X', allocation_size);
             }
 
             // free one of previously allocated blocks with 40% probability

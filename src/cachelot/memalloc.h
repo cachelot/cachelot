@@ -11,22 +11,25 @@
 #  include <cachelot/common.h>
 #endif
 #ifndef CACHELOT_BITS_H_INCLUDED
-#  include <cachelot/bits.h> // pow2 utils
+#  include <cachelot/bits.h> // pow2 utils / CLZ
 #endif
 #ifndef CACHELOT_STATS_H_INCLUDED
 #  include <cachelot/stats.h>
 #endif
-#include <boost/intrusive/list.hpp>
+#ifndef CACHELOT_INTRUSIVE_LIST_H_INCLUDED
+#  include <cachelot/intrusive_list.h> // pages LRU and free blocks list
+#endif
 
+// forward declaration to friend with unit test cases
+namespace { namespace test_memalloc {
+    /// internal
+    struct test_free_blocks_by_size;
+    /// internal
+    struct test_pages;
+} }
 
 /// @ingroup common
 /// @{
-
-/// internal (ignore while generating documentation)
-namespace { namespace test_memalloc {
-    struct test_free_blocks_by_size;
-    struct test_pages;
-} }
 
 namespace cachelot {
 
