@@ -7,128 +7,152 @@
 //  Distributed under the terms of Simplified BSD License
 //  see LICENSE file
 
+#ifndef CACHELOT_COMMON_H_INCLUDED
+#  include <cachelot/common.h>
+#endif
+#include <boost/intrusive/detail/parent_from_member.hpp>
+
 /// @ingroup common
 /// @{
 
 namespace cachelot {
 
-    class intrusive_list_link {
-    protected:
-        intrusive_list_link * prev, * next;
+    struct intrusive_list_node {
+        intrusive_list_node * prev, * next;
     };
 
     /**
-     * Simple doubly linked circular intrusive list
-     * It allows to remove items outside of list (@see intrusive_list::unlink())
+     * Simple doubly linked circular intrusive list. Not STL compliant.
+     *
+     * Intrusive means stored items already contain list nodes and
+     * intrusive_list does not holds items itself, only pointers to them.
+     * User is responsible for providing pointers to the non-temporary items.
      *
      * @tparam T - stored item type
+     * @tparam LinkPonter - pointer to the *intrusive_list_node* member
      */
-    template <class T, intrusive_list_link T::*LinkOffset>
+    template <class T, intrusive_list_node T::*LinkPonter>
     class intrusive_list {
-        /// Link interface
-        struct link_type : public intrusive_list_link {
-            typedef T * pointer;
-            link_type() noexcept {}
-            explicit link_type(pointer fromItem);
-            pointer get_item() noexcept;
-            bool is_linked() const noexcept;
-        };
-
+        // Note: we don't use boost::intrusive_list as it requires that list hooks
+        // must be properly initilized all the time. It's not true where we use it.
+        typedef intrusive_list_node node_type;
     public:
         typedef T value_type;
         typedef T * pointer;
         /// constructor
         constexpr intrusive_list() noexcept : dummy_link({&dummy_link, &dummy_link}) {}
 
-        /// add block `blk` to the list
-        void push_front(pointer blk) noexcept {
-            debug_assert(not islinked(blk));
-            debug_assert(not has(blk));
-            link_type *  link = &blk->link;
-            debug_assert(dummy_link.next->prev == &dummy_link);
-            link->next = dummy_link.next;
-            link->next->prev = link;
-            link->prev = &dummy_link;
-            dummy_link.next = link;
-            debug_assert(dummy_link.prev->next == &dummy_link);
-        }
-
-        /// add block `blk` to the back of the list
-        void push_back(pointer blk) noexcept {
-            debug_assert(not islinked(blk));
-            debug_assert(not has(blk));
-            link_type * link = &blk->link;
-            link->prev = dummy_link.prev;
-            debug_assert(link->prev->next == &dummy_link);
-            link->prev->next = link;
-            link->next = &dummy_link;
-            dummy_link.prev = link;
-            debug_assert(dummy_link.next->prev == &dummy_link);
-        }
-
-        /// remove head of the list
-        pointer pop_front() noexcept {
-            debug_assert(not empty());
-            link_type * link = dummy_link.next;
-            debug_assert(link->prev == &dummy_link);
-            unlink(link);
-            return block_from_link(link);
-        }
-
-        /// remove tail of the list
-        pointer pop_back() noexcept {
-            debug_assert(not empty());
-            link_type * link = dummy_link.prev;
-            debug_assert(link->next == &dummy_link);
-            unlink(link);
-            return block_from_link(link);
-        }
-
-        /// return list head of the list
+        /// return head of the list
         pointer front() noexcept {
             debug_assert(not empty());
-            return block_from_link(dummy_link.next);
+            return pointer_from_link(dummy_link.next);
         }
 
         /// return tail of the list
         pointer back() noexcept {
             debug_assert(not empty());
-            return block_from_link(dummy_link.prev);
+            return pointer_from_link(dummy_link.prev);
         }
 
-        /// check if block `blk` is list head
-        bool is_head(pointer blk) const noexcept {
-            debug_assert(islinked(blk));
-            debug_assert(has(blk));
-            return &blk->link == dummy_link.next;
+        /// add block `item` to the list
+        void push_front(pointer item) noexcept {
+            debug_assert(not has(item));
+            auto link = &(item->*LinkPonter);
+            link->next = dummy_link.next;
+            link->next->prev = link;
+            link->prev = &dummy_link;
+            dummy_link.next = link;
         }
 
-        /// check if block `blk` is list tail
-        bool is_tail(pointer blk) const noexcept {
-            debug_assert(islinked(blk));
-            debug_assert(has(blk));
-            return &blk->link == dummy_link.prev;
+        /// add block `item` to the back of the list
+        void push_back(pointer item) noexcept {
+            debug_assert(not has(item));
+            node_type * link = &item->link;
+            link->prev = dummy_link.prev;
+            link->prev->next = link;
+            link->next = &dummy_link;
+            dummy_link.prev = link;
         }
 
-        /// remove block `blk` from the any list in which it is linked
-        static void unlink(pointer blk) noexcept {
-            debug_assert(islinked(blk));
-            unlink(&blk->link);
-            debug_assert(not islinked(blk));
+        /// remove head of the list
+        pointer pop_front() noexcept {
+            debug_assert(not empty());
+            node_type * link = dummy_link.next;
+            unlink(link);
+            return pointer_from_link(link);
         }
 
-        /// check whether `blk` is linked into some list
-        static bool islinked(pointer blk) noexcept {
-            return blk->link.next != &blk->link && blk->link.prev != &blk->link;
+        /// remove tail of the list
+        pointer pop_back() noexcept {
+            debug_assert(not empty());
+            node_type * link = dummy_link.prev;
+            debug_assert(link->next == &dummy_link);
+            unlink(link);
+            return pointer_from_link(link);
         }
 
-        /// check whether list contains block `blk`
-        bool has(pointer blk) const noexcept {
-            debug_assert(blk != nullptr);
-            const link_type * node = &dummy_link;
+        /// remove `item` from the list
+        void remove(pointer item) noexcept {
+            debug_assert(has(item));
+            unlink(item);
+        }
+
+        /// check if block `item` is list head
+        bool is_head(pointer item) const noexcept {
+            debug_assert(is_linked(item));
+            debug_assert(has(item));
+            return &(item->*LinkPonter) == dummy_link.next;
+        }
+
+        /// check if block `item` is list tail
+        bool is_tail(pointer item) const noexcept {
+            debug_assert(is_linked(item));
+            debug_assert(has(item));
+            return &item->link == dummy_link.prev;
+        }
+
+        /// move `item` to front
+        void move_front(pointer item) noexcept {
+            debug_assert(has(item));
+            if (is_head(item)) {
+                return;
+            }
+            node_type * link = &(item->*LinkPonter);
+            auto prev = link->prev;
+            // relink this with prev->prev
+            prev->prev->next = link;
+            link->prev = prev->prev;
+            auto next = link->next;
+            // relink prev with next
+            next->prev = prev;
+            prev->next = next;
+            // relink this with prev
+            prev->prev = link;
+            link->next = prev;
+        }
+
+        /// remove block `item` from the any list in which it is linked
+        static void unlink(pointer item) noexcept {
+            debug_assert(is_linked(item));
+            unlink(&(item->*LinkPonter));
+        }
+
+        /// check whether `item` is linked into some list
+        static bool is_linked(pointer item) noexcept {
+            auto link = &(item->*LinkPonter);
+            return link->next != link && link->prev != link;
+        }
+
+        /// check whether list contains block `item`
+        bool has(pointer item) const noexcept {
+            debug_assert(item != nullptr);
+            if (not is_linked(item)) {
+                return false;
+            }
+            const node_type * node = &dummy_link;
             while (node->next != &dummy_link) {
                 node = node->next;
-                if (node == &blk->link) {
+                if (node == &(item->*LinkPonter)) {
                     return true;
                 }
                 // DBG_loopbreak(1000)
@@ -142,10 +166,8 @@ namespace cachelot {
         }
 
     private:
-        static void unlink(link_type * link) noexcept {
+        static void unlink(node_type * link) noexcept {
             debug_assert(link != nullptr);
-            // It's not allowed to mess with border blocks
-            debug_assert(not block_from_link(link)->is_border());
             // Integrity check, unlink
             debug_assert(link->prev->next == link);
             link->prev->next = link->next;
@@ -154,14 +176,13 @@ namespace cachelot {
             debug_only(link->next = link->prev = link);
         }
 
-        static pointer block_from_link(link_type * link) noexcept {
-            auto ui8_ptr = reinterpret_cast<uint8 *>(link);
-            auto blk = reinterpret_cast<pointer>(ui8_ptr - offsetof(value_type, link_type));
-            return blk;
+        static pointer pointer_from_link(node_type * link) noexcept {
+            // we don't want to mess with ABI by ourselves
+            return boost::intrusive::detail::parent_from_member<T, intrusive_list_node>(link, LinkPonter);
         }
 
     private:
-        link_type dummy_link;
+        node_type dummy_link;
     };
 
 } // namespace cachelot
