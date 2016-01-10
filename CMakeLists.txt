@@ -2,12 +2,12 @@
 #       Cmake basic setup
 ###########################################################################
 if (NOT CMAKE_GENERATOR STREQUAL "Unix Makefiles")
-    set (CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebugInfo;AddressSanitizer" CACHE TYPE INTERNAL FORCE)
+    set (CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebugInfo;MinSizeRel;AddressSanitizer" CACHE TYPE INTERNAL FORCE)
     mark_as_advanced (CMAKE_CONFIGURATION_TYPES)
 else ()
     # Unix Makefiles support only single build configuration - release by default
-    if (NOT "$CMAKE_BUILD_TYPE")
-        set (CMAKE_BUILD_TYPE RelWithDebugInfo)
+    if (NOT CMAKE_BUILD_TYPE)
+        set (CMAKE_BUILD_TYPE RelWithDebugInfo CACHE TYPE INTERNAL FORCE)
     endif ()
 endif ()
 project (cachelot)
@@ -56,10 +56,12 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
     else ()
         message (FATAL_ERROR "CACHELOT_PLATFORM_BITS is set to unknown value: \"${CACHELOT_PLATFORM_BITS}\"")
     endif ()
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4 -std=c++11")
-    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -DDEBUG")
-    set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -msse2 -DNDEBUG")
-    set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO "${CMAKE_CXX_FLAGS_RELEASE} -O2 -DNDEBUG -g")
+    set (CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4 -std=c++11 -msse2")
+    set (CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
+    set (CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+    set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO "-O2 -DNDEBUG -g")
+    set (CMAKE_CXX_FLAGS_MINSIZEREL "-Os -DNDEBUG")
+
     set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES "")
     # Flags for address sanitizer build type
     set (ADRESS_SANITIZER_FLAGS "-O1 -g -DNDEBUG -DADDRESS_SANITIZER -fno-optimize-sibling-calls")
@@ -124,9 +126,9 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CACHELOT_BUILD}")
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CACHELOT_BUILD}")
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CACHELOT_BUILD}")
 include_directories (src)
-# - - - cachelot library - - - - - - - 
+# - - - cachelot library - - - - - - -
 add_subdirectory (src/cachelot)
-# - - - cachelotd server - - - - - - - 
+# - - - cachelotd server - - - - - - -
 add_subdirectory (src/server)
 # - - - unit tests - - - - - - - - - -
 add_subdirectory (src/unit_test)

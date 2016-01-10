@@ -651,7 +651,7 @@ namespace cachelot {
     inline void * memalloc::alloc_or_evict(const size_t requested_size, bool evict_if_necessary, ForeachFreed on_free_block) {
 
         #if defined(ADDRESS_SANITIZER)
-        return std::malloc(size);
+        return std::malloc(requested_size);
         #endif
 
         STAT_INCR(mem.num_malloc, 1);
