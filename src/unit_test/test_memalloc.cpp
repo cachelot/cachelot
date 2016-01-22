@@ -6,13 +6,6 @@ namespace {
 
 using namespace cachelot;
 
-static constexpr size_t MEMSIZE = 4 * Megabyte;
-static constexpr size_t PAGESIZE = 4 * Kilobyte;
-static constexpr size_t NUM_ALLOC = 100000;
-static constexpr size_t NUM_REPEAT = 50;
-static constexpr size_t MIN_ALLOC_SIZE = 4;
-static constexpr size_t MAX_ALLOC_SIZE = PAGESIZE - 64;
-
 // there is no memalloc in the AddressSanitizer build
 #ifndef ADDRESS_SANITIZER
 
@@ -52,9 +45,7 @@ BOOST_AUTO_TEST_CASE(test_free_blocks_by_size) {
         // Normal blocks
         pos = fixture.position_from_size(256);
         BOOST_CHECK_EQUAL(pos.pow_index, 1); BOOST_CHECK_EQUAL(pos.sub_index, 0);
-        pos = fixture.position_from_size(MAX_ALLOC_SIZE);
-        BOOST_CHECK_EQUAL(pos.pow_index, 4); BOOST_CHECK_EQUAL(pos.sub_index, 31);
-        pos = fixture.position_from_size(1024);
+        pos = fixture.position_from_size(1026);
         BOOST_CHECK_EQUAL(pos.pow_index, 3); BOOST_CHECK_EQUAL(pos.sub_index, 0);
         pos = fixture.position_from_size(1023);
         BOOST_CHECK_EQUAL(pos.pow_index, 2); BOOST_CHECK_EQUAL(pos.sub_index, 31);
@@ -158,10 +149,56 @@ BOOST_AUTO_TEST_CASE(test_pages) {
     BOOST_CHECK_EQUAL(fixture.all_pages[0].num_evictions, 1);
 }
 
+BOOST_AUTO_TEST_CASE(test_realloc_inplace) {
+    // setup
+    memalloc allocator(4 * Kilobyte, 1 * Kilobyte);
+    const auto less_than_halfpage = 300u;
+    // allocate < ~30% of the page
+    void * mem1 = allocator.alloc(less_than_halfpage);
+    BOOST_CHECK(mem1 != nullptr);
+    std::memset(mem1, 'X', less_than_halfpage); // "use" memory
+    // allocate < ~30% more
+    void * mem2 = allocator.alloc(less_than_halfpage);
+    BOOST_CHECK(mem2 != nullptr);
+    std::memset(mem2, 'X', less_than_halfpage); // "use" memory
+    // allocate the same
+    mem2 = allocator.realloc_inplace(mem2, less_than_halfpage);
+    BOOST_CHECK(mem2 != nullptr);
+    std::memset(mem2, 'X', less_than_halfpage); // "use" memory
+    // shrink first chunk
+    mem1 = allocator.realloc_inplace(mem1, less_than_halfpage / 2);
+    BOOST_CHECK(mem1 != nullptr);
+    std::memset(mem1, 'X', less_than_halfpage / 2); // "use" memory
+    // shrink some more
+    mem1 = allocator.realloc_inplace(mem1, less_than_halfpage / 4);
+    BOOST_CHECK(mem1 != nullptr);
+    std::memset(mem1, 'X', less_than_halfpage / 4); // "use" memory
+    // now extend the first chunk back
+    mem1 = allocator.realloc_inplace(mem1, less_than_halfpage);
+    BOOST_CHECK(mem1 != nullptr);
+    std::memset(mem1, 'X', less_than_halfpage); // "use" memory
+    // extend a second chunk a bit
+    mem2 = allocator.realloc_inplace(mem2, less_than_halfpage + 1);
+    BOOST_CHECK(mem2 != nullptr);
+    std::memset(mem2, 'X', less_than_halfpage + 1); // "use" memory
+    // delete the second chunk
+    allocator.free(mem2);
+    // try to extend the first
+    mem1 = allocator.realloc_inplace(mem1, less_than_halfpage * 2);
+    BOOST_CHECK(mem1 != nullptr);
+    std::memset(mem1, 'X', less_than_halfpage * 2); // "use" memory
+}
+
 // allocate and free blocks of a random size
 // in case of the internal inconsistency, memalloc will trigger internal failure calling debug_assert
 //
 BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
+    static constexpr size_t MEMSIZE = 4 * Megabyte;
+    static constexpr size_t PAGESIZE = 4 * Kilobyte;
+    static constexpr size_t NUM_ALLOC = 100000;
+    static constexpr size_t NUM_REPEAT = 50;
+    static constexpr size_t MIN_ALLOC_SIZE = 4;
+    static constexpr size_t MAX_ALLOC_SIZE = PAGESIZE - 64;
     // setup
     memalloc allocator(MEMSIZE, PAGESIZE);
     random_int<size_t> random_size(MIN_ALLOC_SIZE, MAX_ALLOC_SIZE);

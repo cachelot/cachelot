@@ -60,7 +60,7 @@ or
 
 It's possible to configure the build by passing parameters to cmake:
 
-Build with IDE or by running make in root project directory. All binaries (main executable, unit tests, etc.) will be in ./bin/<build_type> directory.
+Build with IDE or by running make in root project directory. All binaries (main executable, unit tests, etc.) will be in ./bin/`build_type` directory.
 
 
  * `-DCMAKE_BUILD_TYPE` to choose build type.

@@ -96,10 +96,14 @@ namespace cachelot {
 
     private:
         /// check whether given `ptr` whithin arena bounaries and block information can be retrieved from it
-        inline bool valid_addr(void * ptr) const noexcept;
+        bool valid_addr(void * ptr) const noexcept;
 
-        /// coalesce adjacent unused blocks up to max block size and return resulting block
-        block * merge_unused(block * block) noexcept;
+        /// coalesce adjacent to the left free blocks up to the page size and return resulting block
+        block * merge_free_left(block * block) noexcept;
+        /// coalesce adjacent to the right free blocks up to the page size and return resulting block
+        block * merge_free_right(block * block) noexcept;
+        /// coalesce adjacent free blocks up to the page size and return resulting block
+        block * merge_free(block * block) noexcept;
 
         /// mark block as non-used and coalesce it with adjacent unused blocks
         void unuse(block * & blk) noexcept;

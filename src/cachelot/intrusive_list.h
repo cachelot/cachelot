@@ -56,7 +56,6 @@ namespace cachelot {
 
         /// add block `item` to the list
         void push_front(pointer item) noexcept {
-            debug_assert(not has(item));
             auto link = &(item->*LinkPonter);
             link->next = dummy_link.next;
             link->next->prev = link;
@@ -66,7 +65,6 @@ namespace cachelot {
 
         /// add block `item` to the back of the list
         void push_back(pointer item) noexcept {
-            debug_assert(not has(item));
             node_type * link = &item->link;
             link->prev = dummy_link.prev;
             link->prev->next = link;

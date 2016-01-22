@@ -102,7 +102,7 @@ namespace cachelot {
         }
 
         /// retrieve boundaries of the page containing address specified
-        tuple<const uint8 * const, const uint8 * const> page_boundaries_from_addr(const void * const ptr) noexcept {
+        tuple<const uint8 * const, const uint8 * const> page_boundaries_from_addr(const void * const ptr) const noexcept {
             const auto page_no = page_no_from_addr(ptr);
             const uint8 * const page_begin = arena_begin + (page_no * page_size);
             const uint8 * const page_end = page_begin + page_size;
@@ -118,7 +118,7 @@ namespace cachelot {
         }
 
         /// retrieve the best candidate for eviction and reuse
-        tuple<uint8 *, uint8 *> page_to_reuse() {
+        tuple<uint8 *, uint8 *> page_to_reuse() noexcept {
             page_info * least_used = lru_pages.back();
             least_used->num_evictions += 1;
             // make it first to prolong its life
@@ -137,13 +137,12 @@ namespace cachelot {
         }
 
         /// check that address is within arena range
-        bool valid_addr(const void * const ptr) {
+        bool valid_addr(const void * const ptr) const noexcept {
             auto u8_ptr = reinterpret_cast<const uint8 * const>(ptr);
             return u8_ptr >= arena_begin && u8_ptr < arena_end;
         }
-
     private:
-        unsigned page_no_from_addr(const void * const ptr) noexcept {
+        unsigned page_no_from_addr(const void * const ptr) const noexcept {
             debug_assert(valid_addr(ptr));
             auto ui8_ptr = reinterpret_cast<const uint8 * const>(ptr);
             unsigned page_no = static_cast<size_t>(ui8_ptr - arena_begin) >> log2_page_size;
@@ -288,6 +287,36 @@ namespace cachelot {
             block_after_right->meta.left_adjacent_offset = left_block->size_with_header();
             return left_block;
         }
+
+
+        /// check that block doesn't cross page boundaries and also check that neighbours are connected correctly
+        void __debug_sanity_check(const std::unique_ptr<pages> & pg, bool check_neighbours = true) const {
+            debug_assert(meta.dbg_marker == DBG_MARKER);
+            const uint8 * page_begin; const uint8 * page_end;
+            tie(page_begin, page_end) = pg->page_boundaries_from_addr(this);
+            auto this_ = reinterpret_cast<const uint8 *>(this);
+            debug_assert(this_ >= page_begin);
+            debug_assert(this_ + size_with_header() <= page_end);
+            if (not check_neighbours) {
+                return;
+            }
+            if (this_ > page_begin) {
+                const auto left = left_adjacent();
+                debug_assert(left->meta.dbg_marker == DBG_MARKER);
+                debug_assert(left->right_adjacent() == this);
+                debug_assert(reinterpret_cast<const uint8 *>(left) >= page_begin);
+                (void)left;
+            }
+            if (this_ + this->size_with_header() < page_end) {
+                const auto right = right_adjacent();
+                debug_assert(right->meta.dbg_marker == DBG_MARKER);
+                debug_assert(right->left_adjacent() == this);
+                debug_assert(reinterpret_cast<const uint8 *>(right) + right->size_with_header() <= page_end);
+                (void)right;
+            }
+            (void)pg; (void)page_begin; (void)page_end; (void)this_;
+        }
+
     private:
         // Allows to create fake blocks in the unit tests
         friend struct test_memalloc::test_free_blocks_by_size;
@@ -512,7 +541,6 @@ namespace cachelot {
             debug_assert(blk->size_with_header() <= page_size);
             position pos = position_from_size(blk->size());
             auto & size_class = size_classes_table[pos.absolute()];
-            debug_only(blk->group_by_size_link.next = blk->group_by_size_link.prev = &blk->group_by_size_link);
             size_class.push_front(blk);
             // unconditionally update bit index
             bit_index_mark_non_empty(pos);
@@ -574,41 +602,70 @@ namespace cachelot {
         debug_assert(available == EOM);
     }
 
-
-    inline memalloc::block * memalloc::merge_unused(memalloc::block * blk) noexcept {
-        const uint8 * page_begin;
-        const uint8 * page_end;
+    inline memalloc::block * memalloc::merge_free_left(memalloc::block * blk) noexcept {
+        // Note: we may not have 'left_adjacent' here.
+        // We have to check that offset is within the page boundaries first.
+        const uint8 * page_begin; const uint8 * page_end;
         tie(page_begin, page_end) = m_pages->page_boundaries_from_addr(blk);
-        // merge free blocks left
+
+        // merge to the left
         const uint8 * left_block_boundary = reinterpret_cast<const uint8 * >(blk);
         while (left_block_boundary > page_begin && blk->left_adjacent()->is_free()) {
-            auto left_blk = blk->left_adjacent();
-            debug_assert(left_blk->size_with_header() + blk->size_with_header() <= page_size);
-            m_free_blocks->remove_block(left_blk);
-            blk = block::merge(left_blk, blk);
+            auto left = blk->left_adjacent();
+            debug_assert(left->size_with_header() + blk->size_with_header() <= page_size);
+            m_free_blocks->remove_block(left);
+            // Sanity check
+            debug_only(left->__debug_sanity_check(m_pages));
+            debug_only(blk->__debug_sanity_check(m_pages));
+            blk = block::merge(left, blk);
+            debug_only(blk->__debug_sanity_check(m_pages));
             left_block_boundary = reinterpret_cast<const uint8 * >(blk);
+            // ensure we don't cross
+            debug_assert(left_block_boundary >= page_begin);
         }
-        // merge right
+        return blk;
+    }
+
+    inline memalloc::block * memalloc::merge_free_right(memalloc::block * blk) noexcept {
+        // Note: we may not have 'right_adjacent' here.
+        // We have to check that offset is within the page boundaries first.
+        const uint8 * page_begin; const uint8 * page_end;
+        tie(page_begin, page_end) = m_pages->page_boundaries_from_addr(blk);
+
+        // merge to the right
         const uint8 * right_block_boundary = reinterpret_cast<const uint8 * >(blk) + blk->size_with_header();
         while (right_block_boundary < page_end && blk->right_adjacent()->is_free()) {
-            auto right_blk = blk->right_adjacent();
-            debug_assert(blk->size_with_header() + right_blk->size_with_header() <= page_size);
-            m_free_blocks->remove_block(right_blk);
-            blk = block::merge(blk, right_blk);
+            auto right = blk->right_adjacent();
+            debug_assert(blk->size_with_header() + right->size_with_header() <= page_size);
+            m_free_blocks->remove_block(right);
+            // Sanity check
+            debug_only(blk->__debug_sanity_check(m_pages));
+            debug_only(right->__debug_sanity_check(m_pages));
+            blk = block::merge(blk, right);
+            debug_only(blk->__debug_sanity_check(m_pages));
             right_block_boundary = reinterpret_cast<const uint8 * >(blk) + blk->size_with_header();
+            // ensure we don't cross
+            debug_assert(right_block_boundary <= page_end);
         }
+        return blk;
+    }
+
+    inline memalloc::block * memalloc::merge_free(memalloc::block * blk) noexcept {
+        blk = merge_free_left(blk);
+        blk = merge_free_right(blk);
         return blk;
     }
 
 
     inline void * memalloc::checkout(block * blk, const size_t requested_size) noexcept {
-        debug_assert(reinterpret_cast<uint8*>(blk) >= reinterpret_cast<uint8*>(m_arena.get()));
-        debug_assert(reinterpret_cast<uint8*>(blk) + blk->size_with_header() <= reinterpret_cast<uint8*>(m_arena.get()) + arena_size);
+        debug_only(blk->__debug_sanity_check(m_pages));
         block * leftover;
         tie(blk, leftover) = block::split(blk, requested_size);
         if (leftover != nullptr) {
+            debug_only(leftover->__debug_sanity_check(m_pages));
             m_free_blocks->put_block(leftover);
         }
+        debug_only(blk->__debug_sanity_check(m_pages));
         STAT_INCR(mem.total_served, blk->size());
         blk->set_used();
         return blk->memory();
@@ -631,6 +688,7 @@ namespace cachelot {
         debug_assert(valid_addr(ptr));
         block * blk = block::from_user_ptr(ptr);
         debug_assert(blk->is_used());
+        debug_only(block::from_user_ptr(ptr)->__debug_sanity_check(m_pages));
         return blk->size();
     }
 
@@ -642,6 +700,8 @@ namespace cachelot {
         debug_assert(valid_addr(ptr));
         // ensure we're touching the used block
         debug_assert(block::from_user_ptr(ptr)->is_used());
+        // additional sanity check
+        debug_only(block::from_user_ptr(ptr)->__debug_sanity_check(m_pages));
         // touch corresponding page
         m_pages->touch(ptr);
     }
@@ -649,6 +709,7 @@ namespace cachelot {
 
     template <typename ForeachFreed>
     inline void * memalloc::alloc_or_evict(const size_t requested_size, bool evict_if_necessary, ForeachFreed on_free_block) {
+        debug_assert(requested_size > 0); debug_assert(requested_size <= page_size);
 
         #if defined(ADDRESS_SANITIZER)
         return std::malloc(requested_size);
@@ -704,45 +765,28 @@ namespace cachelot {
         #if defined(ADDRESS_SANITIZER)
         return nullptr;
         #endif
-//        debug_assert(valid_addr(ptr));
-//        debug_only(m_free_blocks->test_bit_index_integrity_check());
-//        debug_only(used_blocks->test_bit_index_integrity_check());
-//        debug_assert(valid_addr(ptr));
-//        debug_assert(new_size <= max_allocation);
-//        debug_assert(new_size > 0);
-//
-//        STAT_INCR(mem.num_realloc, 1);
-//        block * blk = block::from_user_ptr(ptr);
-//
-//        // shrink the block
-//        if (new_size <= blk->size()) {
-//            block_list::unlink(blk);
-//            block::unuse(blk);
-//            return checkout(blk, new_size);
-//        }
-//
-//        // extend the block on the right side
-//        uint32 available = blk->size();
-//        auto right = blk->right_adjacent();
-//        // check if we have enough space first
-//        while (available < new_size && right->is_free()) {
-//            available += right->size_with_header();
-//            right = right->right_adjacent();
-//        }
-//        if (available >= new_size) {
-//            block_list::unlink(blk);
-//            block::unuse(blk);
-//            while (blk->size() < new_size) {
-//                debug_assert(blk->right_adjacent()->is_free());
-//                block_list::unlink(blk->right_adjacent());
-//                blk = block::merge(blk, blk->right_adjacent());
-//            }
-//            debug_assert(blk->size() >= new_size);
-//            return checkout(blk, new_size);
-//        }
-//
-//        // give up
-//        STAT_INCR(mem.num_realloc_errors, 1);
+        debug_assert(new_size > 0); debug_assert(new_size <= page_size);
+        debug_assert(valid_addr(ptr));
+
+        STAT_INCR(mem.num_realloc, 1);
+        block * blk = block::from_user_ptr(ptr);
+        debug_only(blk->__debug_sanity_check(m_pages));
+        blk->set_free();
+
+        // 1. shrink the block
+        if (new_size <= blk->size()) {
+            return checkout(blk, new_size);
+        }
+
+        // 2. try to expand the block to the right
+        blk = merge_free_right(blk);
+        if (blk->size() >= new_size) {
+            return checkout(blk, new_size);
+        }
+
+        // give up
+        blk->set_used();
+        STAT_INCR(mem.num_realloc_errors, 1);
         return nullptr;
     }
 
@@ -756,8 +800,9 @@ namespace cachelot {
         debug_assert(valid_addr(ptr));
         STAT_INCR(mem.num_free, 1);
         block * blk = block::from_user_ptr(ptr);
+        debug_only(blk->__debug_sanity_check(m_pages));
         blk->set_free();
-        m_free_blocks->put_block(merge_unused(blk));
+        m_free_blocks->put_block(merge_free(blk));
     }
 
 } // namespace cachelot
