@@ -122,9 +122,9 @@ include_directories (${INCLUDE_DIRECTORIES} ${Boost_INCLUDE_DIRS})
 #       Targets
 ###########################################################################
 message (STATUS "Cachelot setup ...")
-set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CACHELOT_BUILD}")
-set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CACHELOT_BUILD}")
-set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CACHELOT_BUILD}")
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
 include_directories (src)
 # - - - cachelot library - - - - - - -
 add_subdirectory (src/cachelot)
