@@ -12,7 +12,7 @@ using namespace cachelot;
 
 static const int num_runs = 10;
 static const size_t memory_limit = 1024 * Megabyte;
-static const size_t page_size = 4 * Megabyte;
+static const size_t page_size = 4 * Kilobyte;
 static const size_t user_available_memory = memory_limit - memory_limit * .2; // 80%
 static const size_t min_allocation_size = 4;
 static const size_t max_allocation_size = page_size;
