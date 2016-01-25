@@ -1,12 +1,14 @@
-#!/bin/sh
+#!/bin/bash
 
 
 function server_test {
     local buildCfg=$1
     ./bin/"${buildCfg}"/cachelotd &
+    sleep 0.5
     ./test/server_test.py
     local ret=$?
     killall cachelotd
+    sleep 0.1
     [[ ${ret} != 0 ]] && exit ${ret}
 }
 

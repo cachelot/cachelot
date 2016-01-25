@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 function clean_artifacts {
     rm -r ./bin/* > /dev/null 2>&1

@@ -115,10 +115,6 @@ namespace cachelot {
     #  error "aligned_alloc function not found"
     #endif
     }
-
-    inline void aligned_free(void * ptr) noexcept {
-        std::free(ptr);
-    }
     #endif // aligned_alloc
 
     constexpr size_t cpu_l1d_cache_line = 64;
@@ -126,6 +122,7 @@ namespace cachelot {
 
     constexpr size_t Kilobyte = 1024;
     constexpr size_t Megabyte = Kilobyte * 1024;
+    constexpr size_t Gigabyte = Megabyte * 1024;
 
 } // namespace cachelot
 

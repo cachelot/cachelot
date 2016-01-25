@@ -1,18 +1,25 @@
 language: cpp
-sudo: false
+sudo: required
+dist: trusty
 cache:
   apt: true
 os:
 - linux
 
-addons:
-  apt:
-    sources:
-    - boost-latest
-    packages:
-    - libboost-system-dev
-    - libboost-test-dev
-    - libboost-program-options-dev
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install -qq
+  - sudo apt-get install -qq libasan0 psmisc libboost-system1.55-dev libboost-test1.55-dev libboost-program-options1.55-dev
+  - sudo service memcached stop
+install:
+  # clang 3.6, libc++
+  - if [ "$CXX" == "clang++" ]; then sudo apt-get -qq install clang-3.6 clang++-3.6 libstdc++6-4.4-dev; fi
+  - if [ "$CXX" == "clang++" ]; then sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 0; fi
+  - if [ "$CXX" == "clang++" ]; then sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 0; fi
+  - if [ "$CXX" == "clang++" ]; then sudo update-alternatives --set clang /usr/bin/clang-3.6; fi
+  - if [ "$CXX" == "clang++" ]; then sudo update-alternatives --set clang++ /usr/bin/clang++-3.6; fi
+  - if [ "$CXX" == "clang++" ]; then export CXXFLAGS="-stdlib=libstdc++"; fi
+  - if [ "$CXX" == "clang++" ]; then export LDFLAGS="-stdlib=libstdc++"; fi
 
 compiler:
   - clang
@@ -21,3 +28,6 @@ compiler:
 script:
   - ./all_build.sh
   - ./run_tests.sh
+notifications:
+  email: false
+

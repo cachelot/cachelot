@@ -1,10 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
-BUILD_CFGS=(Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer)
+BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer"
 
 . ./cleanup.sh
 
-for cfg in ${BUILD_CFGS[@]}; do
+for cfg in ${BUILD_CFGS}; do
   clean_build_files
   echo "Building ${cfg} ..."
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=${cfg} &&

@@ -254,7 +254,7 @@ namespace cachelot {
         /// get block structure back from pointer given to user
         static block * from_user_ptr(void * ptr) noexcept {
             uint8 * u8_ptr = reinterpret_cast<uint8 *>(ptr);
-            memalloc::block * result = reinterpret_cast<memalloc::block *>(u8_ptr - offsetof(memalloc::block, memory_));
+            memalloc::block * result = reinterpret_cast<memalloc::block *>(u8_ptr - memalloc::block::header_size);
             debug_assert(result->meta.dbg_marker == DBG_MARKER);
             return result;
         }
@@ -551,6 +551,12 @@ namespace cachelot {
             size_class_list::unlink(blk);
         }
 
+        /// size of the page, also size of the biggest possible allocation
+        uint32 get_page_size() const noexcept {
+            // supress warning about unused private var in Release build
+            return page_size;
+        }
+
     private:
         // bit indexes here to speed-up block lookups
         // '1' means maybe there is a block; '0' - definitely there is no blocks
@@ -570,7 +576,7 @@ namespace cachelot {
     inline memalloc::memalloc(const size_t memory_limit, const size_t the_page_size)
         : arena_size(memory_limit)
         , page_size(the_page_size)
-        , m_arena(aligned_alloc(page_size, arena_size), &aligned_free) {
+        , m_arena(aligned_alloc(page_size, arena_size), &std::free) {
         STAT_SET(mem.limit_maxbytes, memory_limit);
         STAT_SET(mem.page_size, page_size);
         debug_assert(ispow2(memory_limit));
@@ -600,6 +606,9 @@ namespace cachelot {
             left_adjacent_block_offset = page_size;
         }
         debug_assert(available == EOM);
+        #if defined(ADDRESS_SANITIZER)
+        m_arena.reset(nullptr);
+        #endif
     }
 
     inline memalloc::block * memalloc::merge_free_left(memalloc::block * blk) noexcept {

@@ -12,11 +12,9 @@ import time
 import os
 import subprocess
 
-log = logging.getLogger(__name__)
 
 SELF, _ = os.path.splitext(os.path.basename(sys.argv[0]))
-BASEDIR = os.path.normpath(os.path.dirname(os.path.abspath(sys.argv[0])) + '/..')
-CACHELOTD = os.path.join(BASEDIR, 'bin/cachelotd')
+log = logging.getLogger(SELF)
 
 
 class TestFailedError(Exception):
@@ -173,8 +171,8 @@ def run_smoke_test(mc):
 
 
 def run_fuzzy_test(mc):
-    for num_items in range(10000):
-        pass
+    # TODO: !!!
+    pass
 
 
 def main():
