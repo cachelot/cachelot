@@ -1,0 +1,23 @@
+language: cpp
+sudo: false
+cache:
+  apt: true
+os:
+- linux
+
+addons:
+  apt:
+    sources:
+    - boost-latest
+    packages:
+    - libboost-system-dev
+    - libboost-test-dev
+    - libboost-program-options-dev
+
+compiler:
+  - clang
+  - gcc
+
+script:
+  - ./all_build.sh
+  - ./run_tests.sh
