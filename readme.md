@@ -12,7 +12,7 @@ The code is written in C++ in a hardware-friendly manner.
 All this allows you to store and access three million items per second (depending on the CPU cache size). Maybe 3MOPs doesn't sound like such a large number, but it means ~333 nanoseconds are spent on a single operation, while RAM reference cost is at [~100 nanoseconds](http://www.eecs.berkeley.edu/~rcs/research/interactive_latency.html).
 
 # What is Cachelot Distributed Cache Server #
-Think of [Memcached](http://memcached.org) (Cachelot server is Memcached-compatible) but while the former aims to serve hundreds of simultaneous connections, achieving maximum bandwidth, the latter serves tens of them, achieving minimal latency.
+Think of [Memcached](http://memcached.org) (Cachelot server is Memcached-compatible) but while the former aims to serve hundreds of simultaneous connections, achieving maximum bandwidth, the latter serves tens of them, achieving maximal hardware utilization.
 
 Cachelot is single-threaded, so you can run it while consuming fewer resources (getting cheaper VPS hosts can lead to the huge savings); it also stores less metadata per Item, and thus better utilizes precious RAM.
 
@@ -92,13 +92,13 @@ Be first to know about the new features
 
  * ~~Some Memcached commands not implemented yet (`cas`, `touch`, `append`, `prepend`, `stats`)~~
  * Windows build is broken
- * There is no UDP and binary protocol support
+ * There is no ~~UDP~~ and binary protocol support
  * Cachelot library doesn't have proper build packaging and has no multi-threaded interface
  * Documentation and examples
  * Really neat features, and more...
 
 ## License ##
-Cachelot is free and open source. 
+Cachelot is free and open source.
 Distributed under the terms of [Simplified BSD License](http://cachelot.io/license.txt)
 
 ## Credits ##
