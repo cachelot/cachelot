@@ -12,7 +12,7 @@ import time
 import os
 import subprocess
 
-log = logging.getLogger('Test cachelotd')
+log = logging.getLogger(__name__)
 
 SELF, _ = os.path.splitext(os.path.basename(sys.argv[0]))
 BASEDIR = os.path.normpath(os.path.dirname(os.path.abspath(sys.argv[0])) + '/..')
@@ -82,7 +82,7 @@ def basic_storage_test(mc):
     mc.prepend(k, v1)
     v = v1 + v
     CHECK_EQ( mc.get(k), v )
-    log.info("success")
+    log.info("-   success")
 
 
 def basic_cas_test(mc):
@@ -111,7 +111,7 @@ def basic_cas_test(mc):
     CHECK_EQ( mc.cas(k, v, 0, ver), False )  # cas after set shall fail
     CHECK_EQ( mc.get(k), v )
 
-    log.info("success")
+    log.info("-   success")
 
 
 def basic_batch_op_test(mc):
@@ -124,7 +124,7 @@ def basic_batch_op_test(mc):
         test_dict[k] = v
     for k, v in mc.get_multi(test_dict.keys()):
         CHECK_EQ( test_dict[k], v )
-    log.info("success")
+    log.info("-   success")
 
 
 def basic_expiration_test(mc):
@@ -143,7 +143,7 @@ def basic_expiration_test(mc):
     time.sleep(4)
     CHECK_EQ( mc.get(k), None)
     mc.flush_all()
-    log.info("success")
+    log.info("-   success")
 
 
 def basic_arithmetic_test(mc):
@@ -159,7 +159,7 @@ def basic_arithmetic_test(mc):
     CHECK_EQ( mc.decr(key1, 4294967295), 0 )
     CHECK_EXC( lambda: mc.incr("non-existing-key", 1), memcached.KeyNotFoundError )
     CHECK_EXC( lambda: mc.decr("non-existing-key", 1), memcached.KeyNotFoundError )
-    log.info("success")
+    log.info("-   success")
 
 
 def run_smoke_test(mc):
@@ -178,16 +178,11 @@ def run_fuzzy_test(mc):
 
 
 def main():
-    devnull = open(os.devnull, 'w')
-    cachelot_proc = subprocess.Popen(args=CACHELOTD, stdout=devnull, stderr=devnull)
-    time.sleep(1)
-    try:
-        mc = memcached.connect_tcp('localhost', 11211)
-        ver = mc.version()
-        log.info("Test cachelot version '%s'", ver)
-        run_smoke_test(mc)
-    finally:
-        cachelot_proc.terminate()
+    log.info("Running Cachelot tests ...")
+    mc = memcached.connect_tcp('localhost', 11211)
+    ver = mc.version()
+    log.info("Version: '%s'", ver)
+    run_smoke_test(mc)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
