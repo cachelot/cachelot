@@ -138,6 +138,12 @@ namespace cachelot {
 
 
             /**
+             * destructor
+             */
+            ~Cache();
+
+
+            /**
              * `get` -  retrieve item
              *
              * @return pointer to the Item or `nullptr` if none was found
@@ -291,6 +297,14 @@ namespace cachelot {
             , m_evictions_enabled(enable_evictions)
             , m_oldest_timestamp(std::numeric_limits<timestamp_type>::max())
             , m_newest_timestamp(std::numeric_limits<timestamp_type>::min()) {
+        }
+
+
+        inline Cache::~Cache() {
+            m_dict.remove_if([=](ItemPtr item) -> bool {
+                m_allocator.free(item);
+                return true;
+            });
         }
 
 
@@ -475,7 +489,14 @@ namespace cachelot {
 
         inline void Cache::do_flush_all() noexcept {
             STAT_INCR(cache.cmd_flush, 1);
-            m_dict.remove_if([=](ItemPtr item) -> bool { return item->is_expired(); });
+            m_dict.remove_if([=](ItemPtr item) -> bool {
+                if (item->is_expired()) {
+                    m_allocator.free(item);
+                    return true;
+                } else {
+                    return false;
+                }
+            });
         }
 
 
