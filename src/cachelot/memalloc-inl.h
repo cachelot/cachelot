@@ -260,7 +260,8 @@ namespace cachelot {
         }
 
         /// split given block `blk` to the smaller block of `new_size`, returns splited block and leftover space as a block
-        static tuple<block *, block *> split(block * blk, uint32 new_size) noexcept {
+        static tuple<block *, block *> split(const std::unique_ptr<pages> & pgs, block * blk, uint32 new_size) noexcept {
+            debug_only(blk->__debug_sanity_check(pgs));
             debug_assert(blk->is_free());
             const uint32 new_round_size = new_size > min_memory ? new_size + unaligned_bytes(blk->memory_ + new_size, alignment) : min_memory;
             memalloc::block * leftover = nullptr;
@@ -270,21 +271,30 @@ namespace cachelot {
                 blk->set_size(new_round_size);
                 debug_assert(old_size - new_round_size > block::header_size + block::alignment);
                 leftover = new (blk->right_adjacent()) memalloc::block(old_size - new_round_size - header_size, new_round_size + header_size);
-                block_after_next->meta.left_adjacent_offset = leftover->size_with_header();
+                if (reinterpret_cast<uint8 *>(block_after_next) < pgs->arena_end) {
+                    block_after_next->meta.left_adjacent_offset = leftover->size_with_header();
+                }
             }
+            debug_only(blk->__debug_sanity_check(pgs));
+            debug_only(if (leftover) { leftover->__debug_sanity_check(pgs); });
             return make_tuple(blk, leftover);
         }
 
         /// merge two blocks up to `max_allocation`
-        static block * merge(block * left_block, block * right_block) noexcept {
+        static block * merge(const std::unique_ptr<pages> & pgs, block * left_block, block * right_block) noexcept {
             // Sanity check
             debug_assert(right_block->left_adjacent() == left_block);
             debug_assert(left_block->right_adjacent() == right_block);
+            debug_only(left_block->__debug_sanity_check(pgs));
+            debug_only(right_block->__debug_sanity_check(pgs));
             // Only free blocks may be merged, user data must left untouched
             debug_assert(left_block->is_free()); debug_assert(right_block->is_free());
             memalloc::block * block_after_right = right_block->right_adjacent();
             left_block->set_size(left_block->size() + right_block->size_with_header());
-            block_after_right->meta.left_adjacent_offset = left_block->size_with_header();
+            if (reinterpret_cast<uint8 *>(block_after_right) < pgs->arena_end) {
+                block_after_right->meta.left_adjacent_offset = left_block->size_with_header();
+            }
+            debug_only(left_block->__debug_sanity_check(pgs));
             return left_block;
         }
 
@@ -624,10 +634,7 @@ namespace cachelot {
             debug_assert(left->size_with_header() + blk->size_with_header() <= page_size);
             m_free_blocks->remove_block(left);
             // Sanity check
-            debug_only(left->__debug_sanity_check(m_pages));
-            debug_only(blk->__debug_sanity_check(m_pages));
-            blk = block::merge(left, blk);
-            debug_only(blk->__debug_sanity_check(m_pages));
+            blk = block::merge(m_pages, left, blk);
             left_block_boundary = reinterpret_cast<const uint8 * >(blk);
             // ensure we don't cross
             debug_assert(left_block_boundary >= page_begin);
@@ -648,10 +655,7 @@ namespace cachelot {
             debug_assert(blk->size_with_header() + right->size_with_header() <= page_size);
             m_free_blocks->remove_block(right);
             // Sanity check
-            debug_only(blk->__debug_sanity_check(m_pages));
-            debug_only(right->__debug_sanity_check(m_pages));
-            blk = block::merge(blk, right);
-            debug_only(blk->__debug_sanity_check(m_pages));
+            blk = block::merge(m_pages, blk, right);
             right_block_boundary = reinterpret_cast<const uint8 * >(blk) + blk->size_with_header();
             // ensure we don't cross
             debug_assert(right_block_boundary <= page_end);
@@ -667,14 +671,11 @@ namespace cachelot {
 
 
     inline void * memalloc::checkout(block * blk, const size_t requested_size) noexcept {
-        debug_only(blk->__debug_sanity_check(m_pages));
         block * leftover;
-        tie(blk, leftover) = block::split(blk, requested_size);
+        tie(blk, leftover) = block::split(m_pages, blk, requested_size);
         if (leftover != nullptr) {
-            debug_only(leftover->__debug_sanity_check(m_pages));
             m_free_blocks->put_block(leftover);
         }
-        debug_only(blk->__debug_sanity_check(m_pages));
         STAT_INCR(mem.total_served, blk->size());
         blk->set_used();
         return blk->memory();
