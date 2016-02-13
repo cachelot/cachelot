@@ -119,6 +119,7 @@ namespace cachelot {
             /// interrupt all activity
             void stop() noexcept {
                 error_code __;
+                //m_acceptor
                 m_acceptor.close(__);
             }
 
@@ -193,7 +194,7 @@ namespace cachelot {
                     }
                 });
         }
-        
+
 
         template <class Sock, class Conversation>
         inline void stream_connection<Sock, Conversation>::close() noexcept {
@@ -228,7 +229,7 @@ namespace cachelot {
             m_acceptor.listen();
             async_accept();
         }
-        
+
 
         template <class SocketType, class ImplType>
         inline void stream_server<SocketType, ImplType>::async_accept() {

@@ -24,7 +24,6 @@ namespace  {
 
     void on_signal_terminate(int) {
         killed = true;
-        reactor.stop();
     }
 
     void on_signal_print_stats(int) {
@@ -131,8 +130,10 @@ int main(int argc, char * argv[]) {
 
         error_code error;
         do {
-            reactor.run(error);
-        } while(not killed && not error);
+            reactor.poll(error);
+        } while (not killed && not error);
+        // ensure all pending tasks are finished
+        reactor.poll(error);
 
         if (memcached_tcp) {
             memcached_tcp->stop();
