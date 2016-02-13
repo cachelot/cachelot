@@ -563,7 +563,7 @@ namespace cachelot {
 
         /// size of the page, also size of the biggest possible allocation
         uint32 get_page_size() const noexcept {
-            // supress warning about unused private var in Release build
+            // suppress warning about unused private var in Release build
             return page_size;
         }
 
