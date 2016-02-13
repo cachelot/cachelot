@@ -213,9 +213,8 @@ namespace cachelot {
         /// remove element pos given pos
         void remove(const size_type pos) noexcept {
             debug_assert(not empty_at(pos));
-            m_hashes[pos] = 0;
-            m_entries[pos] = entry_type();
             debug_assert(m_size > 0);
+            m_hashes[pos] = 0;
             m_size -= 1;
             // optimize following items
             size_type current_position = pos;

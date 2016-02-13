@@ -9,7 +9,7 @@ os:
 before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -qq
-  - sudo apt-get install -qq libasan0 psmisc libboost-system1.55-dev libboost-test1.55-dev libboost-program-options1.55-dev
+  - sudo apt-get install -qq libasan0 libboost-system1.55-dev libboost-test1.55-dev libboost-program-options1.55-dev
   - sudo service memcached stop
 install:
   # clang 3.6, libc++

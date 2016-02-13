@@ -4,12 +4,12 @@
 function server_test {
     local buildCfg=$1
     ./bin/"${buildCfg}"/cachelotd &
-    sleep 0.5
+    local pid=$!
     ./test/server_test.py
     local ret=$?
-    killall cachelotd
-    sleep 0.1
+    kill ${pid} || ret=$?
     [[ ${ret} != 0 ]] && exit ${ret}
+    sleep 0.5  # ensure process is down
 }
 
 echo "*** [Debug]"

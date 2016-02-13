@@ -132,14 +132,16 @@ int main(int argc, char * argv[]) {
         do {
             reactor.poll(error);
         } while (not killed && not error);
-        // ensure all pending tasks are finished
-        reactor.poll(error);
-
         if (memcached_tcp) {
             memcached_tcp->stop();
         }
         if (memcached_unix_socket) {
             memcached_unix_socket->stop();
+        }
+        // ensure all pending tasks are finished
+        auto pending = reactor.poll(error);
+        while (pending > 0 && not error) {
+            pending = reactor.poll(error);
         }
 
         return EXIT_SUCCESS;
