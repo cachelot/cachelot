@@ -16,28 +16,6 @@ namespace po = boost::program_options;
 
 namespace  {
 
-    // Global status flag to terminate application from the signal handler
-    static bool killed = false;
-
-    // Global reactor service to access it from the signal handler
-    static net::io_service reactor;
-
-    void on_signal_terminate(int) {
-        killed = true;
-    }
-
-    void on_signal_print_stats(int) {
-        try { PrintStats(); } catch (...) {}
-    }
-
-    void setup_signals() {
-        signal(SIGTERM, &on_signal_terminate);
-        signal(SIGKILL, &on_signal_terminate);
-        signal(SIGINT, &on_signal_terminate);
-        signal(SIGQUIT, &on_signal_terminate);
-        signal(SIGUSR1, &on_signal_print_stats);
-    }
-
     /// Command line arguments parser
     int parse_cmdline(int argc, const char * const argv[]) {
         po::options_description desc("Cachelot is lightning fast in-memory caching system\n"
@@ -102,8 +80,8 @@ int main(int argc, char * argv[]) {
                                                                  settings.cache.page_size,
                                                                  settings.cache.initial_hash_table_size,
                                                                  settings.cache.has_evictions));
-        // Signal handlers
-        setup_signals();
+        // Reactor service
+        net::io_service reactor;
 
         // TCP
         std::unique_ptr<memcached::TcpServer> memcached_tcp = nullptr;
@@ -128,21 +106,28 @@ int main(int argc, char * argv[]) {
             memcached_udp->start(bind_addr);
         }
 
-        error_code error;
+        // Signal handlers
+        boost::asio::signal_set signals(reactor);
+        signals.add(SIGTERM);
+        signals.add(SIGINT);
+        signals.add(SIGQUIT);
+        signals.add(SIGUSR1);
+        signals.async_wait([&reactor](const error_code& error, int signal_number) {
+            if (error) { return; }
+            switch (signal_number) {
+            case SIGUSR1:
+                PrintStats();
+                break;
+            default:
+                reactor.stop();
+            }
+        });
+
+        // Run reactor loop
         do {
-            reactor.poll(error);
-        } while (not killed && not error);
-        if (memcached_tcp) {
-            memcached_tcp->stop();
-        }
-        if (memcached_unix_socket) {
-            memcached_unix_socket->stop();
-        }
-        // ensure all pending tasks are finished
-        auto pending = reactor.poll(error);
-        while (pending > 0 && not error) {
-            pending = reactor.poll(error);
-        }
+            reactor.run();
+        } while (not reactor.stopped());
+
 
         return EXIT_SUCCESS;
     } catch (const std::exception & e) {
