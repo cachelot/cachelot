@@ -302,7 +302,7 @@ namespace cachelot {
 
         inline Cache::~Cache() {
             m_dict.remove_if([=](ItemPtr item) -> bool {
-                m_allocator.free(item);
+                destroy_item(item);
                 return true;
             });
         }
@@ -491,7 +491,7 @@ namespace cachelot {
             STAT_INCR(cache.cmd_flush, 1);
             m_dict.remove_if([=](ItemPtr item) -> bool {
                 if (item->is_expired()) {
-                    m_allocator.free(item);
+                    destroy_item(item);
                     return true;
                 } else {
                     return false;
@@ -568,12 +568,11 @@ namespace cachelot {
         }
 
 
-        inline void Cache::replace_item_at(const iterator at, ItemPtr new_item) noexcept {
+        inline void Cache::replace_item_at(iterator at, ItemPtr new_item) noexcept {
             auto old_item = at.value();
             debug_assert(old_item->hash() == new_item->hash() && old_item->key() == new_item->key());
             destroy_item(old_item);
-            m_dict.remove(at);
-            m_dict.insert(at, new_item->key(), new_item->hash(), new_item);
+            at.unsafe_replace_kv(new_item->key(), new_item->hash(), new_item);
         }
 
 

@@ -104,9 +104,9 @@ inline iterator random_pick() {
 static void generate_test_data() {
     data_array.reserve(num_items);
     for (auto n=num_items; n > 0; --n) {
-        kv_type kv(move(random_string(min_key_len, max_key_len)),
-                   move(random_string(min_value_len, max_value_len)));
-        data_array.emplace_back(move(kv));
+        kv_type kv(random_string(min_key_len, max_key_len),
+                   random_string(min_value_len, max_value_len));
+        data_array.emplace_back(kv);
     }
 }
 

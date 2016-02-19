@@ -64,6 +64,13 @@ namespace cachelot {
               class Entry = internal::hash_table_entry<Key, T>, class Options = internal::DefaultOptions>
     class dict {
         typedef hash_table<Key, T, KeyEqual, Entry, Options> hash_table_type;
+    public:
+        typedef typename hash_table_type::size_type size_type;
+        typedef typename hash_table_type::hash_type hash_type;
+        typedef typename hash_table_type::key_equal key_equal;
+        typedef Key key_type;
+        typedef T mapped_type;
+        typedef typename hash_table_type::entry_type entry_type;
 
         /// iterator (not STL compliant)
         class iterator {
@@ -82,7 +89,7 @@ namespace cachelot {
                 return m_table != nullptr && not m_table->empty_at(m_pos);
             }
 
-            const Key key() const noexcept {
+            const key_type key() const noexcept {
                 if (*this) {
                     return m_table->entry_at(m_pos).key();
                 } else {
@@ -90,7 +97,7 @@ namespace cachelot {
                 }
             }
 
-            const T value() const noexcept {
+            const mapped_type value() const noexcept {
                 if (*this) {
                     return m_table->entry_at(m_pos).value();
                 } else {
@@ -98,9 +105,11 @@ namespace cachelot {
                 }
             }
 
-            void assign(const T new_value) noexcept {
+            void unsafe_replace_kv(const key_type key, const hash_type hash, mapped_type value) noexcept {
                 debug_assert(*this);
-                m_table->entry_at(m_pos).value = new_value;
+                entry_type new_entry(key, value);
+                debug_assert(m_table->hash_at(m_pos) == hash); (void)hash;
+                m_table->entry_at(m_pos).swap(new_entry);
             }
 
         private:
@@ -111,14 +120,6 @@ namespace cachelot {
             size_type m_pos;
         };
 
-    public:
-        typedef typename hash_table_type::size_type size_type;
-        typedef typename hash_table_type::hash_type hash_type;
-        typedef typename hash_table_type::key_equal key_equal;
-        typedef Key key_type;
-        typedef T mapped_type;
-        typedef typename hash_table_type::entry_type entry_type;
-        typedef iterator iterator;
     private:
         static constexpr size_type default_initial_size = 16;
         typedef typename hash_table_type::entry_type entry;
