@@ -32,7 +32,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands) {
         BOOST_CHECK_EQUAL(the_cache.do_set(item1_2), cache::STORED);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_set), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,set_new), 1);
-    	BOOST_CHECK_EQUAL(STAT_GET(cache,set_existing), 1);
+        BOOST_CHECK_EQUAL(STAT_GET(cache,set_existing), 1);
     }
     // get
     {
@@ -40,8 +40,8 @@ BOOST_AUTO_TEST_CASE(test_cache_commands) {
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_get), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,get_hits), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,get_misses), 1);
-        const auto item1 = CreateItem(the_cache, "Key1", "Valu1");
-        BOOST_CHECK(the_cache.do_get(item1->key(), calc_hash(item1->key())) != nullptr);
+        const auto the_key = bytes::from_literal("Key1");
+        BOOST_CHECK(the_cache.do_get(the_key, calc_hash(the_key)) != nullptr);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_get), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,get_hits), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,get_misses), 1);
@@ -55,6 +55,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands) {
         BOOST_CHECK_EQUAL(STAT_GET(cache,add_not_stored), 0);
         const auto item1_2 = CreateItem(the_cache, "Add_Key1", "Value2");
         BOOST_CHECK_EQUAL(the_cache.do_add(item1_2), cache::NOT_STORED);
+        the_cache.destroy_item(item1_2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_add), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,add_stored), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,add_not_stored), 1);
@@ -91,6 +92,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands) {
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_badval), 0);
         const auto item1_3 = CreateItem(the_cache, "CAS_Key1", "Value3");
         BOOST_CHECK_EQUAL(the_cache.do_cas(item1_3, item1_timestamp), cache::EXISTS);
+        the_cache.destroy_item(item1_3);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_cas), 3);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_misses), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_stored), 1);

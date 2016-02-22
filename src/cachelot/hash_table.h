@@ -149,12 +149,15 @@ namespace cachelot {
         /// @tparam ConditionFun ```bool do_remove(mapped_type)```
         template <typename ConditionFun>
         void remove_if(ConditionFun predicate) noexcept {
-            for (size_type pos = 0; pos < capacity(); ++pos) {
-                if (not empty_at(pos)) {
+            size_type pos = 0;
+            while (pos < capacity()) {
+            	if (not empty_at(pos)) {
                     if (predicate(entry_at(pos).value())) {
                         remove(pos);
+                        continue;
                     }
                 }
+                pos += 1;
             }
         }
 

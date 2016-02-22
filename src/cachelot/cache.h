@@ -435,6 +435,7 @@ namespace cachelot {
                         STAT_INCR(cache.prepend_stored, 1);
                     }
                     replace_item_at(at, new_item);
+                    destroy_item(piece);
                     response = STORED;
                 } else {
                     throw system_error(error::out_of_memory);
