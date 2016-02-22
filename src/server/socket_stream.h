@@ -28,7 +28,7 @@ namespace cachelot {
          * TODO: Conversation description
          */
         template <class SocketType, class Conversation>
-        class stream_connection {
+        class stream_connection : public std::enable_shared_from_this<stream_connection<SocketType, Conversation>> {
             typedef stream_connection<SocketType, Conversation> this_type;
             stream_connection(const stream_connection &) = delete;
             stream_connection & operator= (const stream_connection &) = delete;
@@ -76,9 +76,6 @@ namespace cachelot {
 
             /// publish dynamic stats
             void publish_stats() noexcept;
-
-            /// schedule deletion of this connection after the last operation completion
-            void suicide() noexcept;
 
         private:
             SocketType m_socket;
@@ -149,31 +146,28 @@ namespace cachelot {
 
         template <class Sock, class Conversation>
         inline void stream_connection<Sock, Conversation>::async_receive_some() noexcept {
-            if (m_killed) { return; }
+            auto self = this->shared_from_this();
             m_socket.async_read_some(asio::buffer(m_recv_buf.begin_write(), m_recv_buf.available()),
                 [=](const error_code error, const size_t bytes_received) {
                     bytes receive_result;
                     if (not error) {
-                        m_recv_buf.confirm_write(bytes_received);
+                        self->m_recv_buf.confirm_write(bytes_received);
                         ConversationReply reply = handle_data(m_recv_buf, m_send_buf);
-                        m_recv_buf.compact();
+                        self->m_recv_buf.compact();
                         switch (reply) {
                         case SEND_REPLY_AND_READ:
-                            async_send_all();
+                            self->async_send_all();
                             // there is no `break` so we'll continue receive
                         case READ_MORE:
-                            async_receive_some();
+                            self->async_receive_some();
                             break;
                         case CLOSE_IMMEDIATELY:
-                            suicide();
                             break;
                         }
                     } else {
                         if (error == io_error::message_size) {
-                            m_recv_buf.confirm_write(bytes_received);
-                            async_receive_some();
-                        } else {
-                            suicide();
+                            self->m_recv_buf.confirm_write(bytes_received);
+                            self->async_receive_some();
                         }
                     }
                 });
@@ -183,14 +177,13 @@ namespace cachelot {
         template <class Sock, class Conversation>
         inline void stream_connection<Sock, Conversation>::async_send_all() noexcept {
             if (m_killed) { return; }
+            auto self = this->shared_from_this();
             asio::async_write(m_socket, asio::buffer(m_send_buf.begin_read(), m_send_buf.non_read()), asio::transfer_all(),
                 [=](error_code error, size_t bytes_sent) {
                     if (not error) {
-                        debug_assert(m_send_buf.non_read() == bytes_sent);
-                        m_send_buf.confirm_read(bytes_sent);
-                        m_send_buf.compact();
-                    } else {
-                        suicide();
+                        debug_assert(self->m_send_buf.non_read() == bytes_sent);
+                        self->m_send_buf.confirm_read(bytes_sent);
+                        self->m_send_buf.compact();
                     }
                 });
         }
@@ -203,16 +196,6 @@ namespace cachelot {
                 // try to shutdown the connection gracefully
                 m_socket.shutdown(Sock::shutdown_both, ignored);
                 m_socket.close(ignored);
-            }
-        }
-
-
-        template <class Sock, class Conversation>
-        inline void stream_connection<Sock, Conversation>::suicide() noexcept {
-            if (not m_killed) {
-                m_killed = true;
-                close();
-                post([=]() { delete this; } );
             }
         }
 
@@ -239,10 +222,10 @@ namespace cachelot {
                     [=](const error_code error) {
                         if (not error) {
                             new_conversation->start();
-                        } else {
-                            static_cast<ImplType *>(this)->delete_conversation(new_conversation);
                         }
-                        this->async_accept();
+                        if (not m_ios.stopped()) {
+                            this->async_accept();
+                        }
                     });
             } catch (const std::bad_alloc &) {
                 // retry later TODO: will m_ios.post throw ???

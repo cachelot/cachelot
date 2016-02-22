@@ -56,9 +56,10 @@ namespace cachelot {
                 , cache_api(the_cache) {
             }
 
-            ConversationType * new_conversation() { return new ConversationType(cache_api, super::get_io_service(), settings.net.max_rcv_buffer_size, settings.net.max_snd_buffer_size); }
-
-            void delete_conversation(ConversationType * c) { delete c; }
+            std::shared_ptr<ConversationType> new_conversation() {
+                auto new_conv = new ConversationType(cache_api, super::get_io_service(), settings.net.max_rcv_buffer_size, settings.net.max_snd_buffer_size);
+                return std::shared_ptr<ConversationType>(new_conv);
+            }
 
         private:
             cache::Cache & cache_api;
