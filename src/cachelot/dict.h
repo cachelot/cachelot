@@ -105,10 +105,10 @@ namespace cachelot {
                 }
             }
 
-            void unsafe_replace_kv(const key_type key, const hash_type hash, mapped_type value) noexcept {
+            void unsafe_replace_kv(const key_type k, const hash_type h, mapped_type v) noexcept {
                 debug_assert(*this);
-                entry_type new_entry(key, value);
-                debug_assert(m_table->hash_at(m_pos) == hash); (void)hash;
+                entry_type new_entry(k, v);
+                debug_assert(m_table->hash_at(m_pos) == h); (void)h;
                 m_table->entry_at(m_pos).swap(new_entry);
             }
 
