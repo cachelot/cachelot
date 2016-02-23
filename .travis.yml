@@ -28,6 +28,27 @@ compiler:
 script:
   - ./all_build.sh
   - ./run_tests.sh
+
 notifications:
-  email: false
+  email:
+    recipients:
+      - build@cachelot.io
+    # [always|never|change]
+    on_success: change
+    on_failure: always
+
+# coverity scan
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "e7O6bLneIJFJek2ecx0LUdXTnYItv1oBLeCXWT1xZxKAV4uRJ9UayjAMye+NmTqdwZtM/vNH4XQZhpku58uK081G2Abxwy5eDPYzsscjX3u18fhJzgYsKrYdszznkvZbIWuCjLbKxWb5VosdUKFgOPdMvHWsVUUa0OtDfJuFO2odoV++KfiCpLcAd+KWogv+9bEl9NLth6VsO5FG72Dlkyu4sD2Uq74RDbpQgLvMjYycYjKCFh8OA7G4yUWR66uHVh01WgKhpIPOV+ao4Z8Ry1Tz5Pzn05CUye5sdybVIwvj1RUFIJSbs7Inse3dfIl6D/4rJ5ug/OdW0HPAj7W9eFzlj6SZeurZ/U1s98w6z1/ZBHaPiySug0S5zWuj3IFTT3/Y9LJleomoM4ZdjW9aBdqSxQPwmuWA34irIeQeHyvLMJ6ibCiBeOK+rqRmcM2s8Dp5SQ0929QwS64XjGuQil/sa490k0ud2S3QecMTk5VmUBIOfAo4TsKayLfPtGNEJMrDqJ8xqZoFSS0rf614BJt9XZwJKjqxX8X0xIyu+aV0jN/XdDa19Nr+jKjOLLQJUpDrtKtFsysE1y1ic8c0gSXrApgdlWpniKU5U4z+rcBOKUNzDckWFfRZ+Jfa79aaSMj8s4HoPYt00317jeJ5mQgXJCI8h8HCdxRkCdY+DcQ="
+addons:
+  coverity_scan:
+    project:
+      name: "cachelot/cachelot"
+    notification_email: build@cachelot.io
+    build_command_prepend: "cmake -G \"Unix Makefiles\" -DCMAKE_BUILD_TYPE=Release"
+    build_command:   "make"
+    branch_pattern: coverity_scan
 
