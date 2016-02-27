@@ -193,14 +193,14 @@ BOOST_AUTO_TEST_CASE(test_realloc_inplace) {
 // in case of the internal inconsistency, memalloc will trigger internal failure calling debug_assert
 //
 BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
-    static constexpr size_t MEMSIZE = 4 * Megabyte;
-    static constexpr size_t PAGESIZE = 4 * Kilobyte;
+    static constexpr size_t MEM_SIZE = 4 * Megabyte;
+    static constexpr size_t MEM_PAGE_SIZE = 4 * Kilobyte;
     static constexpr size_t NUM_ALLOC = 100000;
     static constexpr size_t NUM_REPEAT = 50;
     static constexpr size_t MIN_ALLOC_SIZE = 4;
-    static constexpr size_t MAX_ALLOC_SIZE = PAGESIZE - 64;
+    static constexpr size_t MAX_ALLOC_SIZE = MEM_PAGE_SIZE - 64;
     // setup
-    memalloc allocator(MEMSIZE, PAGESIZE);
+    memalloc allocator(MEM_SIZE, MEM_PAGE_SIZE);
     random_int<size_t> random_size(MIN_ALLOC_SIZE, MAX_ALLOC_SIZE);
     std::vector<void * > allocations;
     allocations.reserve(NUM_ALLOC);

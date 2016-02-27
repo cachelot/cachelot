@@ -1,43 +1,64 @@
 #!/bin/bash
 
+MYDIR=$(dirname $0)
 
 function server_test {
-    local buildCfg=$1
-    ./bin/"${buildCfg}"/cachelotd &
+    local buildCfg="$1"
+    ${MYDIR}/bin/"${buildCfg}"/cachelotd &
     local pid=$!
-    ./test/server_test.py
+    ${MYDIR}/test/server_test.py
     local ret=$?
     kill ${pid} || ret=$?
     [[ ${ret} != 0 ]] && exit ${ret}
     sleep 0.5  # ensure process is down
 }
 
-echo "*** [Debug]"
-server_test Debug
-bin/Debug/unit_tests || exit 1
 
-echo "*** [Release]"
-server_test Release
-bin/Release/unit_tests || exit 1
-bin/Release/benchmark_cache || exit 1
-bin/Release/benchmark_memalloc || exit 1
+function run_tests {
+    local buildCfg="$1"
+    echo "*** [${buildCfg}]"
+    bindir="${MYDIR}/bin/${buildCfg}"
+    if [ ! -d "${bindir}" ]; then
+        echo "*** [ - skipped -]"
+        return 0
+    fi
+    server_test "${buildCfg}"
+    case "${buildCfg}" in
+    Debug)
+        ./${bindir}/unit_tests || exit 1
+        ;;
+    Release)
+        ./${bindir}/unit_tests || exit 1
+        ./${bindir}/benchmark_cache || exit 1
+        ./${bindir}/benchmark_memalloc || exit 1
+        ;;
+    RelWithDebugInfo)
+        ./${bindir}/unit_tests || exit 1
+        ./${bindir}/benchmark_cache || exit 1
+        ./${bindir}/benchmark_memalloc || exit 1
+        ;;
+    MinSizeRel)
+        ./${bindir}/unit_tests || exit 1
+        ./${bindir}/benchmark_cache || exit 1
+        ./${bindir}/benchmark_memalloc || exit 1
+        ;;
+    AddressSanitizer)
+        ./${bindir}/benchmark_cache || exit 1
+        ./${bindir}/unit_tests || exit 1
+        ./${bindir}/benchmark_cache || exit 1
+        ;;
+    *)
+        echo "Unknown build configuration";
+        exit 1;
+        ;;
+    esac
+}
 
-echo "*** [RelWithDebugInfo]"
-server_test RelWithDebugInfo
-bin/RelWithDebugInfo/unit_tests || exit 1
-bin/RelWithDebugInfo/benchmark_cache || exit 1
-bin/RelWithDebugInfo/benchmark_memalloc || exit 1
+BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer"
 
-echo "*** [MinSizeRel]"
-server_test MinSizeRel
-bin/MinSizeRel/unit_tests || exit 1
-bin/MinSizeRel/benchmark_cache || exit 1
-bin/MinSizeRel/benchmark_memalloc || exit 1
-
-echo "*** [AddressSanitizer]"
-server_test AddressSanitizer
-bin/AddressSanitizer/benchmark_cache || exit 1
-bin/AddressSanitizer/unit_tests || exit 1
+for cfg in ${BUILD_CFGS}; do
+    run_tests "${cfg}"
+done
 
 echo ""
 echo "*** All tests completed successfully"
