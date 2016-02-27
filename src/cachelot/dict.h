@@ -26,11 +26,9 @@ namespace cachelot {
      * Normaly all elements are stored in the primary table and there is no secondary table,
      * but when load factor of primary table exceds threshold, primary becomes the secondary,
      * new table allocated as a new primary and every update operation on dict moves some
-     * items from the secondary table back to the primary, util only primary table will left
+     * items from the secondary table back to the primary, util no items left in the secondary
      *
-     * @note dict is not STL-compliant. It doesn't maintain object lifetime, so user is responsible
-     * for calling new / delete on stored items.
-     * Also dict is not copyable
+     * @note dict does not manage stored items lifetime. It expects items to be POD data with trivial destructor and copy.
      *
      * @tparam Key - key type
      * @tparam T - value type

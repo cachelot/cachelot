@@ -116,6 +116,11 @@ namespace cachelot {
         /**
          * One cache class to rule them all
          *
+         * @note Cache automaticaly manages lifetime of the stored items.
+         * But in cases when Item was *not stored* after call, *user is responsible for deallocating* Item by himself.
+         * Item may not be stored due to an error (the most likely out of memory) or due to invariant
+         * Operations like add/replace/cas/inc/dec may not store item because conditions were not met
+         * @see create_item() destroy_item()
          * @note Cache is *not* thread safe
          */
         class Cache {
@@ -156,7 +161,12 @@ namespace cachelot {
              * @class doxygen_store_command
              *
              * @return Response: one of a possible cache responses
-             * TODO: responses
+             * `STORED` - Item was successfully stored
+             * `NOT_STORED` - Item was not stored because conditions of `add` or `replace` were not met
+             * `EXISTS` - Indicates that outdated Item was provided for the `cas` operation
+             * `NOT_FOUND` - Item was *not* found during `delete` / `cas` / `append` / `prepend` / `touch` / `inc` / `dec`
+             * `DELETED` - Item was deleted by `delete` operation
+             * `TOUCHED` - Item expiration time was modified by `touch`
              */
 
 
@@ -247,12 +257,12 @@ namespace cachelot {
              }
 
             /**
-             * Create new Item using memalloc
+             * Create new Item from the pre-allocated memory arena
              */
             ItemPtr create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds keepalive);
 
             /**
-             * Free existing Item and return memory to the memalloc
+             * Free existing Item and return the memory
              */
             void destroy_item(ItemPtr item) noexcept;
 

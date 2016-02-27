@@ -57,7 +57,7 @@ namespace cachelot {
         x(TOUCHED)              \
         x(NOT_A_RESPONSE)
 
-        /** 
+        /**
          * Cache responces to the different commands
          *
          * - STORED: indicates Item was stored
