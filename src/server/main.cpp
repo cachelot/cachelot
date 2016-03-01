@@ -47,7 +47,8 @@ namespace  {
             return EXIT_FAILURE;
         }
         if (varmap.count("version")) {
-            cerr << CACHELOT_VERSION_STRING << endl;
+            cerr << CACHELOT_VERSION_FULL << endl;
+            cerr << CACHELOT_VERSION_NOTICE << endl;
             return EXIT_FAILURE;
         }
         if (varmap.count("tcp-port") == 1) {

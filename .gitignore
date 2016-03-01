@@ -16,3 +16,4 @@ Makefile
 *.pyc
 .hgignore
 src/cachelot/config.h
+src/cachelot/version.h

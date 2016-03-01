@@ -89,12 +89,35 @@ endif ()
 ###########################################################################
 #       config.h
 ###########################################################################
-include(CheckSymbolExists)
+include (CheckSymbolExists)
 check_symbol_exists (aligned_alloc stdlib.h HAVE_ALIGNED_ALLOC)
 check_symbol_exists (posix_memalign stdlib.h HAVE_POSIX_MEMALIGN)
-
 configure_file (src/cachelot/config.h.in src/cachelot/config.h)
 add_definitions (-DHAVE_CONFIG_H=1)
+
+###########################################################################
+#       version.h
+###########################################################################
+execute_process(COMMAND git describe --tags --dirty=-dirty OUTPUT_VARIABLE cachelot_git_tag WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} OUTPUT_STRIP_TRAILING_WHITESPACE)
+set (git_version_regex "v([0-9]+)\\.([0-9]+)\\.([0-9]+)-([^-]+)-[0-9]+-(.*)$")
+string (REGEX MATCH "${git_version_regex}" version_valid "${cachelot_git_tag}")
+if (version_valid)
+    string (REGEX REPLACE "${git_version_regex}" "\\1;\\2;\\3;\\4;\\5" parsed_version_list "${cachelot_git_tag}")
+    list (GET parsed_version_list 0 cachelot_version_major)
+    list (GET parsed_version_list 1 cachelot_version_minor)
+    list (GET parsed_version_list 2 cachelot_version_patch)
+    list (GET parsed_version_list 3 cachelot_version_extra)
+    list (GET parsed_version_list 4 cachelot_version_hash)
+else (version_valid)
+    message (AUTHOR_WARNING "Bad version ${cachelot_git_tag};")
+    set (cachelot_version_major "?")
+    set (cachelot_version_minor "?")
+    set (cachelot_version_patch "?")
+    set (cachelot_version_extra "unknown")
+    set (cachelot_version_hash "XXX")
+endif ()
+set (cachelot_os_name "${CMAKE_SYSTEM_NAME}")
+configure_file (src/cachelot/version.h.in src/cachelot/version.h ESCAPE_QUOTES @ONLY)
 
 ###########################################################################
 #       3rd party libraries

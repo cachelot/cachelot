@@ -1,0 +1,30 @@
+#ifndef CACHELOT_VERSION_H_INCLUDED
+#define CACHELOT_VERSION_H_INCLUDED
+
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
+
+#define CACHELOT_VERSION_MAJOR "@cachelot_version_major@"
+#define CACHELOT_VERSION_MINOR "@cachelot_version_minor@"
+#define CACHELOT_VERSION_PATCH "@cachelot_version_patch@"
+#define CACHELOT_VERSION_EXTRA "@cachelot_version_extra@"
+#define CACHELOT_VERSION_HASH "@cachelot_version_hash@"
+#define CACHELOT_OS_NAME "@cachelot_os_name@"
+
+#define CACHELOT_VERSION_SHORT CACHELOT_VERSION_MAJOR "." CACHELOT_VERSION_MINOR "." CACHELOT_VERSION_PATCH
+
+#define CACHELOT_VERSION_FULL "Cachelot v" CACHELOT_VERSION_SHORT "-" CACHELOT_VERSION_HASH " (" CACHELOT_VERSION_EXTRA ") " CACHELOT_OS_NAME
+
+#if defined(DEBUG)
+#  define CACHELOT_VERSION_NOTICE "Warning! Debug build. Do not use in production"
+#else
+#  define CACHELOT_VERSION_NOTICE "www.cachelot.io"
+#endif
+
+
+
+#endif // CACHELOT_VERSION_H_INCLUDED

@@ -403,7 +403,7 @@ namespace cachelot {
             if (not args.empty()) {
                 throw system_error(error::crlf_expected);
             }
-            send_buf << VERSION << SPACE << CACHELOT_VERSION_STRING << CRLF;
+            send_buf << VERSION << SPACE << CACHELOT_VERSION_FULL << CRLF;
             return net::SEND_REPLY_AND_READ;
         }
 
