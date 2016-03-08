@@ -1,30 +1,54 @@
-# What is Cachelot Library #
-If your application needs to cache data and retrieve it from the cache at the speed of light, the only way to do so is to store data right into the application's memory. That's what the Cachelot library is.
+<img src="https://travis-ci.org/cachelot/cachelot.svg?branch=master"/>
 
-The library works within a fixed amount of memory. In fact, the user is responsible for providing memory range for the cache. For instance, it can be a battery-protected or mapped memory.
+
+# What is Cachelot Library #
+If your application needs an LRU cache that works at the speed of light. That's what the Cachelot library is.
+
+The library works within a fixed amount of memory. No garbadge collector. Small metadata, near perfect memory utilization.
 
 Besides memory management, Cachelot ensures smooth responsiveness, without any "gaps" for both read and write operations.
 
 Cachelot can work as a consistent cache, returning an error when out of memory or evicting old items to free space for new ones.
 
-The code is written in C++ in a hardware-friendly manner.
+The code is written in C++ and it is highly CPU-optimized. You can use cachelot on platforms where resources are limited, like IoT devices or handheld.
 
 All this allows you to store and access three million items per second (depending on the CPU cache size). Maybe 3MOPs doesn't sound like such a large number, but it means ~333 nanoseconds are spent on a single operation, while RAM reference cost is at [~100 nanoseconds](http://www.eecs.berkeley.edu/~rcs/research/interactive_latency.html).
+Only 3 RAM reference per request, can you compete with that?
+
+There are benchmarks inside of repo, we encourage you to try them for yourself.
+
+It is possible to create bindings and use cachelot from your programming language of choice: Python, Go, Java, etc.
 
 # What is Cachelot Distributed Cache Server #
 Think of [Memcached](http://memcached.org) (Cachelot server is Memcached-compatible) but while the former aims to serve hundreds of simultaneous connections, achieving maximum bandwidth, the latter serves tens of them, achieving maximal hardware utilization.
 
-Cachelot is single-threaded, so you can run it while consuming fewer resources (getting cheaper VPS hosts can lead to the huge savings); it also stores less metadata per Item, and thus better utilizes precious RAM.
+Cachelot is single-threaded, so you can run it while consuming fewer resources; it also allows to store much more items in the same amount of RAM (up to 25% more, depending on the data and store patterns)
 
 And yet, single Cachelot instance is [faster than Memcached](http://cachelot.io/index.html#benchmarks) while serving a certain number of connections. Never the less, you're free to scale up horizontally by running more instances.
+
+The easiest way to play with cachelot is to run Docker container
+
+    $ docker run --net=host cachelot/cachelot
+
+Then you can connect to the port 11211 and speak memcached protocol
+
+    $ telnet localhost 11211
+    >set test 0 0 16
+    >Hello, cachelot!
+    STORED
+    >get test
+    VALUE test 0 16
+    Hello, cachelot!
+    END
+    >quit
 
 * * *
 
 ### Attention ###
-Cachelot is in early-alpha stage, don't use it in production systems
+Cachelot is in beta stage, don't use it in production systems.
 
 ## How To Build ##
-Cachelot has been proven to work on Linux, MacOS and BSD Family.
+Cachelot has been proven to work on Alpine Linux, CentOS 7, Ubuntu Trusty, MacOS and BSD Family.
 Windows build is upcoming.
 
 ### Prerequisites ###
@@ -36,11 +60,7 @@ Windows build is upcoming.
 
 ### Build ###
 
-Clone source code repository on Bitbucket:
-
-    $ hg clone https://bitbucket.org/cachelot/cachelot
-
-or if you prefer GitHub:
+Clone source code repository:
 
     $ git clone https://github.com/cachelot/cachelot.git
 
@@ -52,7 +72,7 @@ Generate project files for your favorite IDE or Makefile by running `cmake -G "{
 
 For example:
 
-    $ cmake -G "Unix Makefiles"
+    $ cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release && make
 
 or
 
@@ -86,16 +106,6 @@ Be first to know about the new features
  * Google+: [+CachelotIo_cache](https://plus.google.com/+CachelotIo_cache)
 
 * * *
-
-## Upcoming Features ##
- Cachelot is still 'work-in-progress' project
-
- * ~~Some Memcached commands not implemented yet (`cas`, `touch`, `append`, `prepend`, `stats`)~~
- * Windows build is broken
- * There is no ~~UDP~~ and binary protocol support
- * Cachelot library doesn't have proper build packaging and has no multi-threaded interface
- * Documentation and examples
- * Really neat features, and more...
 
 ## License ##
 Cachelot is free and open source.
