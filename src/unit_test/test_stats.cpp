@@ -18,8 +18,9 @@ cache::ItemPtr CreateItem(cache::Cache & c, const string k, const string v, cach
     return item;
 }
 
-BOOST_AUTO_TEST_CASE(test_cache_commands) {
-    cache::Cache the_cache(1024*1024*4, 1024*4, 16, false);
+BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
+    ResetStats();
+    cache::Cache the_cache(4 * Megabyte, 4 * Kilobyte, 16, false);
     const auto non_existing = bytes::from_literal("Non-existing key");
     // set
     {
@@ -184,8 +185,9 @@ BOOST_AUTO_TEST_CASE(test_cache_commands) {
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_cache_size) {
-    cache::Cache the_cache(1024*1024*4, 1024*4, 16, false);
+BOOST_AUTO_TEST_CASE(test_cache_size_stats) {
+    cache::Cache the_cache(4 * Megabyte, 4 * Kilobyte, 16, false);
+    ResetStats();
     the_cache.publish_stats();
     BOOST_CHECK_EQUAL(STAT_GET(cache,hash_capacity), 16);
     BOOST_CHECK_EQUAL(STAT_GET(cache,curr_items), 0);

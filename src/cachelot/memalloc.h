@@ -88,12 +88,14 @@ namespace cachelot {
         /// free previously allocated `ptr`
         void free(void * ptr) noexcept;
 
-        /// return size of previously allocate memory including technical alignment bytes
-        size_t reveal_actual_size(void * ptr) const noexcept;
-
         /// touch previously allocated item to increase it's chance to avoid eviction
         void touch(void * ptr) noexcept;
 
+        /// return size of previously allocate memory including alignment bytes
+        size_t reveal_actual_size(void * ptr) const noexcept;
+
+        /// retrieve size of allocator header
+        static size_t header_size() noexcept;
     private:
         /// check whether given `ptr` whithin arena bounaries and block information can be retrieved from it
         bool valid_addr(void * ptr) const noexcept;

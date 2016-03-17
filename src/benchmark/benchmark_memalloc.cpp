@@ -132,9 +132,10 @@ int main() {
         auto print_results = [=](const char * allocator_name, const benchmark_results res) {
             boost::io::ios_all_saver  __save_state(cout);
             cout << setw(25) << setfill('.') << left << allocator_name << setfill(' ') << right;
-            cout << "    alloc: " << setw(8) << setfill('0') << setprecision(6) << (float)res.malloc_took_ns.count() / 1000000 << setfill(' ') << " ms";
-            cout << "     free: " << setw(8) << setfill('0') << setprecision(6) << (float)res.free_took_ns.count() / 1000000 << setfill(' ') << " ms";
-            cout << setw(10) << "x" << setprecision(3) << res.relative_to_baseline(baseline) << std::endl;
+            cout << "    alloc: " << setw(8) << fixed << setprecision(2) << (float)res.malloc_took_ns.count() / 1000000 << setfill(' ') << " ms";
+            cout << "     free: " << setw(8) << fixed << setprecision(2) << (float)res.free_took_ns.count() / 1000000 << setfill(' ') << " ms";
+            cout << "    total: " << setw(8) << fixed << setprecision(2) << (float)(res.malloc_took_ns.count() + res.free_took_ns.count()) / 1000000 << setfill(' ') << " ms";
+            cout << "  (x" << setprecision(3) << res.relative_to_baseline(baseline) << ")" << std::endl;
         };
         print_results("runtime builtin", c_runtime_results);
         print_results("cachelot", cachelot_results);

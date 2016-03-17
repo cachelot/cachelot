@@ -14,26 +14,22 @@
 namespace cachelot {
 
     #define MEMORY_STATS(X) \
-        X(uint64, num_malloc,               "Number of memory allocation requests") \
-        X(uint64, num_free,                 "Number of memory free requests") \
-        X(uint64, num_realloc,              "Number of memory re-allocation requests") \
+        X(uint64, num_malloc,               "Number of alloc calls") \
+        X(uint64, num_free,                 "Number of free calls") \
+        X(uint64, num_realloc,              "Number realloc_inplace calls") \
         X(uint64, num_alloc_errors,         "Number of allocation failures") \
         X(uint64, num_realloc_errors,       "Number of realloc failures") \
-        X(uint64, total_requested,          "Total amount of requested memory") \
-        X(uint64, total_served,             "Total amount of allocated memory") \
-        X(uint64, total_unserved,           "Total amount of memory that had requested but not allocated due to an error") \
-        X(uint64, total_realloc_requested,  "Total amount of memory requested while reallocs") \
-        X(uint64, total_realloc_served,     "Total amount of memory served to reallocs") \
-        X(uint64, total_realloc_unserved,   "Total amount of memory that had requested but not allocated due to an error") \
+        X(uint64, total_requested,          "Amount of requested memory") \
+        X(uint64, total_served,             "Amount of allocated memory") \
+        X(uint64, total_unserved,           "Amount of requested but not allocated due to an error memory") \
+        X(uint64, total_realloc_requested,  "Amount of requested memory via realloc calls") \
+        X(uint64, total_realloc_served,     "Amount of serverd memory via realloc calls") \
+        X(uint64, total_realloc_unserved,   "Amount of requested but not allocated memory via relloc calls") \
         X(uint64, num_free_table_hits,      "Number of times when memory allocated from the corresponding cell of free blocks table") \
         X(uint64, num_free_table_weak_hits, "Number of times when memory allocated from the bigger cell of free blocks table") \
-        X(uint64, num_free_table_merges,    "Number of times when free blocks have merged into one to satisfy new allocation") \
-        X(uint64, num_used_table_hits,      "Number of times when memory allocated from the corresponding cell of used blocks table") \
-        X(uint64, num_used_table_weak_hits, "Number of times when memory allocated from the bigger cell of used blocks table")  \
-        X(uint64, num_used_table_merges,    "Number of times when used blocks have merged into one to satisfy new allocation") \
         X(uint64, limit_maxbytes,           "Maximum amount of memory to use for the storage") \
-        X(uint64, page_size,                "Size of allocator page") \
-        X(uint64, evictions,                "Description of the stat")
+        X(uint64, page_size,                "Size of allocator page (max allocation size)") \
+        X(uint64, evictions,                "Number of evicted items")
 
     #define CACHE_STATS(X) \
         X(uint64, cmd_get,                  "'get' commands") \
@@ -73,7 +69,7 @@ namespace cachelot {
         X(uint64, cmd_flush,                "'flush_all' commands") \
         X(uint64, hash_capacity,            "capacity of the hash table") \
         X(uint64, curr_items,               "number of items in the cache") \
-        X(bool, hash_is_expanding,          "expanding in progress")
+        X(bool, hash_is_expanding,          "hash table is expanding")
 
     struct stats {
         #define DECLARE_STAT(stat_type, stat_name, stat_description) stat_type stat_name = stat_type();
