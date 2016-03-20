@@ -11,8 +11,9 @@ set (CACHELOT_UNIT_TEST_SOURCES
                 test_dict.cpp
                 test_intrusive_list.cpp
                 test_memalloc.cpp
-                test_cache.cpp
                 test_stats.cpp
+                test_cache.cpp
+                test_cache_stats.cpp
                 test_io_buffer.cpp
         )
 

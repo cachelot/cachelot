@@ -99,9 +99,29 @@ namespace cachelot {
     #define __STATGROUP(group, name) __STATGROUP2(group, name)
 
     #define STAT_GET(stat_group, stat_name) __STATGROUP(stat_group, stat_name)
-    #define STAT_INCR(stat_name, delta) do { __STAT(stat_name) += delta; } while(false)
-    #define STAT_DECR(stat_name, delta) do { __STAT(stat_name) = (__STAT(stat_name) >= delta) ? __STAT(stat_name) - delta : 0; } while(false)
     #define STAT_SET(stat_name, value) do { __STAT(stat_name) = value; } while(false)
+    #define STAT_INCR(stat_name, delta) STAT_SET(stat_name, no_overflow_increment(__STAT(stat_name), delta))
+    #define STAT_DECR(stat_name, delta) STAT_SET(stat_name, no_overflow_decrement(__STAT(stat_name), delta))
+
+    template <typename IntType>
+    inline IntType no_overflow_increment(IntType value, size_t delta) noexcept {
+        if (std::numeric_limits<IntType>::max() - static_cast<IntType>(delta) >= value) {
+            return value + delta;
+        } else {
+            debug_assert(false);
+            return std::numeric_limits<IntType>::max();
+        }
+    }
+
+    template <typename IntType>
+    inline IntType no_overflow_decrement(IntType value, size_t delta) noexcept {
+        if (std::numeric_limits<IntType>::min() + static_cast<IntType>(delta) <= value) {
+            return value - delta;
+        } else {
+            debug_assert(false);
+            return std::numeric_limits<IntType>::min();
+        }
+    }
 
 } // namespace cachelot
 
