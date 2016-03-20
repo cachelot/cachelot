@@ -19,6 +19,7 @@ namespace cachelot {
         X(uint64, num_realloc,              "Number realloc_inplace calls") \
         X(uint64, num_alloc_errors,         "Number of allocation failures") \
         X(uint64, num_realloc_errors,       "Number of realloc failures") \
+        X(uint64, used_memory,              "Amount of used memory including cachelot metadata") \
         X(uint64, total_requested,          "Amount of requested memory") \
         X(uint64, total_served,             "Amount of allocated memory") \
         X(uint64, total_unserved,           "Amount of requested but not allocated due to an error memory") \

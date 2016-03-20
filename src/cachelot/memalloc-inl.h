@@ -495,8 +495,8 @@ namespace cachelot {
             : last_power_of_2(log2u(the_page_size))
             , page_size(the_page_size)
             , num_powers_of_2_plus_small_blocks_cell(last_power_of_2 - first_power_of_2 + 1)
-            , first_level_bit_index(0u)
-            , second_level_bit_index(num_powers_of_2_plus_small_blocks_cell, 0u)
+            , first_level_bit_index(0)
+            , second_level_bit_index(num_powers_of_2_plus_small_blocks_cell, 0)
             , size_classes_table(num_powers_of_2_plus_small_blocks_cell * num_sub_cells_per_power) {
             static_assert(min_block_diff >= block::alignment,
                         "Minimal block differense is too small for proper block alignment");
@@ -671,12 +671,14 @@ namespace cachelot {
 
 
     inline void * memalloc::checkout(block * blk, const size_t requested_size) noexcept {
+        debug_assert(blk->size() >= requested_size);
         block * leftover;
         tie(blk, leftover) = block::split(m_pages, blk, requested_size);
         if (leftover != nullptr) {
             m_free_blocks->put_block(leftover);
         }
         blk->set_used();
+        STAT_INCR(mem.used_memory, blk->size_with_header());
         return blk->memory();
     }
 
@@ -719,7 +721,7 @@ namespace cachelot {
             if (found_blk != nullptr) {
                 m_pages->touch(found_blk);
                 auto mem = checkout(found_blk, requested_size);
-                STAT_INCR(mem.total_served, found_blk->size());
+                STAT_INCR(mem.total_served, reveal_actual_size(mem));
                 return mem;
             }
         }
@@ -727,7 +729,7 @@ namespace cachelot {
         if (evict_if_necessary) {
             uint8 * page_begin, * page_end;
             tie(page_begin, page_end) = m_pages->page_to_reuse();
-            // for each block in the page
+            // clean the page, evict used blocks, remove free blocks from the free_blocks list
             auto blk = reinterpret_cast<block *>(page_begin); // every page starts with the block
             debug_assert(blk->meta.dbg_marker == block::DBG_MARKER);
             const uint32 left_adjacent_block_offset = blk->meta.left_adjacent_offset;
@@ -736,6 +738,7 @@ namespace cachelot {
                     // notify user that memory is evicted
                     on_free_block(blk->memory());
                     STAT_INCR(mem.evictions, 1);
+                    STAT_DECR(mem.used_memory, blk->size_with_header());
                 } else {
                     // remove block from the free blocks list
                     m_free_blocks->remove_block(blk);
@@ -749,9 +752,8 @@ namespace cachelot {
                 reinterpret_cast<block *>(page_end)->meta.left_adjacent_offset = page_size;
             }
             auto whole_page_block = new (page_begin) block(page_size - block::header_size, left_adjacent_block_offset);
-
             auto mem = checkout(whole_page_block, requested_size);
-            STAT_INCR(mem.total_served, whole_page_block->size());
+            STAT_INCR(mem.total_served, reveal_actual_size(mem));
             return mem;
         }
         // if we reach here ...
@@ -771,7 +773,9 @@ namespace cachelot {
         STAT_INCR(mem.num_realloc, 1);
         block * blk = block::from_user_ptr(ptr);
         debug_only(blk->__debug_sanity_check(m_pages));
+
         blk->set_free();
+        STAT_DECR(mem.used_memory, blk->size_with_header());
 
         // 1. shrink the block
         if (new_size <= blk->size()) {
@@ -779,20 +783,21 @@ namespace cachelot {
         }
 
         // 2. try to expand the block to the right
-        uint64 extend_size = new_size - blk->size();
-        STAT_INCR(mem.total_realloc_requested, extend_size);
+        const auto old_block_size = blk->size();
+        STAT_INCR(mem.total_realloc_requested, new_size - old_block_size);
         blk = merge_free_right(blk);
         if (blk->size() >= new_size) {
-            STAT_INCR(mem.total_realloc_served, extend_size);
-            return checkout(blk, new_size);
+            auto mem = checkout(blk, new_size);
+            STAT_INCR(mem.total_realloc_served, reveal_actual_size(mem) - old_block_size - block::header_size);
+            return mem;
         } else {
-            STAT_INCR(mem.total_realloc_unserved, extend_size);
+            // give up
+            STAT_INCR(mem.total_realloc_unserved, new_size - old_block_size);
+            // return block to its original state
+            checkout(blk, old_block_size);
+            STAT_INCR(mem.num_realloc_errors, 1);
+            return nullptr;
         }
-
-        // give up
-        blk->set_used();
-        STAT_INCR(mem.num_realloc_errors, 1);
-        return nullptr;
     }
 
 
@@ -807,7 +812,11 @@ namespace cachelot {
         block * blk = block::from_user_ptr(ptr);
         debug_only(blk->__debug_sanity_check(m_pages));
         blk->set_free();
-        m_free_blocks->put_block(merge_free(blk));
+        STAT_DECR(mem.used_memory, blk->size_with_header());
+        // merge with neighbours
+        blk = merge_free(blk);
+        // store for reuse
+        m_free_blocks->put_block(blk);
     }
 
 
@@ -819,7 +828,7 @@ namespace cachelot {
         block * blk = block::from_user_ptr(ptr);
         debug_assert(blk->is_used());
         debug_only(block::from_user_ptr(ptr)->__debug_sanity_check(m_pages));
-        return blk->size();
+        return blk->size_with_header();
     }
 
     inline size_t memalloc::header_size() noexcept {

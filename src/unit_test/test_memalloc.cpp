@@ -236,6 +236,7 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
     uint64 my_num_realloc = 0u;
     uint64 my_num_alloc_errors = 0u;
     uint64 my_num_realloc_errors = 0u;
+    uint64 my_used_memory = 0u;
     uint64 my_total_requested = 0u;
     uint64 my_total_served = 0u;
     uint64 my_total_unserved = 0u;
@@ -244,18 +245,15 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
     uint64 my_total_realloc_unserved = 0u;
     uint64 my_evictions = 0u;
 
-    // run test NUM_REPEAT times
-    for (size_t repeat_no = 0; repeat_no < NUM_REPEAT; ++repeat_no) {
-
-        // random allocations / deallocations
-        for (size_t allocation_no = 0; allocation_no < NUM_ALLOC; ++allocation_no) {
-            // try to allocate new element
-            // if we need to evict existing elements to free space, remove it from the allocations list
-            const auto allocation_size = random_size();
+    auto do_alloc = [&](const size_t allocation_size) -> void * {
+            my_num_malloc += 1;
             my_total_requested += allocation_size;
             void * ptr = allocator.alloc_or_evict(allocation_size, true,
-                [&allocations, &my_evictions](void * mem) {
+                [&](void * mem) {
                     my_evictions += 1;
+                    const auto mem_full_size = allocator.reveal_actual_size(mem);
+                    debug_assert(my_used_memory >= mem_full_size);
+                    my_used_memory -= mem_full_size;
                     for (size_t i = 0; i < allocations.size(); ++i) {
                         if (allocations[i] == mem) {
                             allocations[i] = allocations.back();
@@ -265,22 +263,74 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
                     }
                     debug_assert(false && "unknown pointer");
                 });
-            my_num_malloc += 1;
+
             if (ptr != nullptr) {
-                my_total_served += allocator.reveal_actual_size(ptr);
-                allocations.push_back(ptr);
-                std::memset(ptr, 'X', allocation_size);
+                const auto mem_full_size = allocator.reveal_actual_size(ptr);
+                my_total_served += mem_full_size;
+                debug_assert(STAT_GET(mem,total_served) == my_total_served);
+                my_used_memory += mem_full_size;
             } else {
                 my_num_alloc_errors += 1;
                 my_total_unserved += allocation_size;
             }
+            return ptr;
+    };
+
+    auto do_free = [&](void * ptr) {
+        BOOST_CHECK(ptr != nullptr);
+        my_num_free += 1;
+        const auto mem_full_size = allocator.reveal_actual_size(ptr);
+        BOOST_CHECK(my_used_memory >= mem_full_size);
+        my_used_memory -= mem_full_size;
+        allocator.free(ptr);
+    };
+
+
+    auto do_realloc= [&](void * ptr, const size_t new_size) {
+        BOOST_CHECK(ptr != nullptr);
+        my_num_realloc += 1;
+        // store old size
+        const auto old_full_size = allocator.reveal_actual_size(ptr);
+        const auto old_size = old_full_size - memalloc::header_size();
+        if (old_size < new_size) {
+            my_total_realloc_requested += (new_size - old_size);
+        }
+        my_used_memory -= old_full_size;
+        // try to realloc
+        auto new_alloc = allocator.realloc_inplace(ptr, new_size);
+        const auto new_full_size = allocator.reveal_actual_size(ptr);
+        my_used_memory += new_full_size;
+
+        if (new_alloc != nullptr) {
+            // suceeded
+            if (new_full_size > old_full_size) {
+                my_total_realloc_served += new_full_size - old_full_size;
+            }
+        } else {
+            // failed
+            my_num_realloc_errors += 1;
+            my_total_realloc_unserved += new_size - old_size;
+        }
+    };
+
+    // run test NUM_REPEAT times
+    for (size_t repeat_no = 0; repeat_no < NUM_REPEAT; ++repeat_no) {
+
+        // random allocations / deallocations
+        for (size_t allocation_no = 0; allocation_no < NUM_ALLOC; ++allocation_no) {
+            // try to allocate new element
+            // if we need to evict existing elements to free space, remove it from the allocations list
+            const auto allocation_size = random_size();
+
+            // make a new allocation
+            void * ptr = do_alloc(allocation_size);
+            allocations.push_back(ptr);
+            std::memset(ptr, 'X', allocation_size);
 
             // free one of previously allocated blocks with 40% probability
             if (not allocations.empty() && probably(40)) {
                 auto prev_alloc = random_choise(allocations);
-                BOOST_CHECK(*prev_alloc != nullptr);
-                allocator.free(*prev_alloc);
-                my_num_free += 1;
+                do_free(*prev_alloc);
                 // remove pointer from the vector
                 *prev_alloc = allocations.back();
                 allocations.pop_back();
@@ -290,26 +340,13 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
             if (not allocations.empty() && probably(60)) {
                 auto prev_alloc = random_choise(allocations);
                 const auto new_size = random_size();
-                my_num_realloc += 1;
-                int64 diff = new_size - allocator.reveal_actual_size(*prev_alloc);
-                if (diff < 0) {
-                    diff = 0;
-                }
-                my_total_realloc_requested += diff;
-                auto new_alloc = allocator.realloc_inplace(*prev_alloc, new_size);
-                if (new_alloc != nullptr) {
-                    my_total_realloc_served += diff;
-                } else {
-                    my_num_realloc_errors += 1;
-                    my_total_realloc_unserved += diff;
-                }
+                do_realloc(*prev_alloc, new_size);
             }
         }
         // free all previously allocated memory
         while (not allocations.empty()) {
             void * ptr = allocations.back();
-            allocator.free(ptr);
-            my_num_free += 1;
+            do_free(ptr);
             allocations.pop_back();
         }
         // start over again
@@ -319,6 +356,7 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
     BOOST_CHECK_EQUAL(STAT_GET(mem,num_realloc), my_num_realloc);
     BOOST_CHECK_EQUAL(STAT_GET(mem,num_alloc_errors), my_num_alloc_errors);
     BOOST_CHECK_EQUAL(STAT_GET(mem,num_realloc_errors), my_num_realloc_errors);
+    BOOST_CHECK_EQUAL(STAT_GET(mem,used_memory), my_used_memory);
     BOOST_CHECK_EQUAL(STAT_GET(mem,total_requested), my_total_requested);
     BOOST_CHECK_EQUAL(STAT_GET(mem,total_served), my_total_served);
     BOOST_CHECK_EQUAL(STAT_GET(mem,total_unserved), my_total_unserved);
