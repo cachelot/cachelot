@@ -99,10 +99,10 @@ add_definitions (-DHAVE_CONFIG_H=1)
 #       version.h
 ###########################################################################
 execute_process(COMMAND git describe --tags --dirty=-dirty OUTPUT_VARIABLE cachelot_git_tag WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} OUTPUT_STRIP_TRAILING_WHITESPACE)
-set (git_version_regex "v([0-9]+)\\.([0-9]+)\\.([0-9]+)-([^-]+)-[0-9]+-(.*)$")
+set (git_version_regex "v([0-9]+)\\.([0-9]+)\\.([0-9]+)-([A-z]+)(-[0-9]+-)?(.*)$")
 string (REGEX MATCH "${git_version_regex}" version_valid "${cachelot_git_tag}")
 if (version_valid)
-    string (REGEX REPLACE "${git_version_regex}" "\\1;\\2;\\3;\\4;\\5" parsed_version_list "${cachelot_git_tag}")
+    string (REGEX REPLACE "${git_version_regex}" "\\1;\\2;\\3;\\4;\\6" parsed_version_list "${cachelot_git_tag}")
     list (GET parsed_version_list 0 cachelot_version_major)
     list (GET parsed_version_list 1 cachelot_version_minor)
     list (GET parsed_version_list 2 cachelot_version_patch)
