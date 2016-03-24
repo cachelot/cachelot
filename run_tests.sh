@@ -22,7 +22,9 @@ function run_tests {
         echo "*** [ - skipped -]"
         return 0
     fi
+    # Run basic smoke tests
     server_test "${buildCfg}"
+    # Run other tests/benchmarks depending on build type
     case "${buildCfg}" in
     Debug)
         ./${bindir}/unit_tests || exit 1
@@ -43,7 +45,6 @@ function run_tests {
         ./${bindir}/benchmark_memalloc || exit 1
         ;;
     AddressSanitizer)
-        ./${bindir}/benchmark_cache || exit 1
         ./${bindir}/unit_tests || exit 1
         ./${bindir}/benchmark_cache || exit 1
         ;;
