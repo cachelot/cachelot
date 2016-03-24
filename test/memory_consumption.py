@@ -19,58 +19,27 @@ log = logging.getLogger()
 
 SELF, _ = os.path.splitext(os.path.basename(sys.argv[0]))
 BASEDIR = os.path.normpath(os.path.dirname(os.path.abspath(sys.argv[0])) + '/..')
-CACHELOTD = os.path.join(BASEDIR, 'bin/cachelotd')
+CACHELOTD = os.path.join(BASEDIR, 'bin/RelWithDebugInfo/cachelotd')
 MEMCACHED = '/usr/bin/memcached'
+NUM_RUNS = 10
 
 KEY_ALPHABET = string.ascii_letters + string.digits
 
-VALUE_RANGES = { 'small': (10, 250),
-                 'medium': (250, 1024),
-                 'large' :(1024, 100000),
+VALUE_RANGES = { 'small': (10, 1024),
+                 'medium': (1024, 4096),
+                 'large' :(4096, 1000000),
                  'all': (10, 100000)}
 
-MAX_DICT_MEM = 1024 * 1024 * 128  # 128Mb
+MAX_DICT_MEM = 1024*1024 * 100  # Mb
 
 
 FILTER_STATS = frozenset([
-    'bytes',
-    'bytes_read',
-    'bytes_written',
-    'cmd_get',
-    'cmd_set',
-    'curr_items',
-    'evicted_unfetched',
+    'cmd_get', 'get_hits', 'get_misses',
+    'used_memory',
+    'total_requested', 'total_served',
     'evictions',
-    'expired_unfetched',
-    'get_hits',
-    'get_misses',
-    'hash_bytes',
-    'hash_capacity',
-    'hash_power_level',
-    'limit_maxbytes',
-    'num_alloc_errors',
-    'num_free',
-    'num_free_table_hits',
-    'num_free_table_merges',
-    'num_free_table_weak_hits',
-    'num_malloc',
-    'num_realloc',
-    'num_realloc_errors',
-    'num_used_table_hits',
-    'num_used_table_merges',
-    'num_used_table_weak_hits',
-    'reclaimed',
-    'set_existing',
-    'set_new',
-    'total_items',
-    'total_realloc_requested',
-    'total_realloc_served',
-    'total_realloc_unserved',
-    'total_requested',
-    'total_served',
-    'total_unserved',
-    'uptime',
-    'version'
+    'curr_items', 'total_items',
+    'evicted_unfetched',
 ])
 
 
@@ -81,31 +50,31 @@ def setup_logging():
     # logging setup
     logging_default_level = logging.DEBUG
     logging_console_enable = True
-    logging_console_format = '%(levelname)s: %(message)s'
+    logging_format = '%(levelname)s: %(message)s'
     logging_file_enable = True
-    logging_file_format = '%(asctime)s:%(levelname)s: %(message)s'
-    logging_file_date_format = '%Y-%m-%d %H:%M:%S'
     logging_file_dir = './'
     logging_file_name = SELF + time.strftime('_%Y%b%d-%H%M%S') + '.log'
 
 
-    logging.addLevelName(logging.FATAL, 'FATAL')
-    logging.addLevelName(logging.ERROR, 'ERROR')
-    logging.addLevelName(logging.WARN,  'WARNING')
-    logging.addLevelName(logging.INFO,  'INFO')
-    logging.addLevelName(logging.DEBUG, 'DEBUG')
+    logging.STAT = logging.DEBUG + 1
+    logging.addLevelName(logging.FATAL, 'F')
+    logging.addLevelName(logging.ERROR, 'E')
+    logging.addLevelName(logging.WARN,  'W')
+    logging.addLevelName(logging.INFO,  'I')
+    logging.addLevelName(logging.DEBUG, 'D')
+    logging.addLevelName(logging.STAT,  'S')
+
     root_logger = logging.getLogger()
+    formatter = logging.Formatter(logging_format)
     # Console output
     if logging_console_enable:
         console = logging.StreamHandler()
-        formatter = logging.Formatter(logging_console_format)
         console.setFormatter(formatter)
         root_logger.addHandler(console)
     # Log file
     if logging_file_enable:
         filename = os.path.join(logging_file_dir, logging_file_name)
         logfile = logging.FileHandler(filename)
-        formatter = logging.Formatter(logging_file_format, logging_file_date_format)
         logfile.setFormatter(formatter)
         root_logger.addHandler(logfile)
     atexit.register(logging.shutdown)
@@ -113,7 +82,7 @@ def setup_logging():
 
 
 def random_key():
-    length = random.randint(10, 35)
+    length = random.randint(10, 60)
     return ''.join(random.choice(KEY_ALPHABET) for _ in range(length))
 
 
@@ -125,7 +94,7 @@ def random_value(minlen, maxlen):
 def log_stats(mc):
     for stat, value in mc.stats():
         if stat in FILTER_STATS:
-            log.debug('%30s:  %s' % (stat, value))
+            log.log(logging.STAT, '%30s:  %s' % (stat, value))
 
 
 def shell_exec(command):
@@ -153,14 +122,13 @@ def create_kv_data(range_name):
 
 
 def execute_test(mc, kv_data):
-    for run_no in range(5):
+    for run_no in range(NUM_RUNS):
         start_time = time.time()
         log.debug('Fill-in caching server ...')
         for k, v in kv_data:
             mc.set(k, v)
         log.debug('  Took: %.2f sec', time.time() - start_time)
         log.debug('Checking caching server ...')
-        num_items = 0
         effective_memory = 0
         start_time = time.time()
         for k, local_val in kv_data:
@@ -168,10 +136,9 @@ def execute_test(mc, kv_data):
             if not external_val:
                 # item was evicted, move along
                 continue
-            num_items += 1
             effective_memory += len(k) + len(local_val)
 
-        log.info('External effective memory: %d (%d items).', effective_memory, num_items)
+        log.info('External effective memory: %d.', effective_memory)
         log.debug('  Took: %.2f sec', time.time() - start_time)
 
         # print statistics
@@ -207,8 +174,8 @@ def execute_test_for_values_range(range_name):
 
 
 def main():
-    for range in ['medium', 'small', 'large', 'all']:
-      execute_test_for_values_range(range)
+    for range in ['small', 'medium', 'large', 'all']:
+        execute_test_for_values_range(range)
 
 
 if __name__ == '__main__':
