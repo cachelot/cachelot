@@ -19,8 +19,8 @@ log = logging.getLogger()
 
 SELF, _ = os.path.splitext(os.path.basename(sys.argv[0]))
 BASEDIR = os.path.normpath(os.path.dirname(os.path.abspath(sys.argv[0])) + '/..')
-CACHELOTD = os.path.join(BASEDIR, 'bin/RelWithDebugInfo/cachelotd')
-MEMCACHED = '/usr/bin/memcached'
+CACHELOTD = os.path.join(BASEDIR, 'bin/RelWithDebugInfo/cachelotd -m 4G')
+MEMCACHED = '/usr/bin/memcached -m 4096'
 NUM_RUNS = 10
 
 KEY_ALPHABET = string.ascii_letters + string.digits
@@ -30,7 +30,7 @@ VALUE_RANGES = { 'small': (10, 1024),
                  'large' :(4096, 1000000),
                  'all': (10, 100000)}
 
-MAX_DICT_MEM = 1024*1024 * 100  # Mb
+MAX_DICT_MEM = 1024*1024*1024 * 4  # Gb
 
 
 FILTER_STATS = frozenset([
@@ -122,6 +122,8 @@ def create_kv_data(range_name):
 
 
 def execute_test(mc, kv_data):
+    all_effective_memory = []
+    all_items_stored = []
     for run_no in range(NUM_RUNS):
         start_time = time.time()
         log.debug('Fill-in caching server ...')
@@ -130,6 +132,7 @@ def execute_test(mc, kv_data):
         log.debug('  Took: %.2f sec', time.time() - start_time)
         log.debug('Checking caching server ...')
         effective_memory = 0
+        items_stored = 0
         start_time = time.time()
         for k, local_val in kv_data:
             external_val = mc.get(k)
@@ -137,13 +140,17 @@ def execute_test(mc, kv_data):
                 # item was evicted, move along
                 continue
             effective_memory += len(k) + len(local_val)
+            items_stored += 1
 
-        log.info('External effective memory: %d.', effective_memory)
+        log.info('External effective memory: %.02f Mb. (%d items)', effective_memory*1.0/1024/1024, items_stored)
         log.debug('  Took: %.2f sec', time.time() - start_time)
+        all_effective_memory.append(effective_memory)
+        all_items_stored.append(items_stored)
 
         # print statistics
         log_stats(mc)
         random.shuffle(kv_data)
+    return all_effective_memory, all_items_stored
 
 
 def execute_test_for_values_range(range_name):
@@ -156,26 +163,38 @@ def execute_test_for_values_range(range_name):
     cache_process = shell_exec(CACHELOTD)
     time.sleep(3)
     mc = memcached.connect_tcp('localhost', 11211)
-    execute_test(mc, in_memory_kv)
+    cachelot_eff_mem, cachelot_items = execute_test(mc, in_memory_kv)
     cache_process.terminate()
     time.sleep(2)
     log.info('*' * 60)
 
     # Run dataset on memcached
     log.info("*** MEMCACHED")
-    cache_process = shell_exec(MEMCACHED + ' -p 11212 -n 32 -f 1.05')
+    cache_process = shell_exec(MEMCACHED + ' -p 11212')
     time.sleep(3)
     mc = memcached.connect_tcp('localhost', 11212)
-    execute_test(mc, in_memory_kv)
+    memcached_eff_mem, memcached_items = execute_test(mc, in_memory_kv)
     cache_process.terminate()
     time.sleep(2)
     log.info('*' * 60)
     log.info('\n\n')
+    return { 'cachelot_effective_memory': '[%s]' % ', '.join('%.02f' % (m*1.0/1024/1024) for m in cachelot_eff_mem),
+             'memcached_effective_memory': '[%s]' % ', '.join('%.02f' % (m*1.0/1024/1024) for m in memcached_eff_mem),
+             'cachelot_stored_items': '[%s]' % ', '.join('%d' % i for i in cachelot_items),
+             'memcached_stored_items': '[%s]' % ', '.join('%d' % i for i in memcached_items) }
 
 
 def main():
+    benchmark_data = {}
     for range in ['small', 'medium', 'large', 'all']:
-        execute_test_for_values_range(range)
+        benchmark_data[range] = execute_test_for_values_range(range)
+    print('\n\n\n')
+    for range, series in benchmark_data.items():
+        minval, maxval = VALUE_RANGES[range]
+        print('Range %d ~ %d bytes "%s"' % (minval, maxval, range))
+        for k, v in series.items():
+            print('%s: %s' % (k, v))
+        print('\n')
 
 
 if __name__ == '__main__':
