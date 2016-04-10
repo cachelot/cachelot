@@ -90,7 +90,8 @@ endif ()
 #       config.h
 ###########################################################################
 include (CheckSymbolExists)
-check_symbol_exists (aligned_alloc stdlib.h HAVE_ALIGNED_ALLOC)
+include (CheckCXXSymbolExists)
+check_cxx_symbol_exists (aligned_alloc stdlib.h HAVE_ALIGNED_ALLOC)
 check_symbol_exists (posix_memalign stdlib.h HAVE_POSIX_MEMALIGN)
 configure_file (src/cachelot/config.h.in src/cachelot/config.h)
 add_definitions (-DHAVE_CONFIG_H=1)
