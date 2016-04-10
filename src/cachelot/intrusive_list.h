@@ -65,7 +65,7 @@ namespace cachelot {
 
         /// add block `item` to the back of the list
         void push_back(pointer item) noexcept {
-            node_type * link = &item->link;
+            node_type * link = &(item->*LinkPonter);
             link->prev = dummy_link.prev;
             link->prev->next = link;
             link->next = &dummy_link;
