@@ -90,31 +90,36 @@ BOOST_AUTO_TEST_CASE(test_free_blocks_by_size) {
 
 
 BOOST_AUTO_TEST_CASE(test_pages) {
-    memalloc::pages fixture(4, (uint8 * const)0, (uint8 * const)16);
+    constexpr size_t page_size = 4;
+    constexpr size_t arena_size = 16;
+    std::unique_ptr<uint8, decltype(&std::free)> memory_arena((uint8 *)aligned_alloc(page_size, arena_size), &std::free);
+    uint8 * const arena_begin = memory_arena.get();
+    uint8 * const arena_end = memory_arena.get() + arena_size;
+    memalloc::pages fixture(4, arena_begin, arena_end);
     BOOST_CHECK_EQUAL(fixture.num_pages, 4);
     // page_info_from_addr
-    auto page = fixture.page_info_from_addr((void *)0);
+    auto page = fixture.page_info_from_addr(arena_begin + 0);
     BOOST_CHECK(page == &fixture.all_pages[0]);
-    page = fixture.page_info_from_addr((void *)4);
+    page = fixture.page_info_from_addr(arena_begin + 4);
     BOOST_CHECK(page == &fixture.all_pages[1]);
-    page = fixture.page_info_from_addr((void *)7);
+    page = fixture.page_info_from_addr(arena_begin + 7);
     BOOST_CHECK(page == &fixture.all_pages[1]);
-    page = fixture.page_info_from_addr((void *)15);
+    page = fixture.page_info_from_addr(arena_begin + 15);
     BOOST_CHECK(page == &fixture.all_pages[3]);
     // page_boundaries_from_addr
     const uint8 * page_beg; const uint8 * page_end;
-    tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)0);
-    BOOST_CHECK_EQUAL(page_beg, (uint8 *)0);
-    BOOST_CHECK_EQUAL(page_end, (uint8 *)4);
-    tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)4);
-    BOOST_CHECK_EQUAL(page_beg, (uint8 *)4);
-    BOOST_CHECK_EQUAL(page_end, (uint8 *)8);
-    tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)14);
-    BOOST_CHECK_EQUAL(page_beg, (uint8 *)12);
-    BOOST_CHECK_EQUAL(page_end, (uint8 *)16);
-    tie(page_beg, page_end) = fixture.page_boundaries_from_addr((void *)15);
-    BOOST_CHECK_EQUAL(page_beg, (uint8 *)12);
-    BOOST_CHECK_EQUAL(page_end, (uint8 *)16);
+    tie(page_beg, page_end) = fixture.page_boundaries_from_addr(arena_begin + 0);
+    BOOST_CHECK_EQUAL((const void *)page_beg, (const void *)(arena_begin + 0));
+    BOOST_CHECK_EQUAL((const void *)page_end, (const void *)(arena_begin + 4));
+    tie(page_beg, page_end) = fixture.page_boundaries_from_addr(arena_begin + 4);
+    BOOST_CHECK_EQUAL((const void *)page_beg, (const void *)(arena_begin + 4));
+    BOOST_CHECK_EQUAL((const void *)page_end, (const void *)(arena_begin + 8));
+    tie(page_beg, page_end) = fixture.page_boundaries_from_addr(arena_begin + 14);
+    BOOST_CHECK_EQUAL((const void *)page_beg, (const void *)(arena_begin + 12));
+    BOOST_CHECK_EQUAL((const void *)page_end, (const void *)(arena_begin + 16));
+    tie(page_beg, page_end) = fixture.page_boundaries_from_addr(arena_begin + 15);
+    BOOST_CHECK_EQUAL((const void *)page_beg, (const void *)(arena_begin + 12));
+    BOOST_CHECK_EQUAL((const void *)page_end, (const void *)(arena_begin + 16));
     // touch
     BOOST_CHECK_EQUAL(fixture.all_pages[0].num_hits, 0);
     BOOST_CHECK_EQUAL(fixture.all_pages[1].num_hits, 0);
@@ -124,27 +129,27 @@ BOOST_AUTO_TEST_CASE(test_pages) {
     BOOST_CHECK_EQUAL(fixture.all_pages[1].num_evictions, 0);
     BOOST_CHECK_EQUAL(fixture.all_pages[2].num_evictions, 0);
     BOOST_CHECK_EQUAL(fixture.all_pages[3].num_evictions, 0);
-    fixture.touch((void *)0);
-    fixture.touch((void *)1);
+    fixture.touch(arena_begin + 0);
+    fixture.touch(arena_begin + 1);
     BOOST_CHECK_EQUAL(fixture.all_pages[0].num_hits, 2);
-    fixture.touch((void *)15);
+    fixture.touch(arena_begin + 15);
     BOOST_CHECK_EQUAL(fixture.all_pages[3].num_hits, 1);
-    fixture.touch((void *)9);
+    fixture.touch(arena_begin + 9);
     BOOST_CHECK_EQUAL(fixture.all_pages[2].num_hits, 1);
     // page_to_reuse
     tie(page_beg, page_end) = fixture.page_to_reuse();
     //      must be untouched page #1
-    BOOST_CHECK_EQUAL(page_beg, (uint8 *)4);
-    BOOST_CHECK_EQUAL(page_end, (uint8 *)8);
+    BOOST_CHECK_EQUAL((const void *)page_beg, (const void *)(arena_begin + 4));
+    BOOST_CHECK_EQUAL((const void *)page_end, (const void *)(arena_begin + 8));
     BOOST_CHECK_EQUAL(&fixture.all_pages[1], fixture.lru_pages.front());
     BOOST_CHECK_EQUAL(fixture.all_pages[1].num_evictions, 1);
     //      touch all pages except #0
-    for (size_t fake_addr = 4; fake_addr < 16; ++fake_addr) {
-        fixture.touch((void *)fake_addr);
+    for (uint8 * addr = arena_begin + 4; addr < arena_end; ++addr) {
+        fixture.touch(addr);
     }
     tie(page_beg, page_end) = fixture.page_to_reuse();
-    BOOST_CHECK_EQUAL(page_beg, (uint8 *)0);
-    BOOST_CHECK_EQUAL(page_end, (uint8 *)4);
+    BOOST_CHECK_EQUAL((const void *)page_beg, (const void *)(arena_begin + 0));
+    BOOST_CHECK_EQUAL((const void *)page_end, (const void *)(arena_begin + 4));
     BOOST_CHECK_EQUAL(&fixture.all_pages[0], fixture.lru_pages.front());
     BOOST_CHECK_EQUAL(fixture.all_pages[0].num_evictions, 1);
 }

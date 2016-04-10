@@ -60,16 +60,16 @@ namespace cachelot {
         };
 
         struct page_info {
-            uint64 num_hits = 0;
-            uint64 num_evictions = 0;
             // all pages are lined up by last access time
             intrusive_list_node lru_link;
+            uint64 num_hits = 0;
+            uint64 num_evictions = 0;
         };
     public:
         /// Size of the page
-        const uint32 page_size;
+        const size_t page_size;
         /// Total number of pages in arena
-        const uint32 num_pages;
+        const size_t num_pages;
         /// Pointer to the arena begin
         uint8 * const arena_begin;
         /// Pointer to the arena end
@@ -83,10 +83,10 @@ namespace cachelot {
             , arena_end(the_arena_end)
             , log2_page_size(log2u(the_page_size))
             , all_pages(num_pages) {
-            debug_assert(ispow2(page_size)); debug_assert(page_size > 1);
-            debug_assert(ispow2(num_pages)); debug_assert(num_pages > 1);
+            debug_assert(page_size > 0); debug_assert(ispow2(page_size));
+            debug_assert(num_pages >= 4); debug_assert(ispow2(num_pages));
             // base_addr must be properly aligned
-            debug_assert(unaligned_bytes(arena_begin, page_size) == 0);
+            debug_assert(reinterpret_cast<size_t>(arena_begin) % page_size == 0);
             // memory amount must be divisible by the page size
             debug_assert((arena_end - arena_begin) % the_page_size == 0);
             // place all pages in the LRU list
@@ -389,10 +389,10 @@ namespace cachelot {
         static constexpr uint32 min_block_diff = small_block_boundary / num_sub_cells_per_power;
         // Last power of 2, all blocks are below this power
         const uint32 last_power_of_2;
-        // Allocation limit depends on the page size
-        const uint32 page_size;
         // Number of powers of 2 to serve
         const uint32 num_powers_of_2_plus_small_blocks_cell;
+        // Allocation limit depends on the page size
+        const size_t page_size;
     private:
         /**
          * position in the table
@@ -493,8 +493,8 @@ namespace cachelot {
         /// constructor
         free_blocks_by_size(const size_t the_page_size)
             : last_power_of_2(log2u(the_page_size))
-            , page_size(the_page_size)
             , num_powers_of_2_plus_small_blocks_cell(last_power_of_2 - first_power_of_2 + 1)
+            , page_size(the_page_size)
             , first_level_bit_index(0)
             , second_level_bit_index(num_powers_of_2_plus_small_blocks_cell, 0)
             , size_classes_table(num_powers_of_2_plus_small_blocks_cell * num_sub_cells_per_power) {
@@ -586,13 +586,15 @@ namespace cachelot {
     inline memalloc::memalloc(const size_t memory_limit, const size_t the_page_size)
         : arena_size(memory_limit)
         , page_size(the_page_size)
-        , m_arena(aligned_alloc(page_size, arena_size), &std::free) {
-        STAT_SET(mem.limit_maxbytes, memory_limit);
-        STAT_SET(mem.page_size, page_size);
+        , m_arena(nullptr, &std::free) {
         debug_assert(ispow2(memory_limit));
+        debug_assert(page_size > 0);
         debug_assert(ispow2(page_size));
         debug_assert(memory_limit >= (page_size * 4));
         debug_assert(memory_limit % page_size == 0);
+        STAT_SET(mem.limit_maxbytes, memory_limit);
+        STAT_SET(mem.page_size, page_size);
+        m_arena.reset(aligned_alloc(page_size, arena_size));
         if (m_arena == nullptr) {
             throw std::bad_alloc();
         }
@@ -608,7 +610,7 @@ namespace cachelot {
 
         uint32 left_adjacent_block_offset = 0;
         while (available < EOM) {
-            debug_assert(EOM - available >= page_size);
+            debug_assert(static_cast<size_t>(EOM - available) >= page_size);
             block * huge_block = new (available) block(page_size - block::header_size, left_adjacent_block_offset);
             // store block at max pos of table
             m_free_blocks->put_block(huge_block);

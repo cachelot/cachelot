@@ -125,7 +125,7 @@ namespace cachelot {
         // total amount of memory
         const size_t arena_size;
         // size of the single page
-        const uint32 page_size;
+        const size_t page_size;
         // pointer to the memory arena
         std::unique_ptr<void, decltype(&std::free)> m_arena;
         // logical pages
