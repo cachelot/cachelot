@@ -278,7 +278,7 @@ namespace cachelot {
             auto keep_alive_duration = cache::seconds(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.end()));
             tie(parsed, args) = args.split(SPACE);
             uint32 datalen = str_to_int<uint32>(parsed.begin(), parsed.end());
-            if (datalen > settings.cache.max_value_size) {
+            if (datalen > settings.cache.page_size) {
                 throw system_error(error::value_length);
             }
             cache::timestamp_type cas_unique = 0;
