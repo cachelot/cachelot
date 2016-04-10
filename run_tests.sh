@@ -58,6 +58,10 @@ function run_tests {
 }
 
 BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer"
+# FIXME: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=61693
+if [ "$CXX" == "g++" ]; then
+    BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel"
+fi
 
 for cfg in ${BUILD_CFGS}; do
     run_tests "${cfg}"

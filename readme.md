@@ -1,9 +1,5 @@
 <a href="https://travis-ci.org/cachelot/cachelot/"><img src="https://travis-ci.org/cachelot/cachelot.svg?branch=master"/></a>
 
-#### Build failed because of [gcc bug](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=61693)
-100% tests pass on Clang build
-
-
 # What is Cachelot Library #
 If your application needs an LRU cache that works at the speed of light. That's what the Cachelot library is.
 
