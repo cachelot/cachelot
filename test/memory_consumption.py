@@ -19,18 +19,18 @@ log = logging.getLogger()
 
 SELF, _ = os.path.splitext(os.path.basename(sys.argv[0]))
 BASEDIR = os.path.normpath(os.path.dirname(os.path.abspath(sys.argv[0])) + '/..')
-CACHELOTD = os.path.join(BASEDIR, 'bin/RelWithDebugInfo/cachelotd -m 4G')
-MEMCACHED = '/usr/bin/memcached -m 4096'
+CACHELOTD = os.path.join(BASEDIR, 'bin/RelWithDebugInfo/cachelotd -m 2G')
+MEMCACHED = '/usr/bin/memcached -m 2048'
+MAX_DICT_MEM = 1024*1024*1024 * 2  # Gb
 NUM_RUNS = 10
 
 KEY_ALPHABET = string.ascii_letters + string.digits
 
-VALUE_RANGES = { 'small': (10, 1024),
-                 'medium': (1024, 4096),
-                 'large' :(4096, 1000000),
-                 'all': (10, 100000)}
+VALUE_RANGES = [('small',    10,    1024),
+                ('medium', 1024,    4096),
+                ('large',  4096, 1000000),
+                ('all',      10, 1000000)]
 
-MAX_DICT_MEM = 1024*1024*1024 * 4  # Gb
 
 
 FILTER_STATS = frozenset([
@@ -102,11 +102,10 @@ def shell_exec(command):
     return subprocess.Popen(args=shlex.split(command), stdout=devnull, stderr=devnull)
 
 
-def create_kv_data(range_name):
-    minval, maxval = VALUE_RANGES[range_name]
+def create_kv_data(range, minval, maxval):
     current_dict_mem = 0
     in_memory_kv = []
-    log.info('Creating KV data for the range "%s" [%d:%d]' %(range_name, minval, maxval))
+    log.info('Creating KV data for the range "%s" [%d:%d]' %(range, minval, maxval))
     start_time = time.time()
     while current_dict_mem < MAX_DICT_MEM:
         k = random_key()
@@ -153,10 +152,10 @@ def execute_test(mc, kv_data):
     return all_effective_memory, all_items_stored
 
 
-def execute_test_for_values_range(range_name):
+def execute_test_for_values_range(range_name, minval, maxval):
     log.info('*' * 60)
     # Create test data
-    in_memory_kv = create_kv_data(range_name)
+    in_memory_kv = create_kv_data(range_name, minval, maxval)
 
     # Run dataset on cachelot
     log.info("*** CACHELOT")
@@ -178,21 +177,23 @@ def execute_test_for_values_range(range_name):
     time.sleep(2)
     log.info('*' * 60)
     log.info('\n\n')
-    return { 'cachelot_effective_memory': '[%s]' % ', '.join('%.02f' % (m*1.0/1024/1024) for m in cachelot_eff_mem),
-             'memcached_effective_memory': '[%s]' % ', '.join('%.02f' % (m*1.0/1024/1024) for m in memcached_eff_mem),
-             'cachelot_stored_items': '[%s]' % ', '.join('%d' % i for i in cachelot_items),
-             'memcached_stored_items': '[%s]' % ', '.join('%d' % i for i in memcached_items) }
+    return { 'cachelotEffectiveMem': '[%s]' % ', '.join('%.02f' % (m*1.0/1024/1024) for m in cachelot_eff_mem),
+             'memcachedEffectiveMem': '[%s]' % ', '.join('%.02f' % (m*1.0/1024/1024) for m in memcached_eff_mem),
+             'memDiff': '[%s]' % ', '.join('%d' % abs(m1 - m2) for m1, m2 in zip(cachelot_eff_mem, memcached_eff_mem)),
+             'cachelotItems': '[%s]' % ', '.join('%d' % i for i in cachelot_items),
+             'memcachedItems': '[%s]' % ', '.join('%d' % i for i in memcached_items) }
 
 
 def main():
     benchmark_data = {}
-    for range in ['small', 'medium', 'large', 'all']:
-        benchmark_data[range] = execute_test_for_values_range(range)
+    # collect data
+    for range, minval, maxval in VALUE_RANGES:
+        benchmark_data[range] = execute_test_for_values_range(range, minval, maxval)
+    # print data
     print('\n\n\n')
-    for range, series in benchmark_data.items():
-        minval, maxval = VALUE_RANGES[range]
+    for range, minval, maxval in VALUE_RANGES:
         print('Range %d ~ %d bytes "%s"' % (minval, maxval, range))
-        for k, v in series.items():
+        for k, v in benchmark_data[range].items():
             print('%s: %s' % (k, v))
         print('\n')
 
