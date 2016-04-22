@@ -123,7 +123,7 @@ namespace  {
         if (settings.cache.memory_limit < (settings.cache.page_size * 4)) {
             throw invalid_configuration("There must be at least 4 pages");
         }
-        if (settings.cache.memory_limit > 2*Gigabyte) {
+        if (settings.cache.page_size > 2*Gigabyte) {
             throw invalid_configuration("Maximal page size is 2Gb");
         }
         if (varmap.count("hashtable")) {
