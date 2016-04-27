@@ -1,3 +1,9 @@
+#
+#  (C) Copyright 2015 Iurii Krasnoshchok
+#
+#  Distributed under the terms of Simplified BSD License
+#  see LICENSE file
+
 import socket
 import logging
 import os
@@ -313,7 +319,7 @@ class Client(object):
         return response
 
 
-def unix_connect(socket_name):
+def connect_unix(socket_name):
     """ return Client connected to the Unix domain socket """
     c = Client()
     c.setup_unix_socket(socket_name)
