@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Cachelot server memory consumption measurement
+# Cachelot vs Memcached server memory consumption test
 #
 
 import sys
@@ -16,32 +16,23 @@ import memcached
 
 
 log = logging.getLogger()
+toMb = lambda b: b*1.0/1024/1024
 
 SELF, _ = os.path.splitext(os.path.basename(sys.argv[0]))
 BASEDIR = os.path.normpath(os.path.dirname(os.path.abspath(sys.argv[0])) + '/..')
-CACHELOTD = os.path.join(BASEDIR, 'bin/RelWithDebugInfo/cachelotd -m 2G')
-MEMCACHED = '/usr/bin/memcached -m 2048'
-MAX_DICT_MEM = 1024*1024*1024 * 2  # Gb
+MEMORY_LIMIT = 1024*1024*1024*4  # Gb
+CACHELOTD = os.path.join(BASEDIR, 'bin/RelWithDebugInfo/cachelotd -m%d' % toMb(MEMORY_LIMIT))
+MEMCACHED = '/usr/bin/memcached -m%d' % toMb(MEMORY_LIMIT)
 NUM_RUNS = 10
 
 KEY_ALPHABET = string.ascii_letters + string.digits
+KEY_MINLEN = 10
+KEY_MAXLEN = 60
 
 VALUE_RANGES = [('small',    10,    1024),
                 ('medium', 1024,    4096),
                 ('large',  4096, 1000000),
                 ('all',      10, 1000000)]
-
-
-
-FILTER_STATS = frozenset([
-    'cmd_get', 'get_hits', 'get_misses',
-    'used_memory',
-    'total_requested', 'total_served',
-    'evictions',
-    'curr_items', 'total_items',
-    'evicted_unfetched',
-])
-
 
 def setup_logging():
     """
@@ -54,15 +45,9 @@ def setup_logging():
     logging_file_enable = True
     logging_file_dir = './'
     logging_file_name = SELF + time.strftime('_%Y%b%d-%H%M%S') + '.log'
-
-
+    # Custom STAT level
     logging.STAT = logging.DEBUG + 1
-    logging.addLevelName(logging.FATAL, 'F')
-    logging.addLevelName(logging.ERROR, 'E')
-    logging.addLevelName(logging.WARN,  'W')
-    logging.addLevelName(logging.INFO,  'I')
-    logging.addLevelName(logging.DEBUG, 'D')
-    logging.addLevelName(logging.STAT,  'S')
+    logging.addLevelName(logging.STAT,  'STAT')
 
     root_logger = logging.getLogger()
     formatter = logging.Formatter(logging_format)
@@ -82,16 +67,26 @@ def setup_logging():
 
 
 def random_key():
-    length = random.randint(10, 60)
+    "Generate random key from pre-defined alphabet "
+    length = random.randint(KEY_MINLEN, KEY_MAXLEN)
     return ''.join(random.choice(KEY_ALPHABET) for _ in range(length))
 
 
-def random_value(minlen, maxlen):
-    length = random.randint(minlen, maxlen)
-    return ''.join(map(chr, (random.randint(0,255) for _ in xrange(length))))
+def random_value(length):
+    "Generate value payload (we care only about length, not contents)"
+    return 'X' * length
 
 
 def log_stats(mc):
+    "Print memory related stats of cachelot / memcached to the log"
+    FILTER_STATS = frozenset([
+        'cmd_get', 'get_hits', 'get_misses',
+        'used_memory',
+        'total_requested', 'total_served',
+        'evictions',
+        'curr_items', 'total_items',
+        'evicted_unfetched',
+    ])
     for stat, value in mc.stats():
         if stat in FILTER_STATS:
             log.log(logging.STAT, '%30s:  %s' % (stat, value))
@@ -102,86 +97,95 @@ def shell_exec(command):
     return subprocess.Popen(args=shlex.split(command), stdout=devnull, stderr=devnull)
 
 
-def create_kv_data(range, minval, maxval):
-    current_dict_mem = 0
-    in_memory_kv = []
-    log.info('Creating KV data for the range "%s" [%d:%d]' %(range, minval, maxval))
-    start_time = time.time()
-    while current_dict_mem < MAX_DICT_MEM:
+def create_kv_data(minval, maxval, memlimit):
+    """ Generate array of (key, value_length) pairs
+        Actual values will be generated randomly every time
+        Total size of all keys and values will be around memlimit
+    """
+    data = []
+    data_size = 0
+    while data_size < memlimit:
         k = random_key()
-        current_dict_mem += len(k)
-        v = random_value(minval, maxval)
-        current_dict_mem += len(v)
-        in_memory_kv.append( (k, v) )
-    took_time = time.time() - start_time
-    log.debug('  Took: %.2f sec', took_time)
-    log.info('Local effective memory: %d (%d items).', current_dict_mem, len(in_memory_kv))
+        data_size += len(k)
+        v_length = random.randint(minval, maxval)
+        data_size += v_length
+        data.append((k, v_length))
 
-    return in_memory_kv
+    return data
 
 
-def execute_test(mc, kv_data):
-    all_effective_memory = []
-    all_items_stored = []
-    for run_no in range(NUM_RUNS):
-        start_time = time.time()
-        log.debug('Fill-in caching server ...')
-        for k, v in kv_data:
-            mc.set(k, v)
-        log.debug('  Took: %.2f sec', time.time() - start_time)
-        log.debug('Checking caching server ...')
-        effective_memory = 0
-        items_stored = 0
-        start_time = time.time()
-        for k, local_val in kv_data:
-            external_val = mc.get(k)
-            if not external_val:
-                # item was evicted, move along
-                continue
-            effective_memory += len(k) + len(local_val)
-            items_stored += 1
+def execute_test(mc, minval, maxval, memlimit):
+    """ Main test function.
+        It takes connected memcached client and fills it with random data.
+        After that there is an attempt to retrieve data back.
+    """
+    all_keys = []
+    local_effective_mem = 0
+    log.info('Fill-in caching server with random data')
+    start_time = time.time()
+    while local_effective_mem < memlimit:
+        key = random_key()
+        local_effective_mem += len(key)
+        value = random_value(random.randint(minval, maxval))
+        local_effective_mem += len(value)
+        mc.set(key, value)
+        all_keys.append(key)
+    log.debug('  Took: %.2f sec', time.time() - start_time)
 
-        log.info('External effective memory: %.02f Mb. (%d items)', effective_memory*1.0/1024/1024, items_stored)
-        log.debug('  Took: %.2f sec', time.time() - start_time)
-        all_effective_memory.append(effective_memory)
-        all_items_stored.append(items_stored)
+    log.debug('Checking caching server ...')
+    cache_effective_mem = 0
+    stored_items = 0
+    start_time = time.time()
+    for k in all_keys:
+        external_val = mc.get(k)
+        if external_val:
+            cache_effective_mem += len(k) + len(external_val)
+            stored_items += 1
+    log.debug('  Took: %.2f sec', time.time() - start_time)
+    # print statistics
+    log_stats(mc)
+    log.info('External effective memory: %.02f/%.02f Mb. (%d/%d items)', toMb(cache_effective_mem), stored_items,
+                                                                         toMb(local_effective_mem), len(all_keys))
+    return (cache_effective_mem, stored_items)
 
-        # print statistics
-        log_stats(mc)
-        random.shuffle(kv_data)
-    return all_effective_memory, all_items_stored
+
+def execute_test_n_times(times, mc, minval, maxval, memlimit):
+    all_effective_mem = []
+    all_stored_items = []
+    for run_no in range(1, times+1):
+        log.info('Run #%2d', run_no)
+        effective_mem, stored_items = execute_test(mc, minval, maxval, memlimit)
+        all_effective_mem.append(effective_mem)
+        all_stored_items.append(stored_items)
+    return all_effective_mem, all_stored_items
 
 
 def execute_test_for_values_range(range_name, minval, maxval):
-    log.info('*' * 60)
-    # Create test data
-    in_memory_kv = create_kv_data(range_name, minval, maxval)
-
+    log.info('')
     # Run dataset on cachelot
-    log.info("*** CACHELOT")
-    cache_process = shell_exec(CACHELOTD)
-    time.sleep(3)
+    log.info('*** CACHELOT - range "%s" [%d:%d]' % (range_name, minval, maxval))
+    cache_process = shell_exec(CACHELOTD + ' -p 11211')
+    time.sleep(1) # ensure network is up
     mc = memcached.connect_tcp('localhost', 11211)
-    cachelot_eff_mem, cachelot_items = execute_test(mc, in_memory_kv)
+    cachelot_eff_mem, cachelot_items = execute_test_n_times(NUM_RUNS, mc, minval, maxval, MEMORY_LIMIT)
     cache_process.terminate()
-    time.sleep(2)
-    log.info('*' * 60)
+    log.info('-' * 60)
 
     # Run dataset on memcached
-    log.info("*** MEMCACHED")
+    log.info('*** MEMCACHED - range "%s" [%d:%d]' % (range_name, minval, maxval))
     cache_process = shell_exec(MEMCACHED + ' -p 11212')
-    time.sleep(3)
+    time.sleep(1)
     mc = memcached.connect_tcp('localhost', 11212)
-    memcached_eff_mem, memcached_items = execute_test(mc, in_memory_kv)
+    memcached_eff_mem, memcached_items = execute_test_n_times(NUM_RUNS, mc, minval, maxval, MEMORY_LIMIT)
     cache_process.terminate()
-    time.sleep(2)
-    log.info('*' * 60)
+    log.info('-' * 60)
     log.info('\n\n')
-    return { 'cachelotEffectiveMem': '[%s]' % ', '.join('%.02f' % (m*1.0/1024/1024) for m in cachelot_eff_mem),
-             'memcachedEffectiveMem': '[%s]' % ', '.join('%.02f' % (m*1.0/1024/1024) for m in memcached_eff_mem),
-             'memDiff': '[%s]' % ', '.join('%d' % abs(m1 - m2) for m1, m2 in zip(cachelot_eff_mem, memcached_eff_mem)),
-             'cachelotItems': '[%s]' % ', '.join('%d' % i for i in cachelot_items),
-             'memcachedItems': '[%s]' % ', '.join('%d' % i for i in memcached_items) }
+    r  = 'cachelot: [%s]\n' % ', '.join('%.02f' % toMb(mem) for mem in cachelot_eff_mem)
+    r += 'memcached: [%s]\n' % ', '.join('%.02f' % toMb(mem) for mem in memcached_eff_mem)
+    r += 'memDiff: [%s]\n' % ', '.join('%.02f' % toMb(abs(m1 - m2)) for m1, m2 in zip(cachelot_eff_mem, memcached_eff_mem))
+    r += 'cachelotItems: [%s]\n' % ', '.join('%d' % i for i in cachelot_items)
+    r += 'memcachedItems: [%s]\n' % ', '.join('%d' % i for i in memcached_items)
+    return r
 
 
 def main():
@@ -193,8 +197,7 @@ def main():
     print('\n\n\n')
     for range, minval, maxval in VALUE_RANGES:
         print('Range %d ~ %d bytes "%s"' % (minval, maxval, range))
-        for k, v in benchmark_data[range].items():
-            print('%s: %s' % (k, v))
+        print(benchmark_data[range])
         print('\n')
 
 
