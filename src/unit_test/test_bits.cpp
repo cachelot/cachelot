@@ -14,11 +14,10 @@ BOOST_AUTO_TEST_CASE(test_pow2_utils) {
     BOOST_CHECK(ispow2(2u) == true);
     BOOST_CHECK(ispow2(1024u) == true);
     BOOST_CHECK(ispow2(1023u) == false);
-    BOOST_CHECK(ispow2((size_t)std::pow(2,32)) == true);
+    BOOST_CHECK(ispow2((uint64)std::pow(2,32)) == true);
 
     BOOST_CHECK_EQUAL(pow2(0u), (size_t)std::pow(2,0));
     BOOST_CHECK_EQUAL(pow2(1u), (size_t)std::pow(2,1));
-    BOOST_CHECK_EQUAL(pow2(2u), (size_t)std::pow(2,2));
     BOOST_CHECK_EQUAL(pow2(7u), (size_t)std::pow(2,7));
     BOOST_CHECK_EQUAL(pow2(32ull), (uint64)std::pow(2,32));
     BOOST_CHECK_EQUAL(pow2(63ull), (uint64)std::pow(2,63));
