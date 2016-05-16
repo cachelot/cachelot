@@ -29,6 +29,8 @@ message (STATUS "Platform: ${CMAKE_SYSTEM_NAME} x${CACHELOT_PLATFORM_BITS}")
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     add_definition (-D_WIN32_WINNT=0x05010000) # set NTDDI_WINXP as a target win version
 endif ()
+string (REGEX MATCH "arm.*" ARM_CPU "${CMAKE_SYSTEM_PROCESSOR}")
+string (REGEX MATCH "x86_64" x86_64_CPU "${CMAKE_SYSTEM_PROCESSOR}")
 
 ###########################################################################
 #       Compiler setup
@@ -49,14 +51,10 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
     set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES "Dbghelp.lib")
 elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang"))
 # - GCC / Clang common - - - - - - - - - - - - - - - - - - - - - - - - - -
-    if (CACHELOT_PLATFORM_BITS EQUAL 64)
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64")
-    elseif (CACHELOT_PLATFORM_BITS EQUAL 32)
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m32")
-    else ()
-        message (FATAL_ERROR "CACHELOT_PLATFORM_BITS is set to unknown value: \"${CACHELOT_PLATFORM_BITS}\"")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4 -std=c++11")
+    if (CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64_CPU)
+        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -msse2")
     endif ()
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4 -std=c++11 -msse2")
     set (CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
     set (CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
     set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO "-O2 -DNDEBUG -g")
