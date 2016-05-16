@@ -165,13 +165,13 @@ namespace cachelot {
 
     /// single allocation chunk with metadata
     class memalloc::block {
-        debug_only(static constexpr uint64 DBG_MARKER = 1234567890987654321;)
-
         struct {
             uint32 size : 31;   /// amount of memory available to user
             bool used : 1;      /// indicate whether block is used
             uint32 left_adjacent_offset;  /// offset of previous block in continuous arena
-            debug_only(uint64 dbg_marker;) /// debug constant marker to identify invalid blocks
+            /// debug marker to identify corrupted memory
+            debug_only(uint32 dbg_marker1;)
+            debug_only(uint32 dbg_marker2;)
         } meta;
 
         union {
@@ -180,9 +180,6 @@ namespace cachelot {
             /// pointer to actual memory given to the user
             uint8 memory_[1];
         };
-
-        // TODO: Make it proper
-        friend class memalloc;
 
     public:
         /// allocation alignment
@@ -204,7 +201,8 @@ namespace cachelot {
             // User memory must be properly aligned
             debug_assert(unaligned_bytes(memory_, alignment) == 0);
             // set debug marker
-            debug_only(meta.dbg_marker = DBG_MARKER);
+            debug_only(meta.dbg_marker1 = DBG_MARKER1_INIT);
+            debug_only(meta.dbg_marker2 = DBG_MARKER2_INIT);
             meta.size = the_size;
             meta.used = false;
             meta.left_adjacent_offset = left_adjacent_block_offset;
@@ -255,7 +253,7 @@ namespace cachelot {
         static block * from_user_ptr(void * ptr) noexcept {
             uint8 * u8_ptr = reinterpret_cast<uint8 *>(ptr);
             memalloc::block * result = reinterpret_cast<memalloc::block *>(u8_ptr - memalloc::block::header_size);
-            debug_assert(result->meta.dbg_marker == DBG_MARKER);
+            debug_only(result->assert_dbg_marker());
             return result;
         }
 
@@ -298,10 +296,15 @@ namespace cachelot {
             return left_block;
         }
 
+        // check that marker signature is untouched
+        void assert_dbg_marker() const {
+            debug_assert(meta.dbg_marker1 == DBG_MARKER1_INIT);
+            debug_assert(meta.dbg_marker2 == DBG_MARKER2_INIT);
+        }
 
         /// check that block doesn't cross page boundaries and also check that neighbours are connected correctly
         void __debug_sanity_check(const std::unique_ptr<pages> & pg, bool check_neighbours = true) const {
-            debug_assert(meta.dbg_marker == DBG_MARKER);
+            debug_only(assert_dbg_marker());
             const uint8 * page_begin; const uint8 * page_end;
             tie(page_begin, page_end) = pg->page_boundaries_from_addr(this);
             auto this_ = reinterpret_cast<const uint8 *>(this);
@@ -312,14 +315,14 @@ namespace cachelot {
             }
             if (this_ > page_begin) {
                 const auto left = left_adjacent();
-                debug_assert(left->meta.dbg_marker == DBG_MARKER);
+                debug_only(left->assert_dbg_marker());
                 debug_assert(left->right_adjacent() == this);
                 debug_assert(reinterpret_cast<const uint8 *>(left) >= page_begin);
                 (void)left;
             }
             if (this_ + this->size_with_header() < page_end) {
                 const auto right = right_adjacent();
-                debug_assert(right->meta.dbg_marker == DBG_MARKER);
+                debug_only(right->assert_dbg_marker());
                 debug_assert(right->left_adjacent() == this);
                 debug_assert(reinterpret_cast<const uint8 *>(right) + right->size_with_header() <= page_end);
                 (void)right;
@@ -328,8 +331,13 @@ namespace cachelot {
         }
 
     private:
+        debug_only(static constexpr uint32 DBG_MARKER1_INIT = 1234567890;)
+        debug_only(static constexpr uint32 DBG_MARKER2_INIT = 987654321;)
+
         // Allows to create fake blocks in the unit tests
         friend struct test_memalloc::test_free_blocks_by_size;
+        // TODO: Better solution?
+        friend class memalloc;
     };
 
 
@@ -733,7 +741,7 @@ namespace cachelot {
             tie(page_begin, page_end) = m_pages->page_to_reuse();
             // clean the page, evict used blocks, remove free blocks from the free_blocks list
             auto blk = reinterpret_cast<block *>(page_begin); // every page starts with the block
-            debug_assert(blk->meta.dbg_marker == block::DBG_MARKER);
+            debug_only(blk->assert_dbg_marker());
             const uint32 left_adjacent_block_offset = blk->meta.left_adjacent_offset;
             do {
                 if (blk->is_used()) {
