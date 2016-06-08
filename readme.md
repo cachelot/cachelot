@@ -47,6 +47,8 @@ Then you can connect to the port 11211 and speak memcached protocol
 ## Cross-platform ##
 Cachelot is tested on Alpine Linux (Docker), CentOS 7, Ubuntu Trusty and MacOS.
 
+32bit ARM and x86-64 supported.
+
 Windows build is upcoming.
 
 ## How To Hack ##
