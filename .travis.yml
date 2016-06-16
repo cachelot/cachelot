@@ -2,7 +2,8 @@ language: cpp
 sudo: required
 dist: trusty
 cache:
-  apt: true
+  - apt
+  - ccache
 os:
 - linux
 
