@@ -3,8 +3,11 @@
 BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer"
 
 . ./cleanup.sh
-
-[ -r "/proc/cpuinfo" ] && PARALLEL="-j$(grep -c '^processor' /proc/cpuinfo)"
+if [ TRAVIS == "yes" ]; then
+  PARALLEL="-j2"
+else
+  [ -r "/proc/cpuinfo" ] && PARALLEL="-j$(grep -c '^processor' /proc/cpuinfo)"
+fi
 for cfg in ${BUILD_CFGS}; do
   clean_build_files
   echo "Building ${cfg} ..."
