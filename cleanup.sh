@@ -1,8 +1,9 @@
 #!/bin/bash
 
 function clean_artifacts {
-    rm -r ./bin/* > /dev/null 2>&1
-    rm -r doc/Doxygen/* > /dev/null 2>&1
+    rm -rf ./bin/*
+    rm -rf ./lib/*
+    rm -rf doc/Doxygen/*
 }
 
 function clean_build_files {
@@ -12,4 +13,4 @@ function clean_build_files {
 
 clean_artifacts
 clean_build_files
-echo "Done."
+echo >&2 "clean"
