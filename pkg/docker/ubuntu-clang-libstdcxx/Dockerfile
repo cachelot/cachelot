@@ -17,7 +17,8 @@ RUN apt-get install -qq --no-install-recommends  \
     cmake \
     make \
     libboost-system1.55-dev libboost-test1.55-dev libboost-program-options1.55-dev \
-    libstdc++-4.8-dev
+    libstdc++-4.8-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # LLVM/Clang
 RUN wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key|sudo apt-key add -
@@ -56,8 +57,6 @@ RUN apt-get clean
 
 ENV ASAN_SYMBOLIZER_PATH="/usr/lib/llvm-*/bin/llvm-symbolizer"
 ENV ASAN_OPTIONS=symbolize=1
-
-RUN git config --global http.sslVerify false
 
 WORKDIR "/cachelot"
 COPY run_cachelot_tests.sh /bin/run_cachelot_tests.sh

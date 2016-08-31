@@ -1,6 +1,7 @@
 FROM alpine
 
-RUN apk update && apk add -- git openssh g++ cmake make python bash boost-dev
+RUN apk --update-cache add -- git openssh g++ libc-dev cmake make python py-pip bash boost-dev
+RUN pip install dumb-init
 
 RUN git config --global http.sslVerify false
 
@@ -11,6 +12,6 @@ RUN rm -rf /cachelot/* && mkdir -p /cachelot/src
 RUN adduser -D -h /cachelot -s /bin/bash cachelot
 RUN chown -R cachelot:cachelot /cachelot && chmod ug+rwx /cachelot
 USER cachelot
-CMD build_cachelotd.sh
 WORKDIR "/cachelot"
+ENTRYPOINT /bin/bash
 
