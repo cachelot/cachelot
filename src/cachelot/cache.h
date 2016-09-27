@@ -152,7 +152,7 @@ namespace cachelot {
              * `get` -  retrieve item
              *
              * @return pointer to the Item or `nullptr` if none was found
-             * @warning pointer is only valid *before* the next cache API call
+             * @warning pointer is only valid *until* the next cache API call
              */
             ItemPtr do_get(const bytes key, const hash_type hash) noexcept;
 
@@ -161,12 +161,12 @@ namespace cachelot {
              * @class doxygen_store_command
              *
              * @return Response: one of a possible cache responses
-             * `STORED` - Item was successfully stored
-             * `NOT_STORED` - Item was not stored because conditions of `add` or `replace` were not met
-             * `EXISTS` - Indicates that outdated Item was provided for the `cas` operation
-             * `NOT_FOUND` - Item was *not* found during `delete` / `cas` / `append` / `prepend` / `touch` / `inc` / `dec`
-             * `DELETED` - Item was deleted by `delete` operation
-             * `TOUCHED` - Item expiration time was modified by `touch`
+             * - `STORED` - Item was successfully stored
+             * - `NOT_STORED` - Item was not stored because conditions of `add` or `replace` were not met
+             * - `EXISTS` - Indicates that outdated Item was provided for the `cas` operation
+             * - `NOT_FOUND` - Item was *not* found during `delete` / `cas` / `append` / `prepend` / `touch` / `inc` / `dec`
+             * - `DELETED` - Item was deleted by `delete` operation
+             * - `TOUCHED` - Item expiration time was modified by `touch`
              */
 
 

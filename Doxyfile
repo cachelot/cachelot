@@ -44,7 +44,7 @@ PROJECT_NUMBER         = 0.x
 # for a project that appears at the top of each page and should give viewer a
 # quick idea about the purpose of the project. Keep the description short.
 
-PROJECT_BRIEF          = Fast in-memory cache
+PROJECT_BRIEF          = "High-performance LRU cache"
 
 # With the PROJECT_LOGO tag one can specify an logo or icon that is included in
 # the documentation. The maximum height of the logo should not exceed 55 pixels
@@ -144,7 +144,7 @@ ALWAYS_DETAILED_SEC    = NO
 # operators of the base classes will not be shown.
 # The default value is: NO.
 
-INLINE_INHERITED_MEMB  = NO
+INLINE_INHERITED_MEMB  = YES
 
 # If the FULL_PATH_NAMES tag is set to YES doxygen will prepend the full path
 # before files name in the file list and in the header files. If set to NO the
@@ -214,7 +214,7 @@ MULTILINE_CPP_IS_BRIEF = NO
 # documentation from any documented member that it re-implements.
 # The default value is: YES.
 
-INHERIT_DOCS           = NO
+INHERIT_DOCS           = YES
 
 # If the SEPARATE_MEMBER_PAGES tag is set to YES, then doxygen will produce a
 # new page for each member. If set to NO, the documentation of a member will be
@@ -479,7 +479,7 @@ HIDE_UNDOC_MEMBERS     = YES
 # no effect if EXTRACT_ALL is enabled.
 # The default value is: NO.
 
-HIDE_UNDOC_CLASSES     = YES
+HIDE_UNDOC_CLASSES     = NO
 
 # If the HIDE_FRIEND_COMPOUNDS tag is set to YES, doxygen will hide all friend
 # (class|struct|union) declarations. If set to NO these declarations will be
@@ -839,9 +839,7 @@ EXCLUDE_PATTERNS       =
 # Note that the wildcards are matched against the file with absolute path, so to
 # exclude all test directories use the pattern */test/*
 
-EXCLUDE_SYMBOLS        = boost, \
-                         internal, \
-                         doxygen_
+EXCLUDE_SYMBOLS        = boost boost::* internal internal::* doxygen_*
 
 # The EXAMPLE_PATH tag can be used to specify one or more files or directories
 # that contain example code fragments that are included (see the \include
@@ -1391,7 +1389,7 @@ DISABLE_INDEX          = NO
 # The default value is: NO.
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
-GENERATE_TREEVIEW      = NO
+GENERATE_TREEVIEW      = YES
 
 # The ENUM_VALUES_PER_LINE tag can be used to set the number of enum values that
 # doxygen will group on one line in the generated HTML documentation.
@@ -1401,7 +1399,7 @@ GENERATE_TREEVIEW      = NO
 # Minimum value: 0, maximum value: 20, default value: 4.
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
-ENUM_VALUES_PER_LINE   = 4
+ENUM_VALUES_PER_LINE   = 1
 
 # If the treeview is enabled (see GENERATE_TREEVIEW) then this tag can be used
 # to set the initial width (in pixels) of the frame in which the tree is shown.
