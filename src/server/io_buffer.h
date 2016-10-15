@@ -12,12 +12,10 @@
 #  include <cachelot/bytes.h>
 #endif
 
-/**
- * @defgroup io IO
- * @{
- */
-
 namespace cachelot {
+
+    /// @defgroup io IO
+    /// @{
 
     // constants
     constexpr size_t default_min_buffer_size = 500;
@@ -202,8 +200,10 @@ namespace cachelot {
         size_t m_write_pos = 0;
     };
 
+    /// @}
+
 } // namespace cachelot
 
-/// @}
+
 
 #endif // CACHELOT_IO_BUFFER_H_INCLUDED

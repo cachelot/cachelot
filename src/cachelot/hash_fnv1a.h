@@ -10,11 +10,6 @@
 
 #include <cachelot/bytes.h>
 
-/**
- * @ingroup common
- * @{
- */
-
 namespace cachelot {
 
     namespace internal {
@@ -60,6 +55,7 @@ namespace cachelot {
      * uint32 hash = hash_function(some_data);
      * @endcode
      * @see [FNV-1a on Wikipedia](http://en.wikipedia.org/wiki/Fowler–Noll–Vo_hash_function#FNV-1a_hash)
+     * @ingroup common
      */
     template <typename HashType,
               class = typename std::enable_if<std::is_unsigned<HashType>::value>::type>
@@ -67,7 +63,5 @@ namespace cachelot {
 
 
 } // namespace cachelot
-
-/// @}
 
 #endif // CACHELOT_HASH_FNV1A_H_INCLUDED

@@ -34,15 +34,12 @@
 #  pragma warning(pop)
 #endif
 
-/**
- * @defgroup net Networking and Connectivity
- * TCP, UDP, Unix Sockets asynchronous IO based on Boost.Asio
- * @{
- */
-
 namespace cachelot {
 
-    /// @ref net
+    /// @defgroup net Networking and communication
+    /// @{
+
+    /// TCP, UDP, Unix Sockets asynchronous IO based on Boost.Asio
     namespace net {
 
         // shortcuts
@@ -76,8 +73,10 @@ namespace cachelot {
 
     } // namespace net
 
-} // namespace cachelot::net
+    /// @}
 
-/// @}
+} // namespace cachelot
+
+
 
 #endif // CACHELOT_NETWORK_H_INCLUDED

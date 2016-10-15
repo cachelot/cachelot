@@ -8,9 +8,6 @@
 //
 
 
-/// @ingroup common
-/// @{
-
 namespace cachelot {
 
     namespace internal {
@@ -39,8 +36,9 @@ namespace cachelot {
 
     }
 
-     /// @defgroup bit Bit manipulations
-     /// @{
+    /// @defgroup bit Bit manipulations
+    /// @ingroup common
+    /// @{
 
     /// common bit arithmetics
     namespace bit {
@@ -137,8 +135,6 @@ namespace cachelot {
 
 
 } // namespace cachelot
-
-/// @}
 
 #endif // CACHELOT_BITS_H_INCLUDED
 

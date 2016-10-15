@@ -18,8 +18,6 @@
 #  include <cachelot/expiration_clock.h> // expiration time
 #endif
 
-/// @ingroup cache
-/// @{
 
 namespace cachelot {
 
@@ -39,6 +37,7 @@ namespace cachelot {
          * the key is placed, it's `key_length` bytes long then
          * item flags as ASCII string (the most of the time it will be '0')
          * the value bytes sequence
+         * @ingroup cache
          */
         class Item {
         public:
@@ -187,6 +186,5 @@ namespace cachelot {
 
 } // namespace cachelot
 
-/// @}
 
 #endif // CACHELOT_CACHE_ITEM_H_INCLUDED

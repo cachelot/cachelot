@@ -12,12 +12,13 @@
 #  include <cachelot/bytes.h>
 #endif
 
-/// @ingroup cache
-/// @{
 
 namespace cachelot {
 
     namespace cache {
+
+    /// @addtogroup cache
+    /// @{
 
 #define CACHE_COMMANDS_ENUM(x)  \
         x(ADD)                  \
@@ -85,8 +86,9 @@ namespace cachelot {
             return __AsciiResponses[static_cast<unsigned>(r)];
         }
 
+/// @}
+
 }} // namespace cachelot::cache
 
-/// @}
 
 #endif // CACHELOT_CACHE_DEFS_H_INCLUDED

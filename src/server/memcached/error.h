@@ -11,8 +11,6 @@
 #  include <cachelot/error.h>
 #endif
 
-/// @ingroup memcached
-/// @{
 
 namespace cachelot {
 
@@ -26,7 +24,8 @@ namespace cachelot {
         x(udp_header_size, "UDP packet header is too small")                    \
         x(udp_proto_reserverd, "UDP reserved flag expected to be zero")
 
-    /// @ref error
+    /// @addtogroup error
+    /// @{
     namespace error {
 
         /// Memcached protocol-related errors
@@ -74,9 +73,9 @@ namespace cachelot {
 
     using error::get_protocol_error_category;
 
-} // namespace cachelot
+    /// @}
 
-/// @}
+} // namespace cachelot
 
 namespace boost { namespace system {
     // register error_code type

@@ -12,8 +12,6 @@
 #endif
 #include <boost/intrusive/detail/parent_from_member.hpp>
 
-/// @ingroup common
-/// @{
 
 namespace cachelot {
 
@@ -30,6 +28,7 @@ namespace cachelot {
      *
      * @tparam T - stored item type
      * @tparam LinkPonter - pointer to the *intrusive_list_node* member
+     * @ingroup common
      */
     template <class T, intrusive_list_node T::*LinkPonter>
     class intrusive_list {
@@ -184,7 +183,5 @@ namespace cachelot {
     };
 
 } // namespace cachelot
-
-/// @}
 
 #endif // CACHELOT_INTRUSIVE_LIST_H_INCLUDED

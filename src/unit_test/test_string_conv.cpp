@@ -6,7 +6,7 @@
 namespace {
 
 using namespace cachelot;
-    
+
 #define CHECK_SYSTEM_ERROR(expr, error) \
     try { \
         expr; \

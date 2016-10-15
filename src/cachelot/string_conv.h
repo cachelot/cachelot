@@ -13,12 +13,11 @@
 #endif
 
 
-/// @ingroup common
-/// @{
 
 namespace cachelot {
 
     /// @defgroup conv Type to string and vice versa conversion
+    /// @ingroup common
     /// @{
 
     namespace internal {
@@ -414,14 +413,12 @@ namespace cachelot {
             throw system_error(err_code);
         }
     }
-    
+
 
     /// On-stack buffer to hold the ASCII string representing integer number
     typedef char AsciiIntegerBuffer[24];
 
     /// @}
-
-
 
 } // namespace cachelot
 

@@ -10,12 +10,7 @@
 
 #include <cachelot/hash_table.h> // hash_table
 
-
-/// @ingroup common
-/// @{
-
 namespace cachelot {
-
 
     /**
      * dict is an unordered key-value associative container
@@ -57,6 +52,7 @@ namespace cachelot {
      *  };
      * @endcode
      *
+     * @ingroup common
      */
     template <typename Key, typename T, typename KeyEqual = std::equal_to<Key>,
               class Entry = internal::hash_table_entry<Key, T>, class Options = internal::DefaultOptions>
@@ -338,7 +334,5 @@ namespace cachelot {
     };
 
 } // namespace cachelot
-
-/// @}
 
 #endif // CACHELOT_DICT_H_INCLUDED

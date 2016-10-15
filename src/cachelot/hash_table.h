@@ -10,9 +10,6 @@
 
 #include <cachelot/bits.h> // is_pow2
 
-/// @ingroup common
-/// @{
-
 namespace cachelot {
 
     namespace internal {
@@ -62,6 +59,7 @@ namespace cachelot {
      *
      * @note this is low level implementation class it doesn't support resizing
      * @see dict class
+     * @ingroup common
      */
     template <typename Key, typename T, typename KeyEqual = std::equal_to<Key>,
               class Entry = internal::hash_table_entry<Key, T>, class Options = internal::DefaultOptions>
@@ -308,6 +306,5 @@ namespace cachelot {
 
 } // namespace cachelot
 
-/// @}
 
 #endif // CACHELOT_HASH_TABLE_H_INCLUDED

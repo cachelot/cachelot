@@ -12,14 +12,13 @@
 #include <server/datagram_server.h>
 #include <server/memcached/proto_text.h>
 
-/**
- * @ingroup memcached
- * @{
- */
 
 namespace cachelot {
 
     namespace memcached {
+
+    /// @addtogroup memcached
+    /// @{
 
     using namespace cachelot::net;
 
@@ -81,9 +80,12 @@ namespace cachelot {
         cache::Cache & cache;
     };
 
-} } // namespace cachelot::memcached
+    /// @}
 
-/// @}
+    } // namespace memcached
+
+} // namespace cachelot
+
 
 #endif // CACHELOT_PROTO_MEMCACHED_SERVERS_H_INCLUDED
 

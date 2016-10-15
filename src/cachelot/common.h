@@ -8,10 +8,6 @@
 //  see LICENSE file
 
 
-/// @defgroup common Generic code
-/// @{
-
-
 #if defined(__GNUC__)
 #  pragma GCC system_header  // suppress warnings from the following headers
 #endif
@@ -63,6 +59,9 @@
 #include <cachelot/version.h>
 
 namespace cachelot {
+
+    /// @defgroup common Common
+    /// @{
 
     /// Fixed size integers
     typedef std::int8_t   int8;
@@ -124,9 +123,9 @@ namespace cachelot {
     constexpr size_t Megabyte = Kilobyte * 1024;
     constexpr size_t Gigabyte = Megabyte * 1024;
 
-} // namespace cachelot
+    /// @}
 
-/// @}
+} // namespace cachelot
 
 #endif // CACHELOT_COMMON_H_INCLUDED
 

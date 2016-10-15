@@ -8,14 +8,15 @@
 //  see LICENSE file
 
 
-/// @ingroup memcached
-/// @{
 
 #include <server/memcached/memcached.h>
 #include <server/socket_stream.h>
 #include <server/socket_datagram.h>
 
 namespace cachelot {
+
+    /// @addtogroup memcached
+    /// @{
 
     namespace memcached {
 
@@ -126,11 +127,11 @@ namespace cachelot {
             cache::Cache & cache_api;
         };
 
-
     } // namespace memcached
+
+    /// @}
 
 } // namespace cachelot
 
-/// @}
 
 #endif // CACHELOT_CONVERSATION_H_INCLUDED

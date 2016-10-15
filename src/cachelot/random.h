@@ -10,10 +10,11 @@
 
 #include <random>
 
-/// @ingroup common
-/// @{
 
 namespace cachelot {
+
+    /// @addtogroup common
+    /// @{
 
     /// generate random integer in [min, max] range
     template <typename IntType = int>
@@ -56,8 +57,9 @@ namespace cachelot {
         return str;
     }
 
+    /// @}
+
 } // namespace cachelot
 
-/// @}
 
 #endif // CACHELOT_RANDOM_H_INCLUDED

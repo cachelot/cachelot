@@ -8,10 +8,10 @@
 //  see LICENSE file
 
 
-/// @defgroup settings Program settings
-/// @{
-
 namespace cachelot {
+
+    /// @defgroup settings Program settings
+    /// @{
 
     struct settings {
         struct {
@@ -40,8 +40,8 @@ namespace cachelot {
 
     extern struct settings settings;
 
-} // namespace cachelot
+    /// @}
 
-/// @}
+} // namespace cachelot
 
 #endif // CACHELOT_SETTINGS_H_INCLUDED

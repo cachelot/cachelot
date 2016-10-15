@@ -28,12 +28,10 @@
 #endif
 
 
-/// @defgroup memcached Memcached protocols implementation
-/// @{
-
 namespace cachelot {
 
-    /// @ref memcached
+    /// @defgroup memcached Memcached protocols implementation
+    /// @{
     namespace memcached {
 
         /// Process every received packet
@@ -49,8 +47,10 @@ namespace cachelot {
             }
         }
 
-} } // namespace cachelot::memcached
+    } // namespace memcached
 
-/// @}
+    /// @}
+
+} // namespace cachelot
 
 #endif // CACHELOT_SERVER_MEMCACHED_H_INCLUDED

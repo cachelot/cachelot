@@ -12,10 +12,10 @@
 
 #include <iostream>
 
+namespace cachelot {
+
 /// @defgroup debug Debugging instruments
 /// @{
-
-namespace cachelot {
 
 auto & __debug_out_stream = std::cerr;
 
@@ -25,9 +25,10 @@ auto & __debug_out_stream = std::cerr;
 #  define
 #endif
 
+/// @}
+
 } // namespace cachelot
 
-/// @}
 
 #endif // DEBUG
 

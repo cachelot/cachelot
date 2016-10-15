@@ -8,10 +8,10 @@
 //  see LICENSE file
 
 
-/// @ingroup stats Cache usage statistics
-/// @{
-
 namespace cachelot {
+
+    /// @defgroup stats Cache usage statistics
+    /// @{
 
     #define MEMORY_STATS(X) \
         X(uint64, num_malloc,               "Number of alloc calls") \
@@ -72,6 +72,7 @@ namespace cachelot {
         X(uint64, curr_items,               "number of items in the cache") \
         X(bool, hash_is_expanding,          "hash table is expanding")
 
+    /// Stats storage struct
     struct stats {
         #define DECLARE_STAT(stat_type, stat_name, stat_description) stat_type stat_name = stat_type();
 
@@ -124,8 +125,9 @@ namespace cachelot {
         }
     }
 
+    /// @}
+
 } // namespace cachelot
 
-/// @}
 
 #endif // CACHELOT_STATS_H_INCLUDED

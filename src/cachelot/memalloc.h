@@ -20,7 +20,7 @@
 #  include <cachelot/intrusive_list.h> // pages LRU and free blocks list
 #endif
 
-// forward declaration to friend with unit test cases
+// forward declaration to make friends with the unit test cases
 namespace { namespace test_memalloc {
     /// internal
     struct test_free_blocks_by_size;
@@ -28,10 +28,10 @@ namespace { namespace test_memalloc {
     struct test_pages;
 } }
 
-/// @ingroup common
-/// @{
-
 namespace cachelot {
+
+    /// @defgroup memalloc Memory allocator
+    /// @{
 
    /**
     * Allocator which works whith fixed amount of pre-allocated memory
@@ -138,9 +138,9 @@ namespace cachelot {
         friend struct test_memalloc::test_pages;
     };
 
-} // namespace cachelot
+    /// @}
 
-/// @}
+} // namespace cachelot
 
 #include <cachelot/memalloc-inl.h>
 

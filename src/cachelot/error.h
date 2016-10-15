@@ -11,9 +11,6 @@
 #include <boost/system/error_code.hpp>   // error_code, error_category
 #include <boost/system/system_error.hpp> // system_error exception
 
-/// @ingroup common
-/// @{
-
 namespace cachelot {
 
     // error handling mechanism based on `error_code` and `error_category`
@@ -34,10 +31,11 @@ namespace cachelot {
     using boost::system::error_category;
     using boost::system::system_error;
 
-
-    /// @defgroup error Error codes definition
-    /// @{
+    /// @ref error
     namespace error {
+
+        /// @defgroup error Error codes definition
+        /// @{
 
         /// error_code identifies no error
         extern const error_code success;
@@ -83,16 +81,14 @@ namespace cachelot {
             return error_code(static_cast<int>(ec), get_cachelot_error_category());
         }
 
+        /// @}
 
     } // namespace error
 
     using error::get_cachelot_error_category;
 
-    /// @}
-
 } // namespace cachelot
 
-/// @}
 
 namespace boost { namespace system {
     // register error_code type

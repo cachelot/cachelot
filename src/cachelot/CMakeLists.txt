@@ -2,26 +2,28 @@
 # For instance it is included in unit tests to simplify linking
 
 set (CACHELOT_SOURCES
-    common.h
-    common.cpp
     bits.h
-    hash_table.h
     bytes.h
-    error.h
-    error.cpp
-    dict.h
-    hash_fnv1a.h
-    random.h
-    debug_trace.h
-    intrusive_list.h
-    memalloc.h
-    memalloc-inl.h
-    item.h
-    cache.h
     cache.cpp
+    cache.h
     cache_defs.h
-    stats.h
+    common.cpp
+    common.h
+    debug_trace.h
+    dict.h
+    error.cpp
+    error.h
+    expiration_clock.h
+    hash_fnv1a.h
+    hash_table.h
+    intrusive_list.h
+    item.h
+    memalloc-inl.h
+    memalloc.h
+    random.h
     stats.cpp
+    stats.h
+    string_conv.h
     version.h
 )
 

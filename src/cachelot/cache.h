@@ -33,12 +33,11 @@
 #  include <cachelot/stats.h>
 #endif
 
-/// @defgroup cache Cache implementation
-/// @{
-
 namespace cachelot {
 
-    /// @ref cache
+    /// @defgroup cache Cache implementation
+    /// @{
+
     namespace cache {
         /// Pointer to single cache Item
         typedef Item * ItemPtr;
@@ -595,8 +594,9 @@ namespace cachelot {
 
     } // namespace cache
 
+    /// @}
+
 } // namespace cachelot
 
-/// @}
 
 #endif // CACHELOT_CACHE_H_INCLUDED

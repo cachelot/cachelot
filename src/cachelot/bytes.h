@@ -8,9 +8,6 @@
 //
 
 
-/// @ingroup common
-/// @{
-
 namespace cachelot {
 
     /**
@@ -19,6 +16,8 @@ namespace cachelot {
      *  bytes doesn't own memory, only references external memory.
      *  User is responsible for allocation / deallocation and
      *  for providing valid pointers
+     *
+     *  @ingroup common
      */
     class bytes {
         static_assert(sizeof(char) == 1, "char type must be 1 byte");
@@ -195,7 +194,5 @@ namespace cachelot {
 
 
 } // namespace cachelot
-
-/// @}
 
 #endif // CACHELOT_BYTES_H_INCLUDED
