@@ -7,65 +7,65 @@ namespace cachelot {
     namespace memcached { namespace ascii {
 
         constexpr char SPACE = ' ';
-        constexpr bytes CRLF = bytes::from_literal("\r\n");
-        constexpr bytes VALUE = bytes::from_literal("VALUE");
-        constexpr bytes END = bytes::from_literal("END");
-        constexpr bytes NOREPLY = bytes::from_literal("noreply");
-        constexpr bytes STAT = bytes::from_literal("STAT");
-        constexpr bytes VERSION =  bytes::from_literal("VERSION");
-        constexpr bytes OK =  bytes::from_literal("OK");
+        constexpr slice CRLF = slice::from_literal("\r\n");
+        constexpr slice VALUE = slice::from_literal("VALUE");
+        constexpr slice END = slice::from_literal("END");
+        constexpr slice NOREPLY = slice::from_literal("noreply");
+        constexpr slice STAT = slice::from_literal("STAT");
+        constexpr slice VERSION =  slice::from_literal("VERSION");
+        constexpr slice OK =  slice::from_literal("OK");
 
         /// Memcached error types
-        constexpr bytes ERROR = bytes::from_literal("ERROR"); ///< unknown command
-        constexpr bytes CLIENT_ERROR = bytes::from_literal("CLIENT_ERROR"); ///< request is ill-formed
-        constexpr bytes SERVER_ERROR = bytes::from_literal("SERVER_ERROR"); ///< internal server error
+        constexpr slice ERROR = slice::from_literal("ERROR"); ///< unknown command
+        constexpr slice CLIENT_ERROR = slice::from_literal("CLIENT_ERROR"); ///< request is ill-formed
+        constexpr slice SERVER_ERROR = slice::from_literal("SERVER_ERROR"); ///< internal server error
 
         /// Handle on of the `get` `gets` commands
-        net::ConversationReply handle_retrieval_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_retrieval_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle on of the: `add`, `set`, `replace`, `cas`, `append`, `prepend` commands
-        net::ConversationReply handle_storage_command(cache::Command cmd, bytes args, io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_storage_command(cache::Command cmd, slice args, io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `delete` command
-        net::ConversationReply handle_delete_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_delete_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle on of the: `incr` `decr` commands
-        net::ConversationReply handle_arithmetic_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_arithmetic_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `touch` command
-        net::ConversationReply handle_touch_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_touch_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `stats` command
-        net::ConversationReply handle_statistics_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_statistics_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `version` command
-        net::ConversationReply handle_version_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_version_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `flush` command
-        net::ConversationReply handle_flush_all_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_flush_all_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Write one of the cache responses if `noreply` is not specified, none otherwise
         net::ConversationReply reply_with_response(io_buffer & send_buf, cache::Response response, bool noreply);
 
         /// Parse the name of the `command`
-        cache::Command parse_command_name(bytes command) noexcept;
+        cache::Command parse_command_name(slice command) noexcept;
 
         /// Read key value from the arguments sequence
         /// @return the key and rest of the args
-        tuple<bytes, bytes> parse_key(bytes args);
+        tuple<slice, slice> parse_key(slice args);
 
         /// parse optional `noreply` clause
-        bool maybe_noreply(const bytes buffer);
+        bool maybe_noreply(const slice buffer);
 
         // hash function
-        inline cache::hash_type calc_hash(const bytes key) noexcept {
+        inline cache::hash_type calc_hash(const slice key) noexcept {
             cache::HashFunction do_calc_hash;
             return do_calc_hash(key);
         }
 
 
-        // Stream operator to serialize `bytes`
-        inline io_buffer & operator<<(io_buffer & buf, const bytes value) {
+        // Stream operator to serialize `slice`
+        inline io_buffer & operator<<(io_buffer & buf, const slice value) {
             auto dest = buf.begin_write(value.length());
             std::memcpy(dest, value.begin(), value.length());
             buf.confirm_write(value.length());
@@ -74,10 +74,10 @@ namespace cachelot {
 
 
         // Stream operator to serialize `string`
-        inline io_buffer & operator<<(io_buffer & buf, const string value) { return buf << bytes(&value.front(), value.length()); }
+        inline io_buffer & operator<<(io_buffer & buf, const string value) { return buf << slice(&value.front(), value.length()); }
 
         // Stream operator to serialize `c string`
-        inline io_buffer & operator<<(io_buffer & buf, const char * value) { return buf << bytes(value, std::strlen(value)); }
+        inline io_buffer & operator<<(io_buffer & buf, const char * value) { return buf << slice(value, std::strlen(value)); }
 
 
         // Stream operator to serialize single `char`
@@ -97,8 +97,8 @@ namespace cachelot {
 
         // Stream operator to serialize cache response as an ascii string
         inline io_buffer & operator<<(io_buffer & buf, cache::Response resp) {
-            #define CACHE_RESPONSES_ENUM_STRELEMENT(resp) bytes::from_literal(CACHELOT_PP_STR(resp)),
-            constexpr bytes __AsciiResponses[] = {
+            #define CACHE_RESPONSES_ENUM_STRELEMENT(resp) slice::from_literal(CACHELOT_PP_STR(resp)),
+            constexpr slice __AsciiResponses[] = {
                 CACHE_RESPONSES_ENUM(CACHE_RESPONSES_ENUM_STRELEMENT)
             };
             #undef CACHE_RESPONSES_ENUM_STRELEMENT
@@ -131,7 +131,7 @@ namespace cachelot {
             auto w_savepoint = send_buf.write_savepoint();
             try {
                 // read command header <cmd> <key> <args...>\r\n
-                bytes header = recv_buf.try_read_until(CRLF);
+                slice header = recv_buf.try_read_until(CRLF);
                 if (header.empty()) {
                     throw system_error(error::incomplete_request);
                 }
@@ -139,7 +139,7 @@ namespace cachelot {
                 header = header.rtrim_n(CRLF.length());
 
                 // determine command name
-                bytes ascii_cmd, args;
+                slice ascii_cmd, args;
                 tie(ascii_cmd, args) = header.split(SPACE);
                 auto command = parse_command_name(ascii_cmd);
                 net::ConversationReply reply;
@@ -233,15 +233,15 @@ namespace cachelot {
         }
 
 
-        inline tuple<bytes, bytes> parse_key(bytes args) {
-            bytes key;
+        inline tuple<slice, slice> parse_key(slice args) {
+            slice key;
             tie(key, args) = args.split(SPACE);
             validate_key(key);
             return make_tuple(key, args);
         }
 
 
-        inline bool maybe_noreply(const bytes args) {
+        inline bool maybe_noreply(const slice args) {
             if (args.empty()) {
                 return false;
             } else if (args == NOREPLY) {
@@ -252,9 +252,9 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_retrieval_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api) {
+        inline net::ConversationReply handle_retrieval_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
             do {
-                bytes key; tie(key, args) = parse_key(args);
+                slice key; tie(key, args) = parse_key(args);
                 auto i = cache_api.do_get(key, calc_hash(key));
                 if (i) {
                     send_buf << VALUE << SPACE << i->key() << SPACE << i->opaque_flags() << SPACE << static_cast<uint32>(i->value().length());
@@ -269,9 +269,9 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_storage_command(cache::Command cmd, bytes args, io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api) {
-            bytes key; tie(key, args) = parse_key(args);
-            bytes parsed;
+        inline net::ConversationReply handle_storage_command(cache::Command cmd, slice args, io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api) {
+            slice key; tie(key, args) = parse_key(args);
+            slice parsed;
             tie(parsed, args) = args.split(SPACE);
             cache::opaque_flags_type flags = str_to_int<cache::opaque_flags_type>(parsed.begin(), parsed.end());
             tie(parsed, args) = args.split(SPACE);
@@ -293,7 +293,7 @@ namespace cachelot {
                 recv_buf.ensure_capacity(datalen + CRLF.length() - recv_buf.non_read());
                 throw system_error(error::incomplete_request);
             }
-            auto value = bytes(recv_buf.begin_read(), datalen + CRLF.length());
+            auto value = slice(recv_buf.begin_read(), datalen + CRLF.length());
             if (value.endswith(CRLF)) {
                 value = value.rtrim_n(CRLF.length()); // strip trailing \r\n
                 recv_buf.confirm_read(datalen + CRLF.length());
@@ -338,17 +338,17 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_delete_command(cache::Command, bytes args, io_buffer & send_buf, cache::Cache & cache_api) {
-            bytes key; tie(key, args) = parse_key(args);
+        inline net::ConversationReply handle_delete_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
+            slice key; tie(key, args) = parse_key(args);
             bool noreply = maybe_noreply(args);
             auto response = cache_api.do_delete(key, calc_hash(key));
             return reply_with_response(send_buf, response, noreply);
         }
 
 
-        inline net::ConversationReply handle_arithmetic_command(cache::Command cmd, bytes args, io_buffer & send_buf, cache::Cache & cache_api) {
-            bytes key; tie(key, args) = parse_key(args);
-            bytes parsed;
+        inline net::ConversationReply handle_arithmetic_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
+            slice key; tie(key, args) = parse_key(args);
+            slice parsed;
             tie(parsed, args) = args.split(SPACE);
             auto delta = str_to_int<uint64>(parsed.begin(), parsed.end());
             bool noreply = maybe_noreply(args);
@@ -366,9 +366,9 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_touch_command(cache::Command, bytes args, io_buffer & send_buf, cache::Cache & cache_api) {
-            bytes key; tie(key, args) = parse_key(args);
-            bytes parsed;
+        inline net::ConversationReply handle_touch_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
+            slice key; tie(key, args) = parse_key(args);
+            slice parsed;
             tie(parsed, args) = args.split(SPACE);
             cache::seconds keep_alive_duration(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.end()));
             bool noreply = maybe_noreply(args);
@@ -377,13 +377,13 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_statistics_command(cache::Command, bytes args, io_buffer & send_buf, cache::Cache & cache_api) {
+        inline net::ConversationReply handle_statistics_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
             if (not args.empty()) {
                 throw system_error(error::not_implemented);
             }
             cache_api.publish_stats();
             #define SERIALIZE_STAT(stat_group, stat_type, stat_name, stat_description) \
-                send_buf << STAT << SPACE << bytes::from_literal(CACHELOT_PP_STR(stat_name)) << SPACE << STAT_GET(stat_group, stat_name) << CRLF;
+                send_buf << STAT << SPACE << slice::from_literal(CACHELOT_PP_STR(stat_name)) << SPACE << STAT_GET(stat_group, stat_name) << CRLF;
 
             #define SERIALIZE_CACHE_STAT(typ, name, desc) SERIALIZE_STAT(cache, typ, name, desc)
             CACHE_STATS(SERIALIZE_CACHE_STAT)
@@ -399,7 +399,7 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_version_command(cache::Command, bytes args, io_buffer & send_buf, cache::Cache &) {
+        inline net::ConversationReply handle_version_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache &) {
             if (not args.empty()) {
                 throw system_error(error::crlf_expected);
             }
@@ -408,7 +408,7 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_flush_all_command(cache::Command, bytes args, io_buffer & send_buf, cache::Cache & cache_api) {
+        inline net::ConversationReply handle_flush_all_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
             bool noreply = maybe_noreply(args);
             cache_api.do_flush_all();
             if (noreply) {
@@ -429,12 +429,12 @@ namespace cachelot {
         }
 
 
-        inline cache::Command parse_command_name(bytes command) noexcept {
-            static const auto is_3 = [=](const char literal[4], bytes cmd) -> bool {  return cmd[1] == literal[1] && cmd[2] == literal[2]; };
-            static const auto is_4 = [=](const char literal[5], bytes cmd) -> bool {  return is_3(literal, cmd) && cmd[3] == literal[3]; };
-            static const auto is_5 = [=](const char literal[6], bytes cmd) -> bool {  return is_4(literal, cmd) && cmd[4] == literal[4]; };
-            static const auto is_6 = [=](const char literal[7], bytes cmd) -> bool {  return is_5(literal, cmd) && cmd[5] == literal[5]; };
-            static const auto is_7 = [=](const char literal[8], bytes cmd) -> bool {  return is_6(literal, cmd) && cmd[6] == literal[6]; };
+        inline cache::Command parse_command_name(slice command) noexcept {
+            static const auto is_3 = [=](const char literal[4], slice cmd) -> bool {  return cmd[1] == literal[1] && cmd[2] == literal[2]; };
+            static const auto is_4 = [=](const char literal[5], slice cmd) -> bool {  return is_3(literal, cmd) && cmd[3] == literal[3]; };
+            static const auto is_5 = [=](const char literal[6], slice cmd) -> bool {  return is_4(literal, cmd) && cmd[4] == literal[4]; };
+            static const auto is_6 = [=](const char literal[7], slice cmd) -> bool {  return is_5(literal, cmd) && cmd[5] == literal[5]; };
+            static const auto is_7 = [=](const char literal[8], slice cmd) -> bool {  return is_6(literal, cmd) && cmd[6] == literal[6]; };
 
             if (command) {
                 const char first_char = command[0];

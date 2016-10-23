@@ -5,7 +5,7 @@ set (CACHELOT_UNIT_TEST_SOURCES
                 unit_test.h
                 test_bits.cpp
                 test_string_conv.cpp
-                test_bytes.cpp
+                test_slice.cpp
                 test_item.cpp
                 test_hash_table.cpp
                 test_dict.cpp

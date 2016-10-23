@@ -8,8 +8,8 @@
 //  see LICENSE file
 
 
-#ifndef CACHELOT_BYTES_H_INCLUDED
-#  include <cachelot/bytes.h>
+#ifndef CACHELOT_SLICE_H_INCLUDED
+#  include <cachelot/slice.h>
 #endif
 #ifndef CACHELOT_NET_SOCKET_STREAM_H_INCLUDED
 #  include <server/socket_stream.h>
@@ -38,7 +38,7 @@ namespace cachelot {
         net::ConversationReply handle_received_data(io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// validate the Item key
-        inline void validate_key(const bytes key) {
+        inline void validate_key(const slice key) {
             if (not key) {
                 throw system_error(error::key_expected);
             }

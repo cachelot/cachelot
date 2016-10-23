@@ -11,8 +11,8 @@ BOOST_AUTO_TEST_SUITE(test_cache_stats)
 static auto calc_hash = fnv1a<cache::Cache::hash_type>::hasher();
 
 cache::ItemPtr CreateItem(cache::Cache & c, const string k, const string v, cache::opaque_flags_type flags = 0, cache::seconds keepalive = cache::keepalive_forever ) {
-    const auto key = bytes(k.c_str(), k.length());
-    const auto value = bytes(v.c_str(), v.length());
+    const auto key = slice(k.c_str(), k.length());
+    const auto value = slice(v.c_str(), v.length());
     auto item = c.create_item(key, calc_hash(key), value.length(), flags, keepalive);
     item->assign_value(value);
     return item;
@@ -21,7 +21,7 @@ cache::ItemPtr CreateItem(cache::Cache & c, const string k, const string v, cach
 BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
     ResetStats();
     cache::Cache the_cache(4 * Megabyte, 4 * Kilobyte, 16, false);
-    const auto non_existing = bytes::from_literal("Non-existing key");
+    const auto non_existing = slice::from_literal("Non-existing key");
     // set
     {
         const auto item1 = CreateItem(the_cache, "Key1", "Valu1");
@@ -41,7 +41,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_get), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,get_hits), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,get_misses), 1);
-        const auto the_key = bytes::from_literal("Key1");
+        const auto the_key = slice::from_literal("Key1");
         BOOST_CHECK(the_cache.do_get(the_key, calc_hash(the_key)) != nullptr);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_get), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,get_hits), 1);
@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
         BOOST_CHECK_EQUAL(STAT_GET(cache,delete_misses), 1);
         const auto item1 = CreateItem(the_cache, "Delete_Key1", "Value1");
         BOOST_CHECK_EQUAL(the_cache.do_set(item1), cache::STORED);
-        const auto the_key = bytes::from_literal("Delete_Key1");
+        const auto the_key = slice::from_literal("Delete_Key1");
         BOOST_CHECK(the_cache.do_delete(the_key, calc_hash(the_key)) == cache::DELETED);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_delete), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,delete_hits), 1);
@@ -121,7 +121,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
         BOOST_CHECK_EQUAL(STAT_GET(cache,touch_misses), 1);
         const auto item1 = CreateItem(the_cache, "Touch_Key1", "Value1");
         BOOST_CHECK_EQUAL(the_cache.do_set(item1), cache::STORED);
-        const auto the_key = bytes::from_literal("Touch_Key1");
+        const auto the_key = slice::from_literal("Touch_Key1");
         BOOST_CHECK(the_cache.do_touch(the_key, calc_hash(the_key), cache::keepalive_forever) == cache::TOUCHED);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_touch), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,touch_hits), 1);
@@ -139,7 +139,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
         BOOST_CHECK_EQUAL(STAT_GET(cache,decr_misses), 1);
         const auto item1 = CreateItem(the_cache, "Arithmetic_Key1", "0");
         BOOST_CHECK_EQUAL(the_cache.do_set(item1), cache::STORED);
-        const auto the_key = bytes::from_literal("Arithmetic_Key1");
+        const auto the_key = slice::from_literal("Arithmetic_Key1");
         the_cache.do_incr(the_key, calc_hash(the_key), 1ull);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_incr), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,incr_hits), 1);
@@ -204,7 +204,7 @@ BOOST_AUTO_TEST_CASE(test_cache_size_stats) {
     BOOST_CHECK_EQUAL(STAT_GET(cache,curr_items), 16);
     BOOST_CHECK_EQUAL(STAT_GET(cache,hash_is_expanding), false);
     for (auto k : keys) {
-        auto key = bytes(k.c_str(), k.length());
+        auto key = slice(k.c_str(), k.length());
         BOOST_CHECK_EQUAL(the_cache.do_delete(key, calc_hash(key)), cache::DELETED);
     }
     the_cache.publish_stats();

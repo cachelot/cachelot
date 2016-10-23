@@ -8,8 +8,8 @@
 //  see LICENSE file
 
 
-#ifndef CACHELOT_BYTES_H_INCLUDED
-#  include <cachelot/bytes.h> // key, value
+#ifndef CACHELOT_SLICE_H_INCLUDED
+#  include <cachelot/slice.h> // key, value
 #endif
 #ifndef CACHELOT_BITS_H_INCLUDED
 #  include <cachelot/bits.h>  // unaligned_bytes
@@ -36,7 +36,7 @@ namespace cachelot {
          * Item structure is placed first after it
          * the key is placed, it's `key_length` bytes long then
          * item flags as ASCII string (the most of the time it will be '0')
-         * the value bytes sequence
+         * the value slice sequence
          * @ingroup cache
          */
         class Item {
@@ -70,25 +70,25 @@ namespace cachelot {
             Item & operator= (Item &&) = delete;
         public:
             /// constructor
-            explicit Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration_time, timestamp_type the_timestamp) noexcept;
+            explicit Item(slice the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration_time, timestamp_type the_timestamp) noexcept;
 
             /// Destroy existing Item
             static void Destroy(Item * item) noexcept;
 
-            /// return bytes sequence occupied by key
-            bytes key() const noexcept;
+            /// return slice sequence occupied by key
+            slice key() const noexcept;
 
             /// return hash value
             hash_type hash() const noexcept { return m_hash; }
 
-            /// return bytes sequence occupied by value
-            bytes value() const noexcept;
+            /// return slice sequence occupied by value
+            slice value() const noexcept;
 
             /// assign value to the item
-            void assign_value(bytes the_value) noexcept;
+            void assign_value(slice the_value) noexcept;
 
             /// assign value from the two parts
-            void assign_compose(bytes left, bytes right) noexcept;
+            void assign_compose(slice left, slice right) noexcept;
 
             /// user defined flags
             opaque_flags_type opaque_flags() const noexcept { return m_opaque_flags; }
@@ -105,8 +105,8 @@ namespace cachelot {
             /// update item's expiration time
             void touch(expiration_time_point exptime) noexcept { m_expiration_time = exptime; }
 
-            /// Calculate total size in bytes required to store provided fields
-            static size_t CalcSizeRequired(const bytes the_key, const uint32 value_length) noexcept;
+            /// Calculate total size in slice required to store provided fields
+            static size_t CalcSizeRequired(const slice the_key, const uint32 value_length) noexcept;
 
         private:
             // Item must be properly initialized to call following functions
@@ -115,7 +115,7 @@ namespace cachelot {
         };
 
 
-        inline Item::Item(bytes the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration, timestamp_type the_timestamp) noexcept
+        inline Item::Item(slice the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration, timestamp_type the_timestamp) noexcept
                 : m_timestamp(the_timestamp)
                 , m_hash(the_hash)
                 , m_value_length(value_length)
@@ -130,22 +130,22 @@ namespace cachelot {
         }
 
 
-        inline bytes Item::key() const noexcept {
+        inline slice Item::key() const noexcept {
             debug_assert(m_key_length > 0);
             auto key_begin = reinterpret_cast<const char *>(this) + KeyOffset(this);
-            bytes k(key_begin, key_begin + m_key_length);
+            slice k(key_begin, key_begin + m_key_length);
             return k;
         }
 
 
-        inline bytes Item::value() const noexcept {
+        inline slice Item::value() const noexcept {
             auto value_begin = reinterpret_cast<const char *>(this) + ValueOffset(this);
-            bytes v(value_begin, value_begin + m_value_length);
+            slice v(value_begin, value_begin + m_value_length);
             return v;
         }
 
 
-        inline void Item::assign_value(bytes the_value) noexcept {
+        inline void Item::assign_value(slice the_value) noexcept {
             debug_assert(the_value.length() <= m_value_length);
             auto this_ = reinterpret_cast<uint8 *>(this);
             std::memcpy(this_ + ValueOffset(this), the_value.begin(), the_value.length());
@@ -153,7 +153,7 @@ namespace cachelot {
         }
 
 
-        inline void Item::assign_compose(bytes left, bytes right) noexcept {
+        inline void Item::assign_compose(slice left, slice right) noexcept {
             debug_assert(left.length() + right.length() <= m_value_length);
             auto this_ = reinterpret_cast<uint8 *>(this);
             std::memcpy(this_ + ValueOffset(this), left.begin(), left.length());
@@ -173,7 +173,7 @@ namespace cachelot {
         }
 
 
-        inline size_t Item::CalcSizeRequired(const bytes the_key, const uint32 value_length) noexcept {
+        inline size_t Item::CalcSizeRequired(const slice the_key, const uint32 value_length) noexcept {
             debug_assert(the_key.length() > 0);
             debug_assert(the_key.length() <= max_key_length);
             size_t item_size = sizeof(Item);

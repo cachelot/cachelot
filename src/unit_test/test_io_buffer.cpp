@@ -30,10 +30,10 @@ BOOST_AUTO_TEST_CASE(test_io_buffer_read_write) {
     buf.confirm_read(std::strlen("Test"));
     BOOST_CHECK(std::strncmp(Test, "Test", std::strlen("Test")) == 0);
     // test try_read_until
-    auto read1 = buf.try_read_until(bytes::from_literal("[separator]"));
+    auto read1 = buf.try_read_until(slice::from_literal("[separator]"));
     BOOST_CHECK_EQUAL(string(read1.begin(), read1.length()), string(" string [separator]"));
     BOOST_CHECK_EQUAL(buf.non_read(), std::strlen(" more [separator]"));
-    auto read2 = buf.try_read_until(bytes::from_literal("[separator]"));
+    auto read2 = buf.try_read_until(slice::from_literal("[separator]"));
     BOOST_CHECK_EQUAL(string(read2.begin(), read2.length()), string(" more [separator]"));
     BOOST_CHECK_EQUAL(buf.non_read(), 0);
 }

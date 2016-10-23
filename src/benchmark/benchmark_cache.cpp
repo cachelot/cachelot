@@ -53,8 +53,8 @@ public:
     CacheWrapper() : m_cache(cache_memory, page_size, hash_initial, true) {}
 
     void set(iterator it) {
-        bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
-        bytes v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
+        slice k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
+        slice v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
         cache::ItemPtr item = nullptr;
         try {
             item = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, cache::keepalive_forever);
@@ -70,7 +70,7 @@ public:
     }
 
     void get(iterator it) {
-        bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
+        slice k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         auto found_item = m_cache.do_get(k, calc_hash(k));
         bench_stats.num_get += 1;
         auto & counter = found_item ? bench_stats.num_cache_hit : bench_stats.num_cache_miss;
@@ -78,7 +78,7 @@ public:
     }
 
     void del(iterator it) {
-        bytes k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
+        slice k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         error_code error; cache::Response cache_reply;
         cache_reply = m_cache.do_delete(k, calc_hash(k));
         bench_stats.num_del += 1;

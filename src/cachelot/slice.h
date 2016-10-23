@@ -1,5 +1,5 @@
-#ifndef CACHELOT_BYTES_H_INCLUDED
-#define CACHELOT_BYTES_H_INCLUDED
+#ifndef CACHELOT_SLICE_H_INCLUDED
+#define CACHELOT_SLICE_H_INCLUDED
 
 //
 //  (C) Copyright 2015 Iurii Krasnoshchok
@@ -13,30 +13,30 @@ namespace cachelot {
     /**
      *  @brief references continuous sequence of bytes in memory
      *
-     *  bytes doesn't own memory, only references external memory.
+     *  slice doesn't own memory, only references external memory.
      *  User is responsible for allocation / deallocation and
      *  for providing valid pointers
      *
      *  @ingroup common
      */
-    class bytes {
+    class slice {
         static_assert(sizeof(char) == 1, "char type must be 1 byte");
     public:
          /// @name constructors
          ///@{
 
-        constexpr bytes() noexcept
+        constexpr slice() noexcept
             : m_begin(nullptr)
             , m_end(nullptr) {
         }
 
-        explicit bytes(const char * range_begin, const char * range_end) noexcept
+        explicit slice(const char * range_begin, const char * range_end) noexcept
             : m_begin(range_begin)
             , m_end(range_end) {
             debug_assert(m_begin <= m_end);
         }
 
-        constexpr explicit bytes(const char * range_begin, const size_t range_length) noexcept
+        constexpr explicit slice(const char * range_begin, const size_t range_length) noexcept
             : m_begin(range_begin)
             , m_end(range_begin + range_length) {
         }
@@ -71,7 +71,7 @@ namespace cachelot {
         }
 
         /// check if this range contents are the same as `other` (memory comparisson)
-        bool operator==(const bytes & other) const noexcept {
+        bool operator==(const slice & other) const noexcept {
             if (length() == other.length()) {
                 if (begin() == other.begin() && end() == other.end()) {
                     return true;
@@ -83,108 +83,108 @@ namespace cachelot {
         }
 
         /// check if this range contents are the same as `other` (memory comparisson)
-        bool operator!=(const bytes & other) const noexcept {
+        bool operator!=(const slice & other) const noexcept {
             return not operator==(other);
         }
 
-        /// search for given range `what` in this bytes
-        bytes search(const bytes what) const noexcept {
+        /// search for given range `what` in this slice
+        slice search(const slice what) const noexcept {
             if (what.length() <= length()) {
                 if (what.begin() >= begin() && what.end() <= end()) {
                     return what;
                 } else {
                     const char * pos = std::search(begin(), end(), what.begin(), what.end());
                     if (pos != end()) {
-                        return bytes(pos, what.length());
+                        return slice(pos, what.length());
                     }
                 }
             }
-            return bytes();
+            return slice();
         }
 
-        /// returns `true` if this bytes contents contains given `subrange`
-        bool contains(const bytes subrange) const noexcept {
+        /// returns `true` if this slice contents contains given `subrange`
+        bool contains(const slice subrange) const noexcept {
             return search(subrange) ? true : false;
         }
 
-        /// check if pointer `p` is whithin this bytes range
+        /// check if pointer `p` is whithin this slice range
         constexpr bool contains(const char * b) const noexcept {
             return (b >= begin() && b < end());
         }
 
-        /// returns `true` if this bytes contents starts with `what`
-        bool startswith(const bytes what) const noexcept {
+        /// returns `true` if this slice contents starts with `what`
+        bool startswith(const slice what) const noexcept {
             return search(what).begin() == begin();
         }
 
-        /// returns `true` if this bytes contents ends with `what`
-        bool endswith(const bytes what) const noexcept {
+        /// returns `true` if this slice contents ends with `what`
+        bool endswith(const slice what) const noexcept {
             if (what.length() <= length()) {
-                bytes _, xtail;
+                slice _, xtail;
                 tie(_, xtail) = split_at(length() - what.length());
                 return xtail == what;
             }
             return false;
         }
 
-        /// return bytes containing piece of this bytes range started on `index` length of `len`
-        bytes slice(size_t index, size_t len) const noexcept {
+        /// return slice containing piece of this slice range started on `index` length of `len`
+        slice subslice(size_t index, size_t len) const noexcept {
             debug_assert(nth(index) + len <= m_end);
-            return bytes(nth(index), len);
+            return slice(nth(index), len);
         }
 
 
         /// shorten this range by `n` from the end
-        bytes rtrim_n(const size_t n) const noexcept {
+        slice rtrim_n(const size_t n) const noexcept {
             debug_assert(n <= length());
-            return slice(0, length() - n);
+            return subslice(0, length() - n);
         }
 
 
         /// split this range by first occurrence of `separator` and return pieces before and after this occurrence
-        /// if separator not found split will return this bytes followed by empty range
-        tuple<bytes, bytes> split(const bytes separator) const noexcept {
-            const bytes found_sep = search(separator);
+        /// if separator not found split will return this slice followed by empty range
+        tuple<slice, slice> split(const slice separator) const noexcept {
+            const slice found_sep = search(separator);
             if (found_sep) {
-                return make_tuple(bytes(begin(), found_sep.begin()), bytes(found_sep.end(), end()));
+                return make_tuple(slice(begin(), found_sep.begin()), slice(found_sep.end(), end()));
             } else {
-                return make_tuple(*this, bytes());
+                return make_tuple(*this, slice());
             }
         }
 
         /// @copydoc split()
-        tuple<bytes, bytes> split(const char separator) const noexcept {
-            return split(bytes(&separator, 1));
+        tuple<slice, slice> split(const char separator) const noexcept {
+            return split(slice(&separator, 1));
         }
 
-        /// split bytes at given position (`at` must be within this bytes range)
-        tuple<bytes, bytes> split_at(const char * at) const noexcept {
+        /// split slice at given position (`at` must be within this slice range)
+        tuple<slice, slice> split_at(const char * at) const noexcept {
             debug_assert(at);
             debug_assert(at >= begin() && at < end());
-            return make_tuple(bytes(begin(), at), bytes(at, end()));
+            return make_tuple(slice(begin(), at), slice(at, end()));
         }
 
-        /// split bytes at the given index (`index` must be less than this range length)
-        tuple<bytes, bytes> split_at(const size_t index) const noexcept {
+        /// split slice at the given index (`index` must be less than this range length)
+        tuple<slice, slice> split_at(const size_t index) const noexcept {
             const char * split_pos = nth(index);
             return split_at(split_pos);
         }
 
-        /// create string from this bytes contents
+        /// create string from this slice contents
         string str() const {
             return string(begin(), end());
         }
 
         /**
-         * construct bytes from an ASCII string literal
+         * construct slice from an ASCII string literal
          * @code
-         * bytes b = bytes.from_literal("Some text here");
+         * slice b = slice.from_literal("Some text here");
          * @endcode
-         * @note resulting bytes will not include leading zero char
+         * @note resulting slice will not include leading zero char
          */
         template <size_t N>
-        static constexpr bytes from_literal(const char (&literal)[N]) {
-            return bytes(literal, N-1); // leave out '\0' terminator
+        static constexpr slice from_literal(const char (&literal)[N]) {
+            return slice(literal, N-1); // leave out '\0' terminator
         }
 
     private:
@@ -195,4 +195,4 @@ namespace cachelot {
 
 } // namespace cachelot
 
-#endif // CACHELOT_BYTES_H_INCLUDED
+#endif // CACHELOT_SLICE_H_INCLUDED

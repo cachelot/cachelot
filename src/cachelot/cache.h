@@ -70,7 +70,7 @@ namespace cachelot {
         class ItemDictEntry {
         public:
             ItemDictEntry() = default;
-            explicit constexpr ItemDictEntry(const bytes &, const ItemPtr & the_item) noexcept : m_item(the_item) {}
+            explicit constexpr ItemDictEntry(const slice &, const ItemPtr & the_item) noexcept : m_item(the_item) {}
             constexpr ItemDictEntry(ItemDictEntry &&) noexcept = default;
             ItemDictEntry & operator=(ItemDictEntry &&) noexcept = default;
 
@@ -79,7 +79,7 @@ namespace cachelot {
             ItemDictEntry & operator=(const ItemDictEntry &) = delete;
 
             // key getter
-            const bytes key() const noexcept {
+            const slice key() const noexcept {
                 debug_assert(m_item);
                 return m_item->key();
             }
@@ -124,7 +124,7 @@ namespace cachelot {
          */
         class Cache {
            // Underlying dictionary
-            typedef dict<bytes, ItemPtr, std::equal_to<bytes>, ItemDictEntry, DictOptions> dict_type;
+            typedef dict<slice, ItemPtr, std::equal_to<slice>, ItemDictEntry, DictOptions> dict_type;
             typedef dict_type::iterator iterator;
         public:
             typedef dict_type::hash_type hash_type;
@@ -153,7 +153,7 @@ namespace cachelot {
              * @return pointer to the Item or `nullptr` if none was found
              * @warning pointer is only valid *until* the next cache API call
              */
-            ItemPtr do_get(const bytes key, const hash_type hash) noexcept;
+            ItemPtr do_get(const slice key, const hash_type hash) noexcept;
 
 
             /**
@@ -221,12 +221,12 @@ namespace cachelot {
             /**
              * `delete` - delete existing item
              */
-            Response do_delete(const bytes key, const hash_type hash) noexcept;
+            Response do_delete(const slice key, const hash_type hash) noexcept;
 
             /**
              * `touch` - validate item and prolong its lifetime
              */
-            Response do_touch(const bytes key, const hash_type hash, seconds keepalive) noexcept;
+            Response do_touch(const slice key, const hash_type hash, seconds keepalive) noexcept;
 
             /**
              * `flush_all` - invalidate every item in the cache (remove expired items)
@@ -239,26 +239,26 @@ namespace cachelot {
              * Decrement operation handle underflow and set value to zero if `delta` is greater than item value
              * Owerflow in `incr` command is hardware-dependent integer overflow
              */
-            tuple<Response, uint64> do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta);
+            tuple<Response, uint64> do_arithmetic(Command cmd, const slice key, const hash_type hash, uint64 delta);
 
             /**
              * `incr` - increment counter
              */
-             tuple<Response, uint64> do_incr(const bytes key, const hash_type hash, uint64 delta) {
+             tuple<Response, uint64> do_incr(const slice key, const hash_type hash, uint64 delta) {
                 return do_arithmetic(INCR, key, hash, delta);
              }
 
             /**
              * `decr` - decrement counter
              */
-             tuple<Response, uint64> do_decr(const bytes key, const hash_type hash, uint64 delta) {
+             tuple<Response, uint64> do_decr(const slice key, const hash_type hash, uint64 delta) {
                 return do_arithmetic(DECR, key, hash, delta);
              }
 
             /**
              * Create new Item from the pre-allocated memory arena
              */
-            ItemPtr create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds keepalive);
+            ItemPtr create_item(const slice key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds keepalive);
 
             /**
              * Free existing Item and return the memory
@@ -289,7 +289,7 @@ namespace cachelot {
              * retrieve item from cache taking in account its expiration time,
              * expired items will be immediately removed and retrieve_item() will report that item was not found
              */
-            tuple<bool, dict_type::iterator> retrieve_item(const bytes key, const hash_type hash, bool readonly = false);
+            tuple<bool, dict_type::iterator> retrieve_item(const slice key, const hash_type hash, bool readonly = false);
 
         private:
             memalloc m_allocator;
@@ -317,7 +317,7 @@ namespace cachelot {
         }
 
 
-        inline tuple<bool, Cache::dict_type::iterator> Cache::retrieve_item(const bytes key, const hash_type hash, bool readonly) {
+        inline tuple<bool, Cache::dict_type::iterator> Cache::retrieve_item(const slice key, const hash_type hash, bool readonly) {
             bool found; iterator at;
             tie(found, at) = m_dict.entry_for(key, hash, readonly);
             if (found) {
@@ -335,7 +335,7 @@ namespace cachelot {
         }
 
 
-        inline ItemPtr Cache::do_get(const bytes key, const hash_type hash) noexcept {
+        inline ItemPtr Cache::do_get(const slice key, const hash_type hash) noexcept {
             STAT_INCR(cache.cmd_get, 1);
             // try to retrieve existing item
             bool found; iterator at; bool readonly = true;
@@ -462,7 +462,7 @@ namespace cachelot {
         }
 
 
-        inline Response Cache::do_delete(const bytes key, const hash_type hash) noexcept {
+        inline Response Cache::do_delete(const slice key, const hash_type hash) noexcept {
             STAT_INCR(cache.cmd_delete, 1);
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
@@ -480,7 +480,7 @@ namespace cachelot {
         }
 
 
-        inline Response Cache::do_touch(const bytes key, const hash_type hash, seconds expires) noexcept {
+        inline Response Cache::do_touch(const slice key, const hash_type hash, seconds expires) noexcept {
             STAT_INCR(cache.cmd_touch, 1);
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
@@ -510,7 +510,7 @@ namespace cachelot {
         }
 
 
-        inline tuple<Response, uint64> Cache::do_arithmetic(Command cmd, const bytes key, const hash_type hash, uint64 delta) {
+        inline tuple<Response, uint64> Cache::do_arithmetic(Command cmd, const slice key, const hash_type hash, uint64 delta) {
             if (cmd == INCR) {
                 STAT_INCR(cache.cmd_incr, 1);
             } else {
@@ -549,13 +549,13 @@ namespace cachelot {
             ItemPtr new_item;
             seconds new_keepalive = old_item->expiration_time() == expiration_time_point::max() ? keepalive_forever : old_item->expiration_time() - clock::now();
             new_item = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), new_keepalive);
-            new_item->assign_value(bytes(new_ascii_value, new_ascii_value_length));
+            new_item->assign_value(slice(new_ascii_value, new_ascii_value_length));
             replace_item_at(at, new_item);
             return make_tuple(STORED, new_int_value);
         }
 
 
-        inline ItemPtr Cache::create_item(const bytes key, const hash_type hash, uint32 value_length, opaque_flags_type flags, cache::seconds keepalive) {
+        inline ItemPtr Cache::create_item(const slice key, const hash_type hash, uint32 value_length, opaque_flags_type flags, cache::seconds keepalive) {
             void * memory;
             const size_t size_required = Item::CalcSizeRequired(key, value_length);
             static const auto on_delete = [=](void * ptr) noexcept -> void {

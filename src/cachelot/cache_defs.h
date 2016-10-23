@@ -8,8 +8,8 @@
 //  see LICENSE file
 
 
-#ifndef CACHELOT_BYTES_H_INCLUDED
-#  include <cachelot/bytes.h>
+#ifndef CACHELOT_SLICE_H_INCLUDED
+#  include <cachelot/slice.h>
 #endif
 
 
@@ -75,14 +75,14 @@ namespace cachelot {
         };
 
 
-#define CACHE_RESPONSES_ENUM_STRELEMENT(resp) bytes::from_literal(CACHELOT_PP_STR(resp)),
-        constexpr bytes __AsciiResponses[] = {
+#define CACHE_RESPONSES_ENUM_STRELEMENT(resp) slice::from_literal(CACHELOT_PP_STR(resp)),
+        constexpr slice __AsciiResponses[] = {
             CACHE_RESPONSES_ENUM(CACHE_RESPONSES_ENUM_STRELEMENT)
         };
 #undef CACHE_RESPONSES_ENUM_STRELEMENT
 
         /// Convert cache response from the Enum type to the ASCII string (without zero terminator)
-        constexpr bytes AsciiResponse(Response r) noexcept {
+        constexpr slice AsciiResponse(Response r) noexcept {
             return __AsciiResponses[static_cast<unsigned>(r)];
         }
 

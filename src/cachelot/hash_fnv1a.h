@@ -8,7 +8,7 @@
 //  see LICENSE file
 
 
-#include <cachelot/bytes.h>
+#include <cachelot/slice.h>
 
 namespace cachelot {
 
@@ -25,7 +25,7 @@ namespace cachelot {
             /// @}
 
             /// operator() produces hash value
-            hash_type operator()(const bytes data) const noexcept {
+            hash_type operator()(const slice data) const noexcept {
                 hash_type checksum = Seed;
                 for (uint8 one_byte : data) {
                     checksum = (checksum ^ one_byte) * Prime;

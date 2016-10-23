@@ -8,8 +8,8 @@
 //  see LICENSE file
 
 
-#ifndef CACHELOT_BYTES_H_INCLUDED
-#  include <cachelot/bytes.h>
+#ifndef CACHELOT_SLICE_H_INCLUDED
+#  include <cachelot/slice.h>
 #endif
 
 namespace cachelot {
@@ -30,13 +30,13 @@ namespace cachelot {
      * read and write operation consist of two phases:
      *
      * read:
-     *  - get size in bytes of non_read data with non_read()
+     *  - get size in slice of non_read data with non_read()
      *  - get pointer to the beginning of unread data with begin_read()
-     *  - mark N bytes as read by calling confirm_read()
+     *  - mark N slice as read by calling confirm_read()
      *
      * write:
      *  - get write pointer in buffer by calling begin_write() and
-     *  - mark N bytes as filled by calling confirm_write()
+     *  - mark N slice as filled by calling confirm_write()
      */
     class io_buffer {
         enum class internal_write_savepoint_type : size_t { __DUMMY__ };
@@ -65,10 +65,10 @@ namespace cachelot {
         /// total buffer capacity
         size_t capacity() const noexcept { return m_capacity; }
 
-        /// number of written bytes
+        /// number of written slice
         size_t size() const noexcept { return m_write_pos; }
 
-        /// nuber of non-read bytes
+        /// nuber of non-read slice
         size_t non_read() const noexcept {
             debug_assert(m_write_pos >= m_read_pos);
             return m_write_pos - m_read_pos;
@@ -81,9 +81,9 @@ namespace cachelot {
         }
 
         /// mark `num_bytes` as read
-        bytes confirm_read(const size_t num_bytes) noexcept {
+        slice confirm_read(const size_t num_bytes) noexcept {
             debug_assert((m_read_pos + num_bytes) <= m_write_pos);
-            bytes result(m_data + m_read_pos, num_bytes);
+            slice result(m_data + m_read_pos, num_bytes);
             m_read_pos += num_bytes;
             return result;
         }
@@ -93,7 +93,7 @@ namespace cachelot {
             return static_cast<read_savepoint_type>(m_read_pos);
         }
 
-        /// make bytes unred again up to `savepoint`
+        /// make slice unred again up to `savepoint`
         void rollback_read_transaction(const read_savepoint_type savepoint) noexcept {
             debug_assert(static_cast<size_t>(savepoint) <= m_read_pos);
             m_read_pos = static_cast<size_t>(savepoint);
@@ -101,21 +101,21 @@ namespace cachelot {
         }
 
         /// read all the non-read data
-        bytes read_all() noexcept {
+        slice read_all() noexcept {
             return confirm_read(non_read());
         }
 
-        /// search for `terminator` and return bytes ending on `terminator` on success or empty bytes otherwise
-        bytes try_read_until(const bytes terminator) noexcept {
+        /// search for `terminator` and return slice ending on `terminator` on success or empty slice otherwise
+        slice try_read_until(const slice terminator) noexcept {
             debug_assert(terminator); debug_assert(m_read_pos <= m_write_pos);
-            bytes search_range(m_data + m_read_pos, non_read());
-            const bytes found = search_range.search(terminator);
+            slice search_range(m_data + m_read_pos, non_read());
+            const slice found = search_range.search(terminator);
             if (found) {
-                bytes result(search_range.begin(), found.end());
+                slice result(search_range.begin(), found.end());
                 confirm_read(result.length());
                 return result;
             }
-            return bytes();
+            return slice();
         }
 
         /// positinon in buffer to write to
@@ -143,7 +143,7 @@ namespace cachelot {
             debug_assert(m_write_pos >= m_read_pos);
         }
 
-        /// number of unfilled bytes in buffer
+        /// number of unfilled slice in buffer
         size_t available() const noexcept { return m_capacity - m_write_pos; }
 
         /// forgert reading and writing pos
@@ -152,7 +152,7 @@ namespace cachelot {
             m_write_pos = 0u;
         }
 
-        /// ensure that buffer is capable to store `at_least` bytes; resize if neccessary
+        /// ensure that buffer is capable to store `at_least` slice; resize if neccessary
         void ensure_capacity(const size_t at_least) {
             debug_assert(at_least > 0);
             if (available() >= at_least) {

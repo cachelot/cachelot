@@ -104,7 +104,7 @@ namespace cachelot {
                 if (recv_buf.non_read() < udp_frame_header_size) {
                     throw system_error(error::udp_header_size);
                 }
-                bytes raw = bytes(recv_buf.begin_read(), udp_frame_header_size);
+                slice raw = slice(recv_buf.begin_read(), udp_frame_header_size);
                 recv_buf.confirm_read(udp_frame_header_size);
 
                 uint16 sequence_no = ntohs(*reinterpret_cast<const uint16 *>(raw.begin() + sizeof(uint16) * 1));

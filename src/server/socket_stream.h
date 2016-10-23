@@ -145,7 +145,7 @@ namespace cachelot { namespace net {
         auto self = this->shared_from_this();
         m_socket.async_read_some(asio::buffer(m_recv_buf.begin_write(), m_recv_buf.available()),
             [=](const error_code error, const size_t bytes_received) {
-                bytes receive_result;
+                slice receive_result;
                 if (not error) {
                     self->m_recv_buf.confirm_write(bytes_received);
                     ConversationReply reply = handle_data(m_recv_buf, m_send_buf);

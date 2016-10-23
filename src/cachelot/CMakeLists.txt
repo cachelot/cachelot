@@ -3,7 +3,7 @@
 
 set (CACHELOT_SOURCES
     bits.h
-    bytes.h
+    slice.h
     cache.cpp
     cache.h
     cache_defs.h

@@ -8,8 +8,8 @@
 //  see LICENSE file
 
 
-#ifndef CACHELOT_BYTES_H_INCLUDED
-#  include <cachelot/bytes.h>
+#ifndef CACHELOT_SLICE_H_INCLUDED
+#  include <cachelot/slice.h>
 #endif
 #ifndef CACHELOT_ERROR_H_INCLUDED
 #  include <cachelot/error.h>
