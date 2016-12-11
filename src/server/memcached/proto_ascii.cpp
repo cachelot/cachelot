@@ -305,22 +305,32 @@ namespace cachelot {
             new_item->assign_value(value);
             try {
                 auto response = cache::NOT_A_RESPONSE;
+                bool found = false; bool stored = false;
                 switch (cmd) {
                 case cache::SET:
-                    response = cache_api.do_set(new_item);
+                    cache_api.do_set(new_item);
+                    response = cache::STORED;
                     break;
                 case cache::ADD:
-                    response = cache_api.do_add(new_item);
+                    found = cache_api.do_add(new_item);
+                    response = found ? cache::STORED : cache::NOT_STORED;
                     break;
                 case cache::REPLACE:
-                    response = cache_api.do_replace(new_item);
+                    found = cache_api.do_replace(new_item);
+                    response = found ? cache::STORED : cache::NOT_STORED;
                     break;
                 case cache::CAS:
-                    response = cache_api.do_cas(new_item, cas_unique);
+                    tie(found, stored) = cache_api.do_cas(new_item, cas_unique);
+                    if (found) {
+                        response = stored ? cache::STORED : cache::EXISTS;
+                    } else {
+                        response = cache::NOT_FOUND;
+                    }
                     break;
                 case cache::APPEND:
                 case cache::PREPEND:
-                    response = cache_api.do_extend(cmd, new_item);
+                    found = cache_api.do_extend(cmd, new_item);
+                    response = found ? cache::STORED : cache::NOT_STORED;
                     break;
                 default:
                     debug_assert(false);
@@ -341,7 +351,8 @@ namespace cachelot {
         inline net::ConversationReply handle_delete_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
             slice key; tie(key, args) = parse_key(args);
             bool noreply = maybe_noreply(args);
-            auto response = cache_api.do_delete(key, calc_hash(key));
+            bool found = cache_api.do_delete(key, calc_hash(key));
+            auto response = found ? cache::DELETED : cache::NOT_FOUND;
             return reply_with_response(send_buf, response, noreply);
         }
 
@@ -352,15 +363,15 @@ namespace cachelot {
             tie(parsed, args) = args.split(SPACE);
             auto delta = str_to_int<uint64>(parsed.begin(), parsed.end());
             bool noreply = maybe_noreply(args);
-            cache::Response response; uint64 new_value;
-            tie(response, new_value) = cache_api.do_arithmetic(cmd, key, calc_hash(key), delta);
+            bool found; uint64 new_value;
+            tie(found, new_value) = cache_api.do_arithmetic(cmd, key, calc_hash(key), delta);
             if (noreply) {
                 return net::READ_MORE;
             }
-            if (response == cache::STORED) {
+            if (found) {
                 send_buf << new_value << CRLF;
             } else {
-                send_buf << response << CRLF;
+                send_buf << cache::NOT_FOUND << CRLF;
             }
             return net::SEND_REPLY_AND_READ;
         }
@@ -372,7 +383,8 @@ namespace cachelot {
             tie(parsed, args) = args.split(SPACE);
             cache::seconds keep_alive_duration(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.end()));
             bool noreply = maybe_noreply(args);
-            auto response = cache_api.do_touch(key, calc_hash(key), keep_alive_duration);
+            bool found = cache_api.do_touch(key, calc_hash(key), keep_alive_duration);
+            auto response = found ? cache::TOUCHED : cache::NOT_FOUND;
             return reply_with_response(send_buf, response, noreply);
         }
 

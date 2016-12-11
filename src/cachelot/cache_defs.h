@@ -8,18 +8,6 @@
 //  see LICENSE file
 
 
-#ifndef CACHELOT_SLICE_H_INCLUDED
-#  include <cachelot/slice.h>
-#endif
-
-
-namespace cachelot {
-
-    namespace cache {
-
-    /// @addtogroup cache
-    /// @{
-
 #define CACHE_COMMANDS_ENUM(x)  \
         x(ADD)                  \
         x(APPEND)               \
@@ -39,15 +27,20 @@ namespace cachelot {
         x(FLUSH_ALL)            \
         x(UNDEFINED)
 
-        /**
-         * All the supported commands
-         */
-        enum Command {
-#define CACHE_COMMANDS_ELEMENT(cmd) cmd,
-            CACHE_COMMANDS_ENUM(CACHE_COMMANDS_ELEMENT)
-#undef CACHE_COMMANDS_ELEMENT
-        };
 
+/**
+ * @class doxygen_response
+ *
+ * Cache responses to the different commands
+ *
+ * - STORED: indicates Item was stored
+ * - NOT_STORED: indicates Item was *not* stored because conditions for `add` or `replace` haven't met
+ * - EXISTS: indicates that Item beign modified by `cas` command had been modified since last cas fetch
+ * - NOT_FOUND: indicates that Item was left unmodified because it was not found
+ * - DELETED: indicates that Item was deleted by `del` command
+ * - TOUCHED: indicates that Item was modified by the `touch` command
+ * - NOT_A_RESPONSE: is default (invalid) value 
+ */
 
 #define CACHE_RESPONSES_ENUM(x) \
         x(STORED)               \
@@ -58,15 +51,29 @@ namespace cachelot {
         x(TOUCHED)              \
         x(NOT_A_RESPONSE)
 
+#if defined(__cplusplus)
+
+#ifndef CACHELOT_SLICE_H_INCLUDED
+#  include <cachelot/slice.h>
+#endif
+
+namespace cachelot {
+
+    namespace cache {
+
         /**
-         * Cache responces to the different commands
-         *
-         * - STORED: indicates Item was stored
-         * - NOT_STORED: indicates Item was *not* stored because conditions for `add` or `replace` haven't met
-         * - EXISTS: indicates that Item beign modified by `cas` command had been modified since last cas fetch
-         * - NOT_FOUND: indicates that Item was left unmodified because it was not found
-         * - DELETED: indicates that Item was deleted by `del` command
-         * - TOUCHED: indicates that Item was modified by the `touch` command
+         * All the supported commands
+         * @ingroup cache
+         */
+        enum Command {
+#define CACHE_COMMANDS_ELEMENT(cmd) cmd,
+            CACHE_COMMANDS_ENUM(CACHE_COMMANDS_ELEMENT)
+#undef CACHE_COMMANDS_ELEMENT
+        };
+
+        /**
+         * @copydoc doxygen_response
+         * @ingroup cache
          */
         enum Response {
 #define CACHE_RESPONSES_ELEMENT(resp) resp,
@@ -81,14 +88,16 @@ namespace cachelot {
         };
 #undef CACHE_RESPONSES_ENUM_STRELEMENT
 
-        /// Convert cache response from the Enum type to the ASCII string (without zero terminator)
+        /**
+         * Convert cache response from the Enum type to the char slice (no zero terminator)
+         * @ingroup cache
+         */
         constexpr slice AsciiResponse(Response r) noexcept {
             return __AsciiResponses[static_cast<unsigned>(r)];
         }
 
-/// @}
-
 }} // namespace cachelot::cache
 
+#endif // defined(__cplusplus)
 
 #endif // CACHELOT_CACHE_DEFS_H_INCLUDED
