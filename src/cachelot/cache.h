@@ -38,6 +38,7 @@ namespace cachelot {
     namespace cache {
         /// Pointer to single cache Item
         typedef Item * ItemPtr;
+        typedef const Item * ConstItemPtr;
 
         /// Hash value type
         typedef Item::hash_type hash_type;
@@ -131,25 +132,30 @@ namespace cachelot {
             enum class ArithmeticOperation { INCR, DECR };
             /// APPEND/PREPEND
             enum class ExtendOperation { APPEND, PREPEND };
+
+            // Private constructor
+            explicit Cache(size_t memory_limit, uint32 mem_page_size, dict_type::size_type initial_dict_size, bool enable_evictions);
         public:
             typedef dict_type::hash_type hash_type;
             typedef dict_type::size_type size_type;
         public:
             /**
-             * constructor
+             * static constructor function
              *
              * @param memory_limit - amount of memory available for storage use
              * @param mem_page_size - size of the allocator memory page
              * @param initial_dict_size - number of reserved items in dictionary
              * @param enable_evictions - evict existing items in order to store new ones
+             * @note may throw exception
              */
-            explicit Cache(size_t memory_limit, uint32 mem_page_size, dict_type::size_type initial_dict_size, bool enable_evictions);
+            static Cache Create(size_t memory_limit, size_t mem_page_size, size_t initial_dict_size, bool enable_evictions);
 
 
             /**
              * destructor
              */
             ~Cache();
+
 
             /**
              * Move constructor
@@ -163,7 +169,7 @@ namespace cachelot {
              * @return pointer to the Item or `nullptr` if none was found
              * @warning pointer is only valid *until* the next cache API call
              */
-            ItemPtr do_get(const slice key, const hash_type hash) noexcept;
+            ConstItemPtr do_get(const slice key, const hash_type hash) noexcept;
 
             /**
              * `set` - store item unconditionally
@@ -316,6 +322,32 @@ namespace cachelot {
         };
 
 
+        inline Cache Cache::Create(size_t memory_limit, size_t mem_page_size, size_t initial_dict_size, bool enable_evictions) {
+            if (not ispow2(memory_limit)) {
+                throw std::invalid_argument("memory_limit must be power of 2");
+            }
+            if (memory_limit < (mem_page_size * 4)) {
+                throw std::invalid_argument("memory_limit should be enough for at least 4 pages");
+            }
+            if (not ispow2(mem_page_size)) {
+                throw std::invalid_argument("mem_page_size must be power of 2");
+            }
+            if (mem_page_size > std::numeric_limits<uint32>::max()) {
+                throw std::invalid_argument("mem_page_size is too big");
+            }
+            if (not ispow2(initial_dict_size)) {
+                throw std::invalid_argument("initial_dict_size must be power of 2");
+            }
+            if (initial_dict_size > std::numeric_limits<dict_type::size_type>::max()) {
+                throw std::invalid_argument("initial_dict_size is too big");
+            }
+            if (memory_limit % mem_page_size != 0) {
+                throw std::invalid_argument("memory_limit divide by mem_page_size should be integer");
+            }
+            return Cache(memory_limit, mem_page_size, initial_dict_size, enable_evictions);
+        }
+
+
         inline Cache::Cache(size_t memory_limit, uint32 mem_page_size, dict_type::size_type initial_dict_size, bool enable_evictions)
             : m_allocator(memory_limit, mem_page_size)
             , m_dict(initial_dict_size)
@@ -351,7 +383,7 @@ namespace cachelot {
         }
 
 
-        inline ItemPtr Cache::do_get(const slice key, const hash_type hash) noexcept {
+        inline ConstItemPtr Cache::do_get(const slice key, const hash_type hash) noexcept {
             STAT_INCR(cache.cmd_get, 1);
             // try to retrieve existing item
             bool found; iterator at; bool readonly = true;
@@ -492,14 +524,14 @@ namespace cachelot {
         }
 
 
-        inline bool Cache::do_touch(const slice key, const hash_type hash, seconds expires) noexcept {
+        inline bool Cache::do_touch(const slice key, const hash_type hash, seconds keepalive) noexcept {
             STAT_INCR(cache.cmd_touch, 1);
             bool found; iterator at; const bool readonly = true;
             tie(found, at) = retrieve_item(key, hash, readonly);
             if (found) {
                 auto item = at.value();
                 m_allocator.touch(item); // mark item as recent in LRU list
-                item->set_ttl(expires); // update lifetime
+                item->set_ttl(keepalive); // update lifetime
                 STAT_INCR(cache.touch_hits, 1);
                 return true;
             } else {
@@ -567,7 +599,7 @@ namespace cachelot {
         }
 
 
-        inline ItemPtr Cache::create_item(const slice key, const hash_type hash, size_t value_length, opaque_flags_type flags, cache::seconds keepalive) {
+        inline ItemPtr Cache::create_item(const slice key, const hash_type hash, size_t value_length, opaque_flags_type flags, seconds keepalive) {
             void * memory;
             if (key.length() > Item::max_key_length) {
                 throw system_error(error::key_too_long);

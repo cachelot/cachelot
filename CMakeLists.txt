@@ -165,4 +165,6 @@ add_subdirectory (src/server)
 add_subdirectory (src/unit_test)
 # - - - Benchmarks - - - - - - - - - -
 add_subdirectory (src/benchmark)
+# - - - C API test - - - - - - - - - -
+add_subdirectory (src/test_c_api)
 

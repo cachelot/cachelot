@@ -25,6 +25,8 @@ set (CACHELOT_SOURCES
     stats.h
     string_conv.h
     version.h
+    c_api.h
+    c_api.cpp
 )
 
 add_library (cachelot STATIC ${CACHELOT_SOURCES})

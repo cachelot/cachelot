@@ -50,7 +50,7 @@ typedef array_type::const_iterator iterator;
 
 class CacheWrapper {
 public:
-    CacheWrapper() : m_cache(cache_memory, page_size, hash_initial, true) {}
+    CacheWrapper() : m_cache(cache::Cache::Create(cache_memory, page_size, hash_initial, true)) {}
 
     void set(iterator it) {
         slice k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
