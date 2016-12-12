@@ -9,7 +9,7 @@
 
 
 #ifndef CACHELOT_CACHE_DEFS_H_INCLUDED
-#  include <cachelot/cache_defs.h>
+//#  include <cachelot/cache_defs.h>
 #endif
 #ifndef CACHELOT_MEMALLOC_H_INCLUDED
 #  include <cachelot/memalloc.h>
@@ -133,6 +133,10 @@ namespace cachelot {
            // Underlying dictionary
             typedef dict<slice, ItemPtr, std::equal_to<slice>, ItemDictEntry, DictOptions> dict_type;
             typedef dict_type::iterator iterator;
+            /// INC/DEC
+            enum class ArithmeticOperation { INCR, DECR };
+            /// APPEND/PREPEND
+            enum class ExtendOperation { APPEND, PREPEND };
         public:
             typedef dict_type::hash_type hash_type;
             typedef dict_type::size_type size_type;
@@ -161,20 +165,6 @@ namespace cachelot {
              * @warning pointer is only valid *until* the next cache API call
              */
             ItemPtr do_get(const slice key, const hash_type hash) noexcept;
-
-
-            /**
-             * @class doxygen_store_command
-             *
-             * @return Response: one of a possible cache responses
-             * - `STORED` - Item was successfully stored
-             * - `NOT_STORED` - Item was not stored because conditions of `add` or `replace` were not met
-             * - `EXISTS` - Indicates that outdated Item was provided for the `cas` operation
-             * - `NOT_FOUND` - Item was *not* found during `delete` / `cas` / `append` / `prepend` / `touch` / `inc` / `dec`
-             * - `DELETED` - Item was deleted by `delete` operation
-             * - `TOUCHED` - Item expiration time was modified by `touch`
-             */
-
 
             /**
              * `set` - store item unconditionally
@@ -211,22 +201,13 @@ namespace cachelot {
             tuple<bool, bool> do_cas(ItemPtr item, timestamp_type cas_unique);
 
             /**
-             * Extend (`prepend` or `append`) existing item with the new data
-             *
-             * @return 
-             * - `true` - item was stored
-             * - `false` - no such key
-             */
-            bool do_extend(Command cmd, ItemPtr item);
-
-            /**
              * `append` - append the data of the existing item
              *
              * @return 
              * - `true` - item was stored
              * - `false` - no such key
              */
-            bool do_append(ItemPtr item) { return do_extend(APPEND, item); }
+            bool do_append(ItemPtr item) { return do_extend(ExtendOperation::APPEND, item); }
 
             /**
              * `prepend` - prepend the data of the existing item
@@ -235,7 +216,7 @@ namespace cachelot {
              * - `true` - item was stored
              * - `false` - no such key
              */
-            bool do_prepend(ItemPtr item) { return do_extend(PREPEND, item); }
+            bool do_prepend(ItemPtr item) { return do_extend(ExtendOperation::PREPEND, item); }
 
             /**
              * `delete` - delete existing item
@@ -261,31 +242,27 @@ namespace cachelot {
             void do_flush_all() noexcept;
 
             /**
-             * `incr` or `decr` value by `delta`
-             * On arithmetic operations value is treaten as an decimal ASCII encoded unsigned 64-bit integer
-             * Decrement operation handle underflow and set value to zero if `delta` is greater than item value
-             * Owerflow in `incr` command is hardware-dependent integer overflow
+             * `incr` - increment counter by its `key`
              *
-             * @return tuple<found, new_value>
-             */
-            tuple<bool, uint64> do_arithmetic(Command cmd, const slice key, const hash_type hash, uint64 delta);
-
-            /**
-             * `incr` - increment counter
+             * value is taken as ASCII encoded unsigned 64-bit integer
+             * If overflow happens, value will be set to int64_max
              *
              * @return tuple<found, new_value>
              */
             tuple<bool, uint64> do_incr(const slice key, const hash_type hash, uint64 delta) {
-                return do_arithmetic(INCR, key, hash, delta);
+                return do_arithmetic(ArithmeticOperation::INCR, key, hash, delta);
             }
 
             /**
-             * `decr` - decrement counter
+             * `decr` - decrement counter by its `key`
+             *
+             * value is taken as ASCII encoded unsigned 64-bit integer
+             * Decrement operation handle underflow and set value to zero if `delta` is greater than item value
              *
              * @return tuple<found, new_value>
              */
             tuple<bool, uint64> do_decr(const slice key, const hash_type hash, uint64 delta) {
-                return do_arithmetic(DECR, key, hash, delta);
+                return do_arithmetic(ArithmeticOperation::DECR, key, hash, delta);
             }
 
             /**
@@ -305,7 +282,23 @@ namespace cachelot {
 
         private:
             /**
-             * utility function to create point in time from duration in seconds
+             * Extend (`prepend` or `append`) existing item with the new data
+             *
+             * @return 
+             * - `true` - item was stored
+             * - `false` - no such key
+             */
+            bool do_extend(ExtendOperation op, ItemPtr item);
+
+            /**
+             * Make one of the ArithmeticOperation
+             *
+             * @return tuple<found, new_value>
+             */
+            tuple<bool, uint64> do_arithmetic(ArithmeticOperation op, const slice key, const hash_type hash, uint64 delta);
+
+            /**
+             * Utility function to create point in time from duration in seconds
              */
             static expiration_time_point time_from(seconds expire_after) {
                 // TODO: !Important check that duration will not overflow
@@ -319,7 +312,7 @@ namespace cachelot {
             void replace_item_at(const iterator at, ItemPtr new_item) noexcept;
 
             /**
-             * retrieve item from cache taking in account its expiration time,
+             * Retrieve item from cache taking in account its expiration time;
              * expired items will be immediately removed and retrieve_item() will report that item was not found
              */
             tuple<bool, dict_type::iterator> retrieve_item(const slice key, const hash_type hash, bool readonly = false);
@@ -450,11 +443,11 @@ namespace cachelot {
         }
 
 
-        inline bool Cache::do_extend(Command cmd, ItemPtr piece) {
-            if (cmd == APPEND) {
+        inline bool Cache::do_extend(ExtendOperation op, ItemPtr piece) {
+            if (op == ExtendOperation::APPEND) {
                 STAT_INCR(cache.cmd_append, 1);
             } else {
-                debug_assert(cmd == PREPEND);
+                debug_assert(op == ExtendOperation::PREPEND);
                 STAT_INCR(cache.cmd_prepend, 1);
             }
             bool found; iterator at;
@@ -466,11 +459,11 @@ namespace cachelot {
                 auto memory = m_allocator.alloc_or_evict(Item::CalcSizeRequired(old_item->key(), new_value_size), false, [=](void *){});
                 if (memory != nullptr) {
                     auto new_item = new (memory) Item(old_item->key(), old_item->hash(), new_value_size, old_item->opaque_flags(), old_item->expiration_time(), old_item->timestamp() + 1);
-                    if (cmd == APPEND) {
+                    if (op == ExtendOperation::APPEND) {
                         new_item->assign_compose(old_item->value(), piece->value());
                         STAT_INCR(cache.append_stored, 1);
                     } else {
-                        debug_assert(cmd == PREPEND);
+                        debug_assert(op == ExtendOperation::PREPEND);
                         new_item->assign_compose(piece->value(), old_item->value());
                         STAT_INCR(cache.prepend_stored, 1);
                     }
@@ -480,10 +473,10 @@ namespace cachelot {
                     throw system_error(error::out_of_memory);
                 }
             } else {
-                if (cmd == APPEND) {
+                if (op == ExtendOperation::APPEND) {
                     STAT_INCR(cache.append_misses, 1);
                 } else {
-                    debug_assert(cmd == PREPEND);
+                    debug_assert(op == ExtendOperation::PREPEND);
                     STAT_INCR(cache.prepend_misses, 1);
                 }
             }
@@ -539,20 +532,20 @@ namespace cachelot {
         }
 
 
-        inline tuple<bool, uint64> Cache::do_arithmetic(Command cmd, const slice key, const hash_type hash, uint64 delta) {
-            if (cmd == INCR) {
+        inline tuple<bool, uint64> Cache::do_arithmetic(ArithmeticOperation op, const slice key, const hash_type hash, uint64 delta) {
+            if (op == ArithmeticOperation::INCR) {
                 STAT_INCR(cache.cmd_incr, 1);
             } else {
-                debug_assert(cmd == DECR);
+                debug_assert(op == ArithmeticOperation::DECR);
                 STAT_INCR(cache.cmd_decr, 1);
             }
             bool found; iterator at;
             tie(found, at) = retrieve_item(key, hash);
             if (not found) {
-                if (cmd == INCR) {
+                if (op == ArithmeticOperation::INCR) {
                     STAT_INCR(cache.incr_misses, 1);
                 } else {
-                    debug_assert(cmd == DECR);
+                    debug_assert(op == ArithmeticOperation::DECR);
                     STAT_INCR(cache.decr_misses, 1);
                 }
                 return make_tuple(false, 0ull);
@@ -563,11 +556,12 @@ namespace cachelot {
             auto old_int_value = str_to_int<uint64>(old_ascii_value.begin(), old_ascii_value.end());
             // process arithmetic command
             uint64 new_int_value = 0;
-            if (cmd == INCR) {
-                new_int_value = old_int_value + delta;
+            if (op == ArithmeticOperation::INCR) {
+                constexpr auto max = std::numeric_limits<uint64>::max();
+                new_int_value = (max - old_int_value >= delta) ? old_int_value + delta : max;
                 STAT_INCR(cache.incr_hits, 1);
             } else {
-                debug_assert(cmd == DECR);
+                debug_assert(op == ArithmeticOperation::DECR);
                 new_int_value = (old_int_value >= delta) ? old_int_value - delta : 0;
                 STAT_INCR(cache.decr_hits, 1);
             }

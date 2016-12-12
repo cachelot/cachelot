@@ -21,34 +21,34 @@ namespace cachelot {
         constexpr slice SERVER_ERROR = slice::from_literal("SERVER_ERROR"); ///< internal server error
 
         /// Handle on of the `get` `gets` commands
-        net::ConversationReply handle_retrieval_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_retrieval_command(Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle on of the: `add`, `set`, `replace`, `cas`, `append`, `prepend` commands
-        net::ConversationReply handle_storage_command(cache::Command cmd, slice args, io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_storage_command(Command cmd, slice args, io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `delete` command
-        net::ConversationReply handle_delete_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_delete_command(Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle on of the: `incr` `decr` commands
-        net::ConversationReply handle_arithmetic_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_arithmetic_command(Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `touch` command
-        net::ConversationReply handle_touch_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_touch_command(Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `stats` command
-        net::ConversationReply handle_statistics_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_statistics_command(Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `version` command
-        net::ConversationReply handle_version_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_version_command(Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Handle the `flush` command
-        net::ConversationReply handle_flush_all_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
+        net::ConversationReply handle_flush_all_command(Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api);
 
         /// Write one of the cache responses if `noreply` is not specified, none otherwise
-        net::ConversationReply reply_with_response(io_buffer & send_buf, cache::Response response, bool noreply);
+        net::ConversationReply reply_with_response(io_buffer & send_buf, Response response, bool noreply);
 
         /// Parse the name of the `command`
-        cache::Command parse_command_name(slice command) noexcept;
+        Command parse_command_name(slice command) noexcept;
 
         /// Read key value from the arguments sequence
         /// @return the key and rest of the args
@@ -96,13 +96,8 @@ namespace cachelot {
 
 
         // Stream operator to serialize cache response as an ascii string
-        inline io_buffer & operator<<(io_buffer & buf, cache::Response resp) {
-            #define CACHE_RESPONSES_ENUM_STRELEMENT(resp) slice::from_literal(CACHELOT_PP_STR(resp)),
-            constexpr slice __AsciiResponses[] = {
-                CACHE_RESPONSES_ENUM(CACHE_RESPONSES_ENUM_STRELEMENT)
-            };
-            #undef CACHE_RESPONSES_ENUM_STRELEMENT
-            return buf << __AsciiResponses[static_cast<unsigned>(resp)];
+        inline io_buffer & operator<<(io_buffer & buf, Response resp) {
+            return buf << AsciiResponse(resp);
         }
 
 
@@ -146,44 +141,44 @@ namespace cachelot {
                 // process the command
                 switch (command) {
                 // retrieval command
-                case cache::GET:
-                case cache::GETS:
+                case Command::GET:
+                case Command::GETS:
                     reply = handle_retrieval_command(command, args, send_buf, cache_api);
                     break;
                 // storage command
-                case cache::ADD:
-                case cache::APPEND:
-                case cache::CAS:
-                case cache::PREPEND:
-                case cache::REPLACE:
-                case cache::SET:
+                case Command::ADD:
+                case Command::APPEND:
+                case Command::CAS:
+                case Command::PREPEND:
+                case Command::REPLACE:
+                case Command::SET:
                     reply = handle_storage_command(command, args, recv_buf, send_buf, cache_api);
                     break;
                 // delete
-                case cache::DELETE:
+                case Command::DELETE:
                     reply = handle_delete_command(command, args, send_buf, cache_api);
                     break;
                 // arithmetic
-                case cache::INCR:
-                case cache::DECR:
+                case Command::INCR:
+                case Command::DECR:
                     reply = handle_arithmetic_command(command, args, send_buf, cache_api);
                     break;
                 // touch
-                case cache::TOUCH:
+                case Command::TOUCH:
                     reply = handle_touch_command(command, args, send_buf, cache_api);
                     break;
                 // statistics retrieval
-                case cache::STATS:
+                case Command::STATS:
                     reply = handle_statistics_command(command, args, send_buf, cache_api);
                     break;
-                case cache::VERSION:
+                case Command::VERSION:
                     reply = handle_version_command(command, args, send_buf, cache_api);
                     break;
-                case cache::FLUSH_ALL:
+                case Command::FLUSH_ALL:
                     reply = handle_flush_all_command(command, args, send_buf, cache_api);
                     break;
                 // terminate session
-                case cache::QUIT:
+                case Command::QUIT:
                     return net::CLOSE_IMMEDIATELY;
                 // unknown command
                 default:
@@ -252,13 +247,13 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_retrieval_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
+        inline net::ConversationReply handle_retrieval_command(Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
             do {
                 slice key; tie(key, args) = parse_key(args);
                 auto i = cache_api.do_get(key, calc_hash(key));
                 if (i) {
                     send_buf << VALUE << SPACE << i->key() << SPACE << i->opaque_flags() << SPACE << static_cast<uint32>(i->value().length());
-                    if (cmd == cache::GETS) {
+                    if (cmd == Command::GETS) {
                         send_buf << SPACE << i->timestamp();
                     }
                     send_buf << CRLF << i->value() << CRLF;
@@ -269,7 +264,7 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_storage_command(cache::Command cmd, slice args, io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api) {
+        inline net::ConversationReply handle_storage_command(Command cmd, slice args, io_buffer & recv_buf, io_buffer & send_buf, cache::Cache & cache_api) {
             slice key; tie(key, args) = parse_key(args);
             slice parsed;
             tie(parsed, args) = args.split(SPACE);
@@ -282,7 +277,7 @@ namespace cachelot {
                 throw system_error(error::value_length);
             }
             cache::timestamp_type cas_unique = 0;
-            if (cmd == cache::CAS) {
+            if (cmd == Command::CAS) {
                 tie(parsed, args) = args.split(SPACE);
                 cas_unique = str_to_int<cache::timestamp_type>(parsed.begin(), parsed.end());
             }
@@ -304,39 +299,42 @@ namespace cachelot {
             auto new_item = cache_api.create_item(key, calc_hash(key), value.length(), flags, keep_alive_duration);
             new_item->assign_value(value);
             try {
-                auto response = cache::NOT_A_RESPONSE;
+                auto response = Response::NOT_A_RESPONSE;
                 bool found = false; bool stored = false;
                 switch (cmd) {
-                case cache::SET:
+                case Command::SET:
                     cache_api.do_set(new_item);
-                    response = cache::STORED;
+                    response = Response::STORED;
                     break;
-                case cache::ADD:
+                case Command::ADD:
                     found = cache_api.do_add(new_item);
-                    response = found ? cache::STORED : cache::NOT_STORED;
+                    response = found ? Response::STORED : Response::NOT_STORED;
                     break;
-                case cache::REPLACE:
+                case Command::REPLACE:
                     found = cache_api.do_replace(new_item);
-                    response = found ? cache::STORED : cache::NOT_STORED;
+                    response = found ? Response::STORED : Response::NOT_STORED;
                     break;
-                case cache::CAS:
+                case Command::CAS:
                     tie(found, stored) = cache_api.do_cas(new_item, cas_unique);
                     if (found) {
-                        response = stored ? cache::STORED : cache::EXISTS;
+                        response = stored ? Response::STORED : Response::EXISTS;
                     } else {
-                        response = cache::NOT_FOUND;
+                        response = Response::NOT_FOUND;
                     }
                     break;
-                case cache::APPEND:
-                case cache::PREPEND:
-                    found = cache_api.do_extend(cmd, new_item);
-                    response = found ? cache::STORED : cache::NOT_STORED;
+                case Command::APPEND:
+                    found = cache_api.do_append(new_item);
+                    response = found ? Response::STORED : Response::NOT_STORED;
+                    break;
+                case Command::PREPEND:
+                    found = cache_api.do_prepend(new_item);
+                    response = found ? Response::STORED : Response::NOT_STORED;
                     break;
                 default:
                     debug_assert(false);
                     throw system_error(error::unknown_error);
                 }
-                if (response != cache::STORED) {
+                if (response != Response::STORED) {
                     // Item was not stored in the cache
                     cache_api.destroy_item(new_item);
                 }
@@ -348,48 +346,52 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_delete_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
+        inline net::ConversationReply handle_delete_command(Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
             slice key; tie(key, args) = parse_key(args);
             bool noreply = maybe_noreply(args);
             bool found = cache_api.do_delete(key, calc_hash(key));
-            auto response = found ? cache::DELETED : cache::NOT_FOUND;
+            auto response = found ? Response::DELETED : Response::NOT_FOUND;
             return reply_with_response(send_buf, response, noreply);
         }
 
 
-        inline net::ConversationReply handle_arithmetic_command(cache::Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
+        inline net::ConversationReply handle_arithmetic_command(Command cmd, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
             slice key; tie(key, args) = parse_key(args);
             slice parsed;
             tie(parsed, args) = args.split(SPACE);
             auto delta = str_to_int<uint64>(parsed.begin(), parsed.end());
             bool noreply = maybe_noreply(args);
             bool found; uint64 new_value;
-            tie(found, new_value) = cache_api.do_arithmetic(cmd, key, calc_hash(key), delta);
+            if (cmd == Command::INCR) {
+                tie(found, new_value) = cache_api.do_incr(key, calc_hash(key), delta);
+            } else {
+                tie(found, new_value) = cache_api.do_decr(key, calc_hash(key), delta);
+            }
             if (noreply) {
                 return net::READ_MORE;
             }
             if (found) {
                 send_buf << new_value << CRLF;
             } else {
-                send_buf << cache::NOT_FOUND << CRLF;
+                send_buf << Response::NOT_FOUND << CRLF;
             }
             return net::SEND_REPLY_AND_READ;
         }
 
 
-        inline net::ConversationReply handle_touch_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
+        inline net::ConversationReply handle_touch_command(Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
             slice key; tie(key, args) = parse_key(args);
             slice parsed;
             tie(parsed, args) = args.split(SPACE);
             cache::seconds keep_alive_duration(str_to_int<cache::seconds::rep>(parsed.begin(), parsed.end()));
             bool noreply = maybe_noreply(args);
             bool found = cache_api.do_touch(key, calc_hash(key), keep_alive_duration);
-            auto response = found ? cache::TOUCHED : cache::NOT_FOUND;
+            auto response = found ? Response::TOUCHED : Response::NOT_FOUND;
             return reply_with_response(send_buf, response, noreply);
         }
 
 
-        inline net::ConversationReply handle_statistics_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
+        inline net::ConversationReply handle_statistics_command(Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
             if (not args.empty()) {
                 throw system_error(error::not_implemented);
             }
@@ -411,7 +413,7 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_version_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache &) {
+        inline net::ConversationReply handle_version_command(Command, slice args, io_buffer & send_buf, cache::Cache &) {
             if (not args.empty()) {
                 throw system_error(error::crlf_expected);
             }
@@ -420,7 +422,7 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply handle_flush_all_command(cache::Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
+        inline net::ConversationReply handle_flush_all_command(Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
             bool noreply = maybe_noreply(args);
             cache_api.do_flush_all();
             if (noreply) {
@@ -431,7 +433,7 @@ namespace cachelot {
         }
 
 
-        inline net::ConversationReply reply_with_response(io_buffer & send_buf, cache::Response response, bool noreply) {
+        inline net::ConversationReply reply_with_response(io_buffer & send_buf, Response response, bool noreply) {
             if (not noreply) {
                 send_buf << response << CRLF;
                 return net::SEND_REPLY_AND_READ;
@@ -441,7 +443,7 @@ namespace cachelot {
         }
 
 
-        inline cache::Command parse_command_name(slice command) noexcept {
+        inline Command parse_command_name(slice command) noexcept {
             static const auto is_3 = [=](const char literal[4], slice cmd) -> bool {  return cmd[1] == literal[1] && cmd[2] == literal[2]; };
             static const auto is_4 = [=](const char literal[5], slice cmd) -> bool {  return is_3(literal, cmd) && cmd[3] == literal[3]; };
             static const auto is_5 = [=](const char literal[6], slice cmd) -> bool {  return is_4(literal, cmd) && cmd[4] == literal[4]; };
@@ -453,46 +455,46 @@ namespace cachelot {
                 switch (command.length()) {
                 case 3:
                     switch (first_char) {
-                    case 'a': return is_3("add", command) ? cache::ADD : cache::UNDEFINED;
-                    case 'c': return is_3("cas", command) ? cache::CAS : cache::UNDEFINED;
-                    case 'g': return is_3("get", command) ? cache::GET : cache::UNDEFINED;
-                    case 's': return is_3("set", command) ? cache::SET : cache::UNDEFINED;
-                    default : return cache::UNDEFINED;
+                    case 'a': return is_3("add", command) ? Command::ADD : Command::UNDEFINED;
+                    case 'c': return is_3("cas", command) ? Command::CAS : Command::UNDEFINED;
+                    case 'g': return is_3("get", command) ? Command::GET : Command::UNDEFINED;
+                    case 's': return is_3("set", command) ? Command::SET : Command::UNDEFINED;
+                    default : return Command::UNDEFINED;
                     }
                 case 4:
                     switch (first_char) {
-                    case 'd': return is_4("decr", command) ? cache::DECR : cache::UNDEFINED;
-                    case 'g': return is_4("gets", command) ? cache::GETS : cache::UNDEFINED;
-                    case 'i': return is_4("incr", command) ? cache::INCR : cache::UNDEFINED;
-                    case 'q': return is_4("quit", command) ? cache::QUIT : cache::UNDEFINED;
-                    default : return cache::UNDEFINED;
+                    case 'd': return is_4("decr", command) ? Command::DECR : Command::UNDEFINED;
+                    case 'g': return is_4("gets", command) ? Command::GETS : Command::UNDEFINED;
+                    case 'i': return is_4("incr", command) ? Command::INCR : Command::UNDEFINED;
+                    case 'q': return is_4("quit", command) ? Command::QUIT : Command::UNDEFINED;
+                    default : return Command::UNDEFINED;
                     }
                 case 5:
                     switch (first_char) {
-                    case 't': return is_5("touch", command) ? cache::TOUCH : cache::UNDEFINED;
-                    case 's': return is_5("stats", command) ? cache::STATS : cache::UNDEFINED;
-                    default : return cache::UNDEFINED;
+                    case 't': return is_5("touch", command) ? Command::TOUCH : Command::UNDEFINED;
+                    case 's': return is_5("stats", command) ? Command::STATS : Command::UNDEFINED;
+                    default : return Command::UNDEFINED;
                     }
                 case 6:
                     switch (first_char) {
-                    case 'a': return is_6("append", command) ? cache::APPEND : cache::UNDEFINED;
-                    case 'd': return is_6("delete", command) ? cache::DELETE : cache::UNDEFINED;
-                    default : return cache::UNDEFINED;
+                    case 'a': return is_6("append", command) ? Command::APPEND : Command::UNDEFINED;
+                    case 'd': return is_6("delete", command) ? Command::DELETE : Command::UNDEFINED;
+                    default : return Command::UNDEFINED;
                     }
                 case 7:
                     switch (first_char) {
-                    case 'p': return is_7("prepend", command) ? cache::PREPEND : cache::UNDEFINED;
-                    case 'r': return is_7("replace", command) ? cache::REPLACE : cache::UNDEFINED;
-                    case 'v': return is_7("version", command) ? cache::VERSION : cache::UNDEFINED;
-                    default : return cache::UNDEFINED;
+                    case 'p': return is_7("prepend", command) ? Command::PREPEND : Command::UNDEFINED;
+                    case 'r': return is_7("replace", command) ? Command::REPLACE : Command::UNDEFINED;
+                    case 'v': return is_7("version", command) ? Command::VERSION : Command::UNDEFINED;
+                    default : return Command::UNDEFINED;
                     }
                 case 9:
-                    return std::strncmp("flush_all", command.begin(), 9) == 0 ? cache::FLUSH_ALL : cache::UNDEFINED;
+                    return std::strncmp("flush_all", command.begin(), 9) == 0 ? Command::FLUSH_ALL : Command::UNDEFINED;
                 default :
-                    return cache::UNDEFINED;
+                    return Command::UNDEFINED;
                 }
             }
-            return cache::UNDEFINED;
+            return Command::UNDEFINED;
         }
 
 

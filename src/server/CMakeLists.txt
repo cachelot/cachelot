@@ -6,6 +6,7 @@ set (CACHELOT_SERVER_SOURCES
         settings.cpp
         settings.h
         memcached/error.h
+        memcached/proto_defs.h
         memcached/proto_ascii.h
         memcached/proto_ascii.cpp
         memcached/proto_binary.h

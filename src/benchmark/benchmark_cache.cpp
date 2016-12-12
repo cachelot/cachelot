@@ -79,11 +79,9 @@ public:
 
     void del(iterator it) {
         slice k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
-        error_code error; cache::Response cache_reply;
         bool found = m_cache.do_delete(k, calc_hash(k));
-        cache_reply = found ? cache::DELETED : cache::NOT_FOUND;
         bench_stats.num_del += 1;
-        auto & counter = (cache_reply == cache::DELETED) ? bench_stats.num_cache_hit : bench_stats.num_cache_miss;
+        auto & counter = found ? bench_stats.num_cache_hit : bench_stats.num_cache_miss;
         counter += 1;
     }
 private:

@@ -160,7 +160,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
     // append
     {
         const auto item1 = CreateItem(the_cache, "Append_Key1", "Value1");
-        BOOST_CHECK_EQUAL(the_cache.do_append(item1), cache::NOT_FOUND);
+        BOOST_CHECK_EQUAL(the_cache.do_append(item1), false);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_append), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,append_stored), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,append_misses), 1);
@@ -174,7 +174,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
     // prepend
     {
         const auto item1 = CreateItem(the_cache, "Prepend_Key1", "Value1");
-        BOOST_CHECK_EQUAL(the_cache.do_prepend(item1), cache::NOT_FOUND);
+        BOOST_CHECK_EQUAL(the_cache.do_prepend(item1), false);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_prepend), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,prepend_stored), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,prepend_misses), 1);
@@ -213,7 +213,7 @@ BOOST_AUTO_TEST_CASE(test_cache_size_stats) {
     BOOST_CHECK_EQUAL(STAT_GET(cache,hash_is_expanding), false);
     for (auto k : keys) {
         auto key = slice(k.c_str(), k.length());
-        BOOST_CHECK_EQUAL(the_cache.do_delete(key, calc_hash(key)), cache::DELETED);
+        BOOST_CHECK_EQUAL(the_cache.do_delete(key, calc_hash(key)), true);
     }
     the_cache.publish_stats();
     BOOST_CHECK_EQUAL(STAT_GET(cache,hash_capacity), 32);

@@ -6,7 +6,6 @@ set (CACHELOT_SOURCES
     slice.h
     cache.cpp
     cache.h
-    cache_defs.h
     common.cpp
     common.h
     debug_trace.h

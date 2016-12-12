@@ -1,5 +1,5 @@
-#ifndef CACHELOT_CACHE_DEFS_H_INCLUDED
-#define CACHELOT_CACHE_DEFS_H_INCLUDED
+#ifndef CACHELOT_MEMCACHED_PROTO_DEFS_H_INCLUDED
+#define CACHELOT_MEMCACHED_PROTO_DEFS_H_INCLUDED
 
 //
 //  (C) Copyright 2015 Iurii Krasnoshchok
@@ -8,7 +8,15 @@
 //  see LICENSE file
 
 
-#define CACHE_COMMANDS_ENUM(x)  \
+
+#ifndef CACHELOT_SLICE_H_INCLUDED
+#  include <cachelot/slice.h>
+#endif
+
+
+namespace cachelot { namespace memcached {
+
+#define MEMCACHED_COMMANDS_ENUM(x)  \
         x(ADD)                  \
         x(APPEND)               \
         x(CAS)                  \
@@ -31,7 +39,7 @@
 /**
  * @class doxygen_response
  *
- * Cache responses to the different commands
+ * Responses to the different commands
  *
  * - STORED: indicates Item was stored
  * - NOT_STORED: indicates Item was *not* stored because conditions for `add` or `replace` haven't met
@@ -39,10 +47,10 @@
  * - NOT_FOUND: indicates that Item was left unmodified because it was not found
  * - DELETED: indicates that Item was deleted by `del` command
  * - TOUCHED: indicates that Item was modified by the `touch` command
- * - NOT_A_RESPONSE: is default (invalid) value 
+ * - NOT_A_RESPONSE: is default (invalid) value
  */
 
-#define CACHE_RESPONSES_ENUM(x) \
+#define MEMCACHED_RESPONSES_ENUM(x) \
         x(STORED)               \
         x(NOT_STORED)           \
         x(EXISTS)               \
@@ -51,53 +59,43 @@
         x(TOUCHED)              \
         x(NOT_A_RESPONSE)
 
-#if defined(__cplusplus)
-
-#ifndef CACHELOT_SLICE_H_INCLUDED
-#  include <cachelot/slice.h>
-#endif
-
-namespace cachelot {
-
-    namespace cache {
 
         /**
          * All the supported commands
-         * @ingroup cache
+         * @ingroup memcached
          */
-        enum Command {
-#define CACHE_COMMANDS_ELEMENT(cmd) cmd,
-            CACHE_COMMANDS_ENUM(CACHE_COMMANDS_ELEMENT)
-#undef CACHE_COMMANDS_ELEMENT
+        enum class Command {
+#define MEMCACHED_COMMANDS_ELEMENT(cmd) cmd,
+            MEMCACHED_COMMANDS_ENUM(MEMCACHED_COMMANDS_ELEMENT)
+#undef MEMCACHED_COMMANDS_ELEMENT
         };
 
         /**
          * @copydoc doxygen_response
-         * @ingroup cache
+         * @ingroup memcached
          */
-        enum Response {
-#define CACHE_RESPONSES_ELEMENT(resp) resp,
-            CACHE_RESPONSES_ENUM(CACHE_RESPONSES_ELEMENT)
-#undef CACHE_RESPONSES_ELEMENT
+        enum class Response {
+#define MEMCACHED_RESPONSES_ELEMENT(resp) resp,
+            MEMCACHED_RESPONSES_ENUM(MEMCACHED_RESPONSES_ELEMENT)
+#undef MEMCACHED_RESPONSES_ELEMENT
         };
 
 
-#define CACHE_RESPONSES_ENUM_STRELEMENT(resp) slice::from_literal(CACHELOT_PP_STR(resp)),
+#define MEMCACHED_RESPONSES_ENUM_STRELEMENT(resp) slice::from_literal(CACHELOT_PP_STR(resp)),
         constexpr slice __AsciiResponses[] = {
-            CACHE_RESPONSES_ENUM(CACHE_RESPONSES_ENUM_STRELEMENT)
+            MEMCACHED_RESPONSES_ENUM(MEMCACHED_RESPONSES_ENUM_STRELEMENT)
         };
-#undef CACHE_RESPONSES_ENUM_STRELEMENT
+#undef MEMCACHED_RESPONSES_ENUM_STRELEMENT
 
         /**
-         * Convert cache response from the Enum type to the char slice (no zero terminator)
-         * @ingroup cache
+         * Convert response from the Enum type to the char slice (no zero terminator)
+         * @ingroup memcached
          */
         constexpr slice AsciiResponse(Response r) noexcept {
             return __AsciiResponses[static_cast<unsigned>(r)];
         }
 
-}} // namespace cachelot::cache
+}} // namespace cachelot::memcached
 
-#endif // defined(__cplusplus)
 
-#endif // CACHELOT_CACHE_DEFS_H_INCLUDED
+#endif // CACHELOT_MEMCACHED_PROTO_DEFS_H_INCLUDED
