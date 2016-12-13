@@ -17,6 +17,7 @@ set (CACHELOT_SOURCES
     hash_table.h
     intrusive_list.h
     item.h
+    item.cpp
     memalloc-inl.h
     memalloc.h
     random.h

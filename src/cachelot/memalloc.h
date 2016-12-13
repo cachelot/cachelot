@@ -64,6 +64,10 @@ namespace cachelot {
         ///                The less page is, the less items would be evicted when allocator ran out of free memory
         explicit memalloc(const size_t memory_limit, const size_t page_size);
 
+
+        /// move contructor
+        memalloc(memalloc && ma) = default;
+
         /// Try to allocate `size` bytes, return `nullptr` on fail
         /// Returned memory is guaranteed to be aligned to the `sizeof(void *)`
         ///

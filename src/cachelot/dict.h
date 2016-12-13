@@ -137,6 +137,9 @@ namespace cachelot {
         dict(const dict &) = delete;
         dict & operator= (const dict &) = delete;
 
+        // allow move constructor
+        dict(dict &&) = default;
+
         /// @copydoc hash_table::get
         tuple<bool, mapped_type> get(const key_type key, const hash_type hash) const noexcept {
             if (not is_expanding()) {

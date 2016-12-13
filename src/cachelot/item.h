@@ -49,7 +49,8 @@ namespace cachelot {
             typedef clock::time_point expiration_time_point;
             typedef uint64 timestamp_type;
             static constexpr uint8 max_key_length = 250; // ! key size is limited to uint8
-            static constexpr uint32 max_value_length = std::numeric_limits<uint32>::max(); // ! value size is limited to uint32
+            static constexpr uint32 max_value_length = std::numeric_limits<uint32>::max();
+            static const seconds infinite_TTL;
         private:
             // Important! declaration order affects item size
             const timestamp_type m_timestamp; // timestamp of this item
@@ -70,7 +71,7 @@ namespace cachelot {
             Item & operator= (Item &&) = delete;
         public:
             /// constructor
-            explicit Item(slice the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration_time, timestamp_type the_timestamp) noexcept;
+            explicit Item(slice the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, seconds ttl, timestamp_type the_timestamp) noexcept;
 
             /// Destroy existing Item
             static void Destroy(Item * item) noexcept;
@@ -93,17 +94,23 @@ namespace cachelot {
             /// user defined flags
             opaque_flags_type opaque_flags() const noexcept { return m_opaque_flags; }
 
+            /// re-assign user defined flags
+            void set_opaque_flags(opaque_flags_type f) noexcept { m_opaque_flags = f; }
+
             /// retrieve timestamp of this item
             timestamp_type timestamp() const noexcept { return m_timestamp; }
 
             /// retrieve expiration time of this item
             expiration_time_point expiration_time() const noexcept { return m_expiration_time; }
 
+            /// retrive number of seconds until expiration
+            seconds ttl() const noexcept;
+
+            /// set new time to live
+            void set_ttl(seconds secs) noexcept;
+
             /// check whether Item is expired
             bool is_expired() const noexcept { return m_expiration_time <= clock::now(); }
-
-            /// update item's expiration time
-            void touch(expiration_time_point exptime) noexcept { m_expiration_time = exptime; }
 
             /// Calculate total size in slice required to store provided fields
             static size_t CalcSizeRequired(const slice the_key, const uint32 value_length) noexcept;
@@ -115,13 +122,13 @@ namespace cachelot {
         };
 
 
-        inline Item::Item(slice the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, expiration_time_point expiration, timestamp_type the_timestamp) noexcept
+        inline Item::Item(slice the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, seconds ttl, timestamp_type the_timestamp) noexcept
                 : m_timestamp(the_timestamp)
                 , m_hash(the_hash)
                 , m_value_length(value_length)
-                , m_expiration_time(expiration)
                 , m_opaque_flags(the_flags)
                 , m_key_length(the_key.length()) {
+            set_ttl(ttl);
             debug_assert(unaligned_bytes(this, alignof(Item) == 0));
             debug_assert(the_key.length() <= max_key_length);
             debug_assert(value_length <= max_value_length);
@@ -159,6 +166,25 @@ namespace cachelot {
             std::memcpy(this_ + ValueOffset(this), left.begin(), left.length());
             std::memcpy(this_ + ValueOffset(this) + left.length(), right.begin(), right.length());
             m_value_length = static_cast<decltype(m_value_length)>(left.length() + right.length());
+        }
+
+
+
+        inline seconds Item::ttl() const noexcept {
+            if (m_expiration_time == expiration_time_point::max()) {
+                return infinite_TTL;
+            } else {
+                return std::chrono::duration_cast<seconds>(m_expiration_time - clock::now());
+            }
+        }
+
+
+        inline void Item::set_ttl(seconds s) noexcept {
+            if (s == infinite_TTL) {
+                m_expiration_time = expiration_time_point::max();
+            } else {
+                m_expiration_time = clock::now() + s;
+            }
         }
 
 

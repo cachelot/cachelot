@@ -8,9 +8,6 @@
 //  see LICENSE file
 
 
-#ifndef CACHELOT_CACHE_DEFS_H_INCLUDED
-//#  include <cachelot/cache_defs.h>
-#endif
 #ifndef CACHELOT_MEMALLOC_H_INCLUDED
 #  include <cachelot/memalloc.h>
 #endif
@@ -62,9 +59,6 @@ namespace cachelot {
 
         /// Maximum key length in bytes
         static constexpr auto max_key_length = Item::max_key_length;
-
-        /// Maximum key length in bytes
-        static constexpr auto keepalive_forever = seconds(0);
 
         /**
          * Item has both - the key and the value. This is wrapper to use Item pointer as a dict entry
@@ -157,6 +151,11 @@ namespace cachelot {
              */
             ~Cache();
 
+            /**
+             * Move constructor
+             */
+            Cache(Cache && c) = default;
+
 
             /**
              * `get` -  retrieve item
@@ -175,7 +174,7 @@ namespace cachelot {
             /**
              * `add` - store non-existing item
              *
-             * @return 
+             * @return
              * - `true` - item was stored
              * - `false` - key already exists
              */
@@ -184,7 +183,7 @@ namespace cachelot {
             /**
              * `replace` - modify existing item
              *
-             * @return 
+             * @return
              * - `true` - item was stored
              * - `false` - no such key
              */
@@ -203,7 +202,7 @@ namespace cachelot {
             /**
              * `append` - append the data of the existing item
              *
-             * @return 
+             * @return
              * - `true` - item was stored
              * - `false` - no such key
              */
@@ -212,7 +211,7 @@ namespace cachelot {
             /**
              * `prepend` - prepend the data of the existing item
              *
-             * @return 
+             * @return
              * - `true` - item was stored
              * - `false` - no such key
              */
@@ -221,7 +220,7 @@ namespace cachelot {
             /**
              * `delete` - delete existing item
              *
-             * @return 
+             * @return
              * - `true` - item was deleted
              * - `false` - no such key
              */
@@ -284,7 +283,7 @@ namespace cachelot {
             /**
              * Extend (`prepend` or `append`) existing item with the new data
              *
-             * @return 
+             * @return
              * - `true` - item was stored
              * - `false` - no such key
              */
@@ -296,15 +295,6 @@ namespace cachelot {
              * @return tuple<found, new_value>
              */
             tuple<bool, uint64> do_arithmetic(ArithmeticOperation op, const slice key, const hash_type hash, uint64 delta);
-
-            /**
-             * Utility function to create point in time from duration in seconds
-             */
-            static expiration_time_point time_from(seconds expire_after) {
-                // TODO: !Important check that duration will not overflow
-                //if (std::numeric_limits<seconds::rep>::max() - expire_after.count() )
-                return expire_after == keepalive_forever ? expiration_time_point::max() : clock::now() + expire_after;
-            }
 
             /**
              * Replace Item at position with another one
@@ -458,7 +448,7 @@ namespace cachelot {
                 // do not evict existing items to avoid accidentally free the `piece` or the `old_item`
                 auto memory = m_allocator.alloc_or_evict(Item::CalcSizeRequired(old_item->key(), new_value_size), false, [=](void *){});
                 if (memory != nullptr) {
-                    auto new_item = new (memory) Item(old_item->key(), old_item->hash(), new_value_size, old_item->opaque_flags(), old_item->expiration_time(), old_item->timestamp() + 1);
+                    auto new_item = new (memory) Item(old_item->key(), old_item->hash(), new_value_size, old_item->opaque_flags(), old_item->ttl(), ++m_newest_timestamp);
                     if (op == ExtendOperation::APPEND) {
                         new_item->assign_compose(old_item->value(), piece->value());
                         STAT_INCR(cache.append_stored, 1);
@@ -509,7 +499,7 @@ namespace cachelot {
             if (found) {
                 auto item = at.value();
                 m_allocator.touch(item); // mark item as recent in LRU list
-                item->touch(time_from(expires)); // update lifetime
+                item->set_ttl(expires); // update lifetime
                 STAT_INCR(cache.touch_hits, 1);
                 return true;
             } else {
@@ -570,8 +560,7 @@ namespace cachelot {
             const auto new_ascii_value_length = int_to_str(new_int_value, new_ascii_value);
             // create new item to hold value including zero terminator
             ItemPtr new_item;
-            seconds new_keepalive = old_item->expiration_time() == expiration_time_point::max() ? keepalive_forever : old_item->expiration_time() - clock::now();
-            new_item = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), new_keepalive);
+            new_item = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), old_item->ttl());
             new_item->assign_value(slice(new_ascii_value, new_ascii_value_length));
             replace_item_at(at, new_item);
             return make_tuple(true, new_int_value);
@@ -588,7 +577,7 @@ namespace cachelot {
             };
             memory = m_allocator.alloc_or_evict(size_required, m_evictions_enabled, on_delete);
             if (memory != nullptr) {
-                auto item = new (memory) Item(key, hash, value_length, flags, time_from(keepalive), ++m_newest_timestamp);
+                auto item = new (memory) Item(key, hash, value_length, flags, keepalive, ++m_newest_timestamp);
                 return item;
             } else {
                 throw system_error(error::out_of_memory);

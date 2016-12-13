@@ -10,7 +10,7 @@ BOOST_AUTO_TEST_SUITE(test_cache_stats)
 
 static auto calc_hash = fnv1a<cache::Cache::hash_type>::hasher();
 
-cache::ItemPtr CreateItem(cache::Cache & c, const string k, const string v, cache::opaque_flags_type flags = 0, cache::seconds keepalive = cache::keepalive_forever ) {
+cache::ItemPtr CreateItem(cache::Cache & c, const string k, const string v, cache::opaque_flags_type flags = 0, cache::seconds keepalive = cache::Item::infinite_TTL) {
     const auto key = slice(k.c_str(), k.length());
     const auto value = slice(v.c_str(), v.length());
     auto item = c.create_item(key, calc_hash(key), value.length(), flags, keepalive);
@@ -123,14 +123,14 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
     }
     // touch
     {
-        BOOST_CHECK_EQUAL(the_cache.do_touch(non_existing, calc_hash(non_existing), cache::keepalive_forever), false);
+        BOOST_CHECK_EQUAL(the_cache.do_touch(non_existing, calc_hash(non_existing), cache::Item::infinite_TTL), false);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_touch), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,touch_hits), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,touch_misses), 1);
         const auto item1 = CreateItem(the_cache, "Touch_Key1", "Value1");
         the_cache.do_set(item1);
         const auto the_key = slice::from_literal("Touch_Key1");
-        BOOST_CHECK_EQUAL(the_cache.do_touch(the_key, calc_hash(the_key), cache::keepalive_forever), true);
+        BOOST_CHECK_EQUAL(the_cache.do_touch(the_key, calc_hash(the_key), cache::Item::infinite_TTL), true);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_touch), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,touch_hits), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,touch_misses), 1);
