@@ -62,7 +62,7 @@ namespace cachelot {
         /// @p page_size - size of internal allocator page.
         ///                Page size limits single allocation size.
         ///                The less page is, the less items would be evicted when allocator ran out of free memory
-        explicit memalloc(const size_t memory_limit, const size_t page_size);
+        explicit memalloc(const size_t memory_limit, const uint32 page_size);
 
 
         /// move contructor
@@ -115,7 +115,7 @@ namespace cachelot {
         void unuse(block * & blk) noexcept;
 
         /// mark block as used and give requested memory to user
-        void * checkout(block * blk, const size_t requested_size) noexcept;
+        void * checkout(block * blk, const uint32 requested_size) noexcept;
 
         // disallow copying
         memalloc(const memalloc &) = delete;
@@ -125,18 +125,19 @@ namespace cachelot {
         void * alloc_or_evict_impl(size_t size, bool evict_if_necessary = false,
                                    ForeachFreed on_free_block = [](void *) -> void {});
 
-    private:
+    public:
         // total amount of memory
         const size_t arena_size;
         // size of the single page
-        const size_t page_size;
+        const uint32 page_size;
+    private:
         // pointer to the memory arena
         std::unique_ptr<void, decltype(&std::free)> m_arena;
         // logical pages
         std::unique_ptr<pages> m_pages;
         // free memory blocks are placed in the table, grouped by block size
         std::unique_ptr<free_blocks_by_size> m_free_blocks;
-    private:
+
         // Test cases
         friend struct test_memalloc::test_free_blocks_by_size;
         friend struct test_memalloc::test_pages;

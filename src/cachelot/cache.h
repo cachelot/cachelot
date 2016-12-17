@@ -143,7 +143,7 @@ namespace cachelot {
              * @param initial_dict_size - number of reserved items in dictionary
              * @param enable_evictions - evict existing items in order to store new ones
              */
-            explicit Cache(size_t memory_limit, size_t mem_page_size, size_t initial_dict_size, bool enable_evictions);
+            explicit Cache(size_t memory_limit, uint32 mem_page_size, dict_type::size_type initial_dict_size, bool enable_evictions);
 
 
             /**
@@ -267,7 +267,7 @@ namespace cachelot {
             /**
              * Create new Item from the pre-allocated memory arena
              */
-            ItemPtr create_item(const slice key, const hash_type hash, uint32 value_length, opaque_flags_type flags, seconds keepalive);
+            ItemPtr create_item(const slice key, const hash_type hash, size_t value_length, opaque_flags_type flags, seconds keepalive);
 
             /**
              * Free existing Item and return the memory
@@ -316,7 +316,7 @@ namespace cachelot {
         };
 
 
-        inline Cache::Cache(size_t memory_limit, size_t mem_page_size, size_t initial_dict_size, bool enable_evictions)
+        inline Cache::Cache(size_t memory_limit, uint32 mem_page_size, dict_type::size_type initial_dict_size, bool enable_evictions)
             : m_allocator(memory_limit, mem_page_size)
             , m_dict(initial_dict_size)
             , m_evictions_enabled(enable_evictions)
@@ -444,11 +444,11 @@ namespace cachelot {
             tie(found, at) = retrieve_item(piece->key(), piece->hash());
             if (found) {
                 auto old_item = at.value();
-                const auto new_value_size = old_item->value().length() + piece->value().length();
+                const size_t new_value_size = old_item->value().length() + piece->value().length();
                 // do not evict existing items to avoid accidentally free the `piece` or the `old_item`
                 auto memory = m_allocator.alloc_or_evict(Item::CalcSizeRequired(old_item->key(), new_value_size), false, [=](void *){});
                 if (memory != nullptr) {
-                    auto new_item = new (memory) Item(old_item->key(), old_item->hash(), new_value_size, old_item->opaque_flags(), old_item->ttl(), ++m_newest_timestamp);
+                    auto new_item = new (memory) Item(old_item->key(), old_item->hash(), static_cast<uint32>(new_value_size), old_item->opaque_flags(), old_item->ttl(), ++m_newest_timestamp);
                     if (op == ExtendOperation::APPEND) {
                         new_item->assign_compose(old_item->value(), piece->value());
                         STAT_INCR(cache.append_stored, 1);
@@ -567,9 +567,15 @@ namespace cachelot {
         }
 
 
-        inline ItemPtr Cache::create_item(const slice key, const hash_type hash, uint32 value_length, opaque_flags_type flags, cache::seconds keepalive) {
+        inline ItemPtr Cache::create_item(const slice key, const hash_type hash, size_t value_length, opaque_flags_type flags, cache::seconds keepalive) {
             void * memory;
+            if (key.length() > Item::max_key_length) {
+                throw system_error(error::key_too_long);
+            }
             const size_t size_required = Item::CalcSizeRequired(key, value_length);
+            if (size_required > m_allocator.page_size) {
+                throw system_error(error::item_too_big);
+            }
             static const auto on_delete = [=](void * ptr) noexcept -> void {
                 auto i = reinterpret_cast<Item *>(ptr);
                 debug_only(bool deleted = ) this->m_dict.del(i->key(), i->hash());
@@ -577,7 +583,7 @@ namespace cachelot {
             };
             memory = m_allocator.alloc_or_evict(size_required, m_evictions_enabled, on_delete);
             if (memory != nullptr) {
-                auto item = new (memory) Item(key, hash, value_length, flags, keepalive, ++m_newest_timestamp);
+                auto item = new (memory) Item(key, hash, static_cast<uint32>(value_length), flags, keepalive, ++m_newest_timestamp);
                 return item;
             } else {
                 throw system_error(error::out_of_memory);

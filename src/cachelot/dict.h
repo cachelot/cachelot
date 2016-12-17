@@ -248,7 +248,7 @@ namespace cachelot {
         }
 
         tuple<bool, iterator> search_primary(key_type key, hash_type hash, bool readonly) {
-            bool found; size_t at;
+            bool found; size_type at;
             tie(found, at) = m_primary_tbl->entry_for(key, hash);
             if (not found) {
                 if (m_primary_tbl->threshold_reached()) {
@@ -266,12 +266,12 @@ namespace cachelot {
         tuple<bool, iterator> search_secondary(key_type key, hash_type hash) noexcept {
             rehash_some();
             if (is_expanding()) {  // are we still expanding after rehash
-                bool found; size_t old_pos;
+                bool found; size_type old_pos;
                 // lookup in secondary table first
                 tie(found, old_pos) = m_secondary_tbl->entry_for(key, hash);
                 if (found) {
                     // move item to the primary table and return its position there
-                    bool __; size_t new_pos;
+                    bool __; size_type new_pos;
                     tie(__, new_pos) = m_primary_tbl->entry_for(key, hash);
                     debug_assert(not __); // not found in primary as it is in secondary already
                     const entry_type & e = m_secondary_tbl->entry_at(old_pos);
@@ -280,7 +280,7 @@ namespace cachelot {
                     return make_tuple(true, iter(m_primary_tbl, new_pos));
                 }
             }
-            bool found; size_t at;
+            bool found; size_type at;
             tie(found, at) = m_primary_tbl->entry_for(key, hash);
             return make_tuple(found, iter(m_primary_tbl, at));
         }

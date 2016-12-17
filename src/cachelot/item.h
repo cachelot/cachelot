@@ -113,7 +113,7 @@ namespace cachelot {
             bool is_expired() const noexcept { return m_expiration_time <= clock::now(); }
 
             /// Calculate total size in slice required to store provided fields
-            static size_t CalcSizeRequired(const slice the_key, const uint32 value_length) noexcept;
+            static size_t CalcSizeRequired(const slice the_key, const size_t value_length) noexcept;
 
         private:
             // Item must be properly initialized to call following functions
@@ -199,9 +199,10 @@ namespace cachelot {
         }
 
 
-        inline size_t Item::CalcSizeRequired(const slice the_key, const uint32 value_length) noexcept {
+        inline size_t Item::CalcSizeRequired(const slice the_key, const size_t value_length) noexcept {
             debug_assert(the_key.length() > 0);
             debug_assert(the_key.length() <= max_key_length);
+            debug_assert(value_length <= std::numeric_limits<uint32>::max());
             size_t item_size = sizeof(Item);
             item_size += the_key.length();
             item_size += value_length;
