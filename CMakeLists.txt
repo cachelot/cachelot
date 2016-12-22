@@ -45,21 +45,24 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
     add_definitions ("/wd4996") # function call with parameters that may be unsafe
     add_definitions (-DWIN32_LEAN_AND_MEAN) # limit amount of code in Windows.h to the minimum
     add_definitions (-DNOMINMAX) # disable min / max macro from Windows.h
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 /EHsc /Zi")
-    set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD /Ot")
-    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /sdl /MDd /GS /Ob0 /Od /DEBUG /RTC1")
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /EHsc /Zi")
+    set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MD /Ot")
+    set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /sdl /MDd /GS /Ob0 /Od /DEBUG /RTC1")
     set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES "Dbghelp.lib")
 elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang"))
 # - GCC / Clang common - - - - - - - - - - - - - - - - - - - - - - - - - -
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4 -std=c++11")
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4")
     if (CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64_CPU)
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -msse2")
+        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -msse2")
+        if (CACHELOT_PLATFORM_BITS EQUAL 64)
+            set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -m64")
+        endif ()
     endif ()
-    set (CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
-    set (CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
-    set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO "-O2 -DNDEBUG -g")
-    set (CMAKE_CXX_FLAGS_MINSIZEREL "-Os -DNDEBUG")
-    set (CMAKE_CXX_FLAGS_ADDRESSSANITIZER "-fsanitize=address -O1 -g -DNDEBUG -DADDRESS_SANITIZER -fno-optimize-sibling-calls")
+    set (CMAKE_C_FLAGS_DEBUG "-O0 -g -DDEBUG")
+    set (CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
+    set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-O2 -DNDEBUG -g")
+    set (CMAKE_C_FLAGS_MINSIZEREL "-Os -DNDEBUG")
+    set (CMAKE_C_FLAGS_ADDRESSSANITIZER "-fsanitize=address -O1 -g -DNDEBUG -DADDRESS_SANITIZER -fno-optimize-sibling-calls")
 
     set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES "")
     # - - GCC specific - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -83,6 +86,12 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
 else ()
     message (FATAL_ERROR "unknown compiler")
 endif ()
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS} -std=c++11")
+set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${CMAKE_C_FLAGS_DEBUG}")
+set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_C_FLAGS_RELEASE}")
+set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO "${CMAKE_CXX_FLAGS_RELWITHDEBUGINFO} ${CMAKE_C_FLAGS_RELWITHDEBUGINFO}")
+set (CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} ${CMAKE_C_FLAGS_MINSIZEREL}")
+set (CMAKE_CXX_FLAGS_ADDRESSSANITIZER "${CMAKE_CXX_FLAGS_ADDRESSSANITIZER} ${CMAKE_C_FLAGS_ADDRESSSANITIZER}")
 
 ###########################################################################
 #       CCache configuration
@@ -106,7 +115,7 @@ add_definitions (-DHAVE_CONFIG_H=1)
 ###########################################################################
 #       version.h
 ###########################################################################
-execute_process(COMMAND git describe --tags --dirty=-dirty OUTPUT_VARIABLE cachelot_git_tag WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND git describe --tags --dirty=-git OUTPUT_VARIABLE cachelot_git_tag WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} OUTPUT_STRIP_TRAILING_WHITESPACE)
 set (git_version_regex "v([0-9]+)\\.([0-9]+)\\.([0-9]+)-([A-z]+)(-[0-9]+-)?(.*)$")
 string (REGEX MATCH "${git_version_regex}" version_valid "${cachelot_git_tag}")
 if (version_valid)
@@ -124,7 +133,7 @@ else (version_valid)
     set (cachelot_version_extra "unknown")
     set (cachelot_version_hash "XXX")
 endif ()
-set (cachelot_os_name "${CMAKE_SYSTEM_NAME}")
+set (cachelot_os_name "${CMAKE_SYSTEM_NAME} x${CACHELOT_PLATFORM_BITS}")
 configure_file (src/cachelot/version.h.in src/cachelot/version.h ESCAPE_QUOTES @ONLY)
 
 ###########################################################################
