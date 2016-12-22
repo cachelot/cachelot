@@ -171,7 +171,7 @@ namespace cachelot {
         }
 
         /// @copydoc hash_table::del
-        bool del(key_type key, hash_type hash) {
+        bool del(key_type key, hash_type hash) noexcept {
             if (not is_expanding()) {
                 return m_primary_tbl->del(key, hash);
             } else {
