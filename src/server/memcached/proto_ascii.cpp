@@ -334,13 +334,8 @@ namespace cachelot {
                     debug_assert(false);
                     throw system_error(error::unknown_error);
                 }
-                if (response != Response::STORED) {
-                    // Item was not stored in the cache
-                    cache_api.destroy_item(new_item);
-                }
                 return reply_with_response(send_buf, response, noreply);
             } catch (...) {
-                cache_api.destroy_item(new_item);
                 throw;
             }
         }

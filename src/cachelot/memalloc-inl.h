@@ -834,6 +834,7 @@ namespace cachelot {
         STAT_DECR(mem.used_memory, blk->size_with_header());
         // merge with neighbours
         blk = merge_free(blk);
+        debug_only(std::memset(blk->memory(), 0xC, blk->size()));
         // store for reuse
         m_free_blocks->put_block(blk);
     }

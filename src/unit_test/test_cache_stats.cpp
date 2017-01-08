@@ -24,13 +24,11 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
     const auto non_existing = slice::from_literal("Non-existing key");
     // set
     {
-        const auto item1 = CreateItem(the_cache, "Key1", "Valu1");
-        the_cache.do_set(item1);
+        the_cache.do_set(CreateItem(the_cache, "Key1", "Valu1"));
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_set), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,set_new), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,set_existing), 0);
-        const auto item1_2 = CreateItem(the_cache, "Key1", "Valu2");
-        the_cache.do_set(item1_2);
+        the_cache.do_set(CreateItem(the_cache, "Key1", "Valu2"));
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_set), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,set_new), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,set_existing), 1);
@@ -49,59 +47,52 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
     }
     // add
     {
-        const auto item1 = CreateItem(the_cache, "Add_Key1", "Value1");
-        BOOST_CHECK_EQUAL(the_cache.do_add(item1), true);
+        BOOST_CHECK_EQUAL(the_cache.do_add(CreateItem(the_cache, "Add_Key1", "Value1")), true);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_add), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,add_stored), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,add_not_stored), 0);
-        const auto item1_2 = CreateItem(the_cache, "Add_Key1", "Value2");
-        BOOST_CHECK_EQUAL(the_cache.do_add(item1_2), false);
-        the_cache.destroy_item(item1_2);
+        BOOST_CHECK_EQUAL(the_cache.do_add(CreateItem(the_cache, "Add_Key1", "Value2")), false);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_add), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,add_stored), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,add_not_stored), 1);
     }
     // replace
     {
-        const auto item1 = CreateItem(the_cache, "Replace_Key1", "Value1");
-        BOOST_CHECK_EQUAL(the_cache.do_replace(item1), false);
+        BOOST_CHECK_EQUAL(the_cache.do_replace(CreateItem(the_cache, "Replace_Key1", "Value1")), false);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_replace), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,replace_stored), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,replace_not_stored), 1);
-        the_cache.do_set(item1);
-        const auto item1_2 = CreateItem(the_cache, "Replace_Key1", "Value2");
-        BOOST_CHECK_EQUAL(the_cache.do_replace(item1_2), true);
+        the_cache.do_set(CreateItem(the_cache, "Replace_Key1", "Value1"));
+        BOOST_CHECK_EQUAL(the_cache.do_replace(CreateItem(the_cache, "Replace_Key1", "Value2")), true);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_replace), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,replace_stored), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,replace_not_stored), 1);
     }
     // cas
     {
-        const auto item1 = CreateItem(the_cache, "CAS_Key1", "Value1");
-        const auto item1_timestamp = item1->timestamp();
         bool found; bool stored;
-        tie(found, stored) = the_cache.do_cas(item1, 0);
+        tie(found, stored) = the_cache.do_cas(CreateItem(the_cache, "CAS_Key1", "Value1"), 0);
         BOOST_CHECK_EQUAL(found, false);
         BOOST_CHECK_EQUAL(stored, false);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_cas), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_misses), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_stored), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_badval), 0);
-        the_cache.do_set(item1);
-        const auto item1_2 = CreateItem(the_cache, "CAS_Key1", "Value2");
-        tie(found, stored) = the_cache.do_cas(item1_2, item1_timestamp);
+
+        the_cache.do_set(CreateItem(the_cache, "CAS_Key1", "Value1"));
+        auto key = slice::from_literal("CAS_Key1");
+        auto item_timestamp = the_cache.do_get(key, calc_hash(key))->timestamp();
+        tie(found, stored) = the_cache.do_cas(CreateItem(the_cache, "CAS_Key1", "Value2"), item_timestamp);
         BOOST_CHECK_EQUAL(found, true);
         BOOST_CHECK_EQUAL(stored, true);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_cas), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_misses), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_stored), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_badval), 0);
-        const auto item1_3 = CreateItem(the_cache, "CAS_Key1", "Value3");
 
-        tie(found, stored) = the_cache.do_cas(item1_3, item1_timestamp);
+        tie(found, stored) = the_cache.do_cas(CreateItem(the_cache, "CAS_Key1", "Value3"), item_timestamp);
         BOOST_CHECK_EQUAL(found, true);
         BOOST_CHECK_EQUAL(stored, false);
-        the_cache.destroy_item(item1_3);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_cas), 3);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_misses), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cas_stored), 1);
@@ -113,8 +104,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_delete), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,delete_hits), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,delete_misses), 1);
-        const auto item1 = CreateItem(the_cache, "Delete_Key1", "Value1");
-        the_cache.do_set(item1);
+        the_cache.do_set(CreateItem(the_cache, "Delete_Key1", "Value1"));
         const auto the_key = slice::from_literal("Delete_Key1");
         BOOST_CHECK_EQUAL(the_cache.do_delete(the_key, calc_hash(the_key)), true);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_delete), 2);
@@ -127,8 +117,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_touch), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,touch_hits), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,touch_misses), 1);
-        const auto item1 = CreateItem(the_cache, "Touch_Key1", "Value1");
-        the_cache.do_set(item1);
+        the_cache.do_set(CreateItem(the_cache, "Touch_Key1", "Value1"));
         const auto the_key = slice::from_literal("Touch_Key1");
         BOOST_CHECK_EQUAL(the_cache.do_touch(the_key, calc_hash(the_key), cache::Item::infinite_TTL), true);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_touch), 2);
@@ -145,8 +134,7 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_decr), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,decr_hits), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,decr_misses), 1);
-        const auto item1 = CreateItem(the_cache, "Arithmetic_Key1", "0");
-        the_cache.do_set(item1);
+        the_cache.do_set(CreateItem(the_cache, "Arithmetic_Key1", "0"));
         const auto the_key = slice::from_literal("Arithmetic_Key1");
         the_cache.do_incr(the_key, calc_hash(the_key), 1ull);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_incr), 2);
@@ -159,28 +147,24 @@ BOOST_AUTO_TEST_CASE(test_cache_commands_stats) {
     }
     // append
     {
-        const auto item1 = CreateItem(the_cache, "Append_Key1", "Value1");
-        BOOST_CHECK_EQUAL(the_cache.do_append(item1), false);
+        BOOST_CHECK_EQUAL(the_cache.do_append(CreateItem(the_cache, "Append_Key1", "Value1")), false);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_append), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,append_stored), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,append_misses), 1);
-        the_cache.do_set(item1);
-        const auto item1_1 = CreateItem(the_cache, "Append_Key1", "Value2");
-        BOOST_CHECK_EQUAL(the_cache.do_append(item1_1), true);
+        the_cache.do_set(CreateItem(the_cache, "Append_Key1", "Value1"));
+        BOOST_CHECK_EQUAL(the_cache.do_append(CreateItem(the_cache, "Append_Key1", "Value2")), true);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_append), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,append_stored), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,append_misses), 1);
     }
     // prepend
     {
-        const auto item1 = CreateItem(the_cache, "Prepend_Key1", "Value1");
-        BOOST_CHECK_EQUAL(the_cache.do_prepend(item1), false);
+        BOOST_CHECK_EQUAL(the_cache.do_prepend(CreateItem(the_cache, "Prepend_Key1", "Value1")), false);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_prepend), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,prepend_stored), 0);
         BOOST_CHECK_EQUAL(STAT_GET(cache,prepend_misses), 1);
-        the_cache.do_set(item1);
-        const auto item1_1 = CreateItem(the_cache, "Prepend_Key1", "Value2");
-        BOOST_CHECK_EQUAL(the_cache.do_prepend(item1_1), true);
+        the_cache.do_set(CreateItem(the_cache, "Prepend_Key1", "Value1"));
+        BOOST_CHECK_EQUAL(the_cache.do_prepend(CreateItem(the_cache, "Prepend_Key1", "Value2")), true);
         BOOST_CHECK_EQUAL(STAT_GET(cache,cmd_prepend), 2);
         BOOST_CHECK_EQUAL(STAT_GET(cache,prepend_stored), 1);
         BOOST_CHECK_EQUAL(STAT_GET(cache,prepend_misses), 1);

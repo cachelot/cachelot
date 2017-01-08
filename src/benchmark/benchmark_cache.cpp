@@ -63,9 +63,6 @@ public:
             bench_stats.num_set += 1;
         } catch (const std::exception &) {
             bench_stats.num_error += 1;
-            if (item) {
-                m_cache.destroy_item(item);
-            }
         }
     }
 

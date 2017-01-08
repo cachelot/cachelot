@@ -303,15 +303,30 @@ namespace cachelot {
             tuple<bool, uint64> do_arithmetic(ArithmeticOperation op, const slice key, const hash_type hash, uint64 delta);
 
             /**
-             * Replace Item at position with another one
-             */
-            void replace_item_at(const iterator at, ItemPtr new_item) noexcept;
-
-            /**
              * Retrieve item from cache taking in account its expiration time;
              * expired items will be immediately removed and retrieve_item() will report that item was not found
              */
             tuple<bool, dict_type::iterator> retrieve_item(const slice key, const hash_type hash, bool readonly = false);
+
+            class ItemAutoDelete {
+                Cache * m_cache;
+                Item * m_item;
+            public:
+                explicit ItemAutoDelete(Cache * c, Item * i) noexcept : m_cache(c), m_item(i) {}
+                ~ItemAutoDelete() { if (m_item) m_cache->destroy_item(m_item); }
+                void reset() noexcept { m_item = nullptr; }
+                ItemPtr get() noexcept { return m_item; }
+            };
+
+            /**
+             * Replace Item at position with another one
+             */
+            void replace_item_at(const iterator at, ItemAutoDelete & lockedItem) noexcept;
+
+            /**
+             * Add new item to the cache
+             */
+            void insert_item_at(const iterator at, ItemAutoDelete & lockedItem) noexcept;
 
         private:
             memalloc m_allocator;
@@ -403,24 +418,26 @@ namespace cachelot {
 
         inline void Cache::do_set(ItemPtr item) {
             STAT_INCR(cache.cmd_set, 1);
+            ItemAutoDelete _item_uniq_ptr(this, item);
             bool found; iterator at;
             tie(found, at) = retrieve_item(item->key(), item->hash());
             if (not found) {
                 STAT_INCR(cache.set_new, 1);
-                m_dict.insert(at, item->key(), item->hash(), item);
+                insert_item_at(at, _item_uniq_ptr);
             } else {
                 STAT_INCR(cache.set_existing, 1);
-                replace_item_at(at, item);
+                replace_item_at(at, _item_uniq_ptr);
             }
         }
 
 
         inline bool Cache::do_add(ItemPtr item) {
-            bool found; iterator at;
             STAT_INCR(cache.cmd_add, 1);
+            ItemAutoDelete _item_uniq_ptr(this, item);
+            bool found; iterator at;
             tie(found, at) = retrieve_item(item->key(), item->hash());
             if (not found) {
-                m_dict.insert(at, item->key(), item->hash(), item);
+                insert_item_at(at, _item_uniq_ptr);
                 STAT_INCR(cache.add_stored, 1);
                 return true;
             } else {
@@ -431,11 +448,12 @@ namespace cachelot {
 
 
         inline bool Cache::do_replace(ItemPtr item) {
-            bool found; iterator at;
             STAT_INCR(cache.cmd_replace, 1);
+            ItemAutoDelete _item_uniq_ptr(this, item);
+            bool found; iterator at;
             tie(found, at) = retrieve_item(item->key(), item->hash());
             if (found) {
-                replace_item_at(at, item);
+                replace_item_at(at, _item_uniq_ptr);
                 STAT_INCR(cache.replace_stored, 1);
                 return true;
             } else {
@@ -446,12 +464,13 @@ namespace cachelot {
 
 
         inline tuple<bool, bool> Cache::do_cas(ItemPtr item, timestamp_type cas_unique) {
-            bool found; iterator at;
             STAT_INCR(cache.cmd_cas, 1);
+            ItemAutoDelete _item_uniq_ptr(this, item);
+            bool found; iterator at;
             tie(found, at) = retrieve_item(item->key(), item->hash());
             if (found) {
                 if (cas_unique == at.value()->timestamp()) {
-                    replace_item_at(at, item);
+                    replace_item_at(at, _item_uniq_ptr);
                     STAT_INCR(cache.cas_stored, 1);
                     return make_tuple(true, true);
                 } else {
@@ -472,6 +491,7 @@ namespace cachelot {
                 debug_assert(op == ExtendOperation::PREPEND);
                 STAT_INCR(cache.cmd_prepend, 1);
             }
+            ItemAutoDelete _piece_unique_ptr(this, piece);
             bool found; iterator at;
             tie(found, at) = retrieve_item(piece->key(), piece->hash());
             if (found) {
@@ -481,6 +501,7 @@ namespace cachelot {
                 auto memory = m_allocator.alloc_or_evict(Item::CalcSizeRequired(old_item->key(), new_value_size), false, [=](void *){});
                 if (memory != nullptr) {
                     auto new_item = new (memory) Item(old_item->key(), old_item->hash(), static_cast<uint32>(new_value_size), old_item->opaque_flags(), old_item->ttl(), ++m_newest_timestamp);
+                    ItemAutoDelete _item_uniq_ptr(this, new_item);
                     if (op == ExtendOperation::APPEND) {
                         new_item->assign_compose(old_item->value(), piece->value());
                         STAT_INCR(cache.append_stored, 1);
@@ -489,8 +510,7 @@ namespace cachelot {
                         new_item->assign_compose(piece->value(), old_item->value());
                         STAT_INCR(cache.prepend_stored, 1);
                     }
-                    replace_item_at(at, new_item);
-                    destroy_item(piece);
+                    replace_item_at(at, _item_uniq_ptr);
                 } else {
                     throw system_error(error::out_of_memory);
                 }
@@ -593,8 +613,9 @@ namespace cachelot {
             // create new item to hold value including zero terminator
             ItemPtr new_item;
             new_item = create_item(old_item->key(), old_item->hash(), new_ascii_value_length, old_item->opaque_flags(), old_item->ttl());
+            ItemAutoDelete _item_uniq_ptr(this, new_item);
             new_item->assign_value(slice(new_ascii_value, new_ascii_value_length));
-            replace_item_at(at, new_item);
+            replace_item_at(at, _item_uniq_ptr);
             return make_tuple(true, new_int_value);
         }
 
@@ -628,11 +649,20 @@ namespace cachelot {
         }
 
 
-        inline void Cache::replace_item_at(iterator at, ItemPtr new_item) noexcept {
+        inline void Cache::replace_item_at(iterator at, ItemAutoDelete & lockedItem) noexcept {
             auto old_item = at.value();
+            auto new_item = lockedItem.get();
             debug_assert(old_item->hash() == new_item->hash() && old_item->key() == new_item->key());
             destroy_item(old_item);
             at.unsafe_replace_kv(new_item->key(), new_item->hash(), new_item);
+            lockedItem.reset(); // Item will live
+        }
+
+
+        inline void Cache::insert_item_at(const iterator at, ItemAutoDelete & lockedItem) noexcept {
+            auto i = lockedItem.get();
+            m_dict.insert(at, i->key(), i->hash(), i);
+            lockedItem.reset();
         }
 
 
