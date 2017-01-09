@@ -1,3 +1,9 @@
+//
+//  (C) Copyright 2015 Iurii Krasnoshchok
+//
+//  Distributed under the terms of Simplified BSD License
+//  see LICENSE file
+
 #include <cachelot/common.h>
 #include <cachelot/cache.h>
 #include <cachelot/stats.h>
@@ -143,17 +149,17 @@ int main(int argc, char * argv[]) {
             return EXIT_FAILURE;
         }
         // Cache Service
-        std::unique_ptr<cache::Cache> the_cache(new cache::Cache(settings.cache.memory_limit,
-                                                                 settings.cache.page_size,
-                                                                 settings.cache.initial_hash_table_size,
-                                                                 settings.cache.has_evictions));
+        auto the_cache = cache::Cache::Create(settings.cache.memory_limit,
+                                              settings.cache.page_size,
+                                              settings.cache.initial_hash_table_size,
+                                              settings.cache.has_evictions);
         // Reactor service
         net::io_service reactor;
 
         // TCP
         std::unique_ptr<memcached::TcpServer> memcached_tcp = nullptr;
         if (settings.net.has_TCP) {
-            memcached_tcp.reset(new memcached::TcpServer(*the_cache, reactor));
+            memcached_tcp.reset(new memcached::TcpServer(the_cache, reactor));
             net::tcp::endpoint bind_addr(net::ip::address_v4::any(), settings.net.TCP_port);
             memcached_tcp->start(bind_addr);
         }
@@ -161,14 +167,14 @@ int main(int argc, char * argv[]) {
         // Unix local socket
         std::unique_ptr<memcached::UnixSocketServer> memcached_unix_socket = nullptr;
         if (settings.net.has_unix_socket) {
-            memcached_unix_socket.reset(new memcached::UnixSocketServer(*the_cache, reactor));
+            memcached_unix_socket.reset(new memcached::UnixSocketServer(the_cache, reactor));
             memcached_unix_socket->start(settings.net.unix_socket);
         }
 
         // UDP
         std::unique_ptr<memcached::UdpServer> memcached_udp = nullptr;
         if (settings.net.has_UDP) {
-            memcached_udp.reset(new memcached::UdpServer(*the_cache, reactor));
+            memcached_udp.reset(new memcached::UdpServer(the_cache, reactor));
             net::udp::endpoint bind_addr(net::ip::address_v4::any(), settings.net.UDP_port);
             memcached_udp->start(bind_addr);
         }

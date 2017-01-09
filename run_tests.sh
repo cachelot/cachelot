@@ -30,25 +30,30 @@ function run_tests {
     case "${buildCfg}" in
     Debug)
         ${bindir}/unit_tests || exit 1
+        ${bindir}/test_c_api || exit 1
         ;;
     Release)
         ${bindir}/unit_tests || exit 1
         ${bindir}/benchmark_cache || exit 1
         ${bindir}/benchmark_memalloc || exit 1
+        ${bindir}/test_c_api || exit 1
         ;;
     RelWithDebugInfo)
         ${bindir}/unit_tests || exit 1
         ${bindir}/benchmark_cache || exit 1
         ${bindir}/benchmark_memalloc || exit 1
+        ${bindir}/test_c_api || exit 1
         ;;
     MinSizeRel)
         ${bindir}/unit_tests || exit 1
         ${bindir}/benchmark_cache || exit 1
         ${bindir}/benchmark_memalloc || exit 1
+        ${bindir}/test_c_api || exit 1
         ;;
     AddressSanitizer)
         ${bindir}/unit_tests || exit 1
         ${bindir}/benchmark_cache || exit 1
+        ${bindir}/test_c_api || exit 1
         ;;
     *)
         echo "Unknown build configuration";

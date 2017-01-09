@@ -6,7 +6,6 @@ set (CACHELOT_SOURCES
     slice.h
     cache.cpp
     cache.h
-    cache_defs.h
     common.cpp
     common.h
     debug_trace.h
@@ -18,6 +17,7 @@ set (CACHELOT_SOURCES
     hash_table.h
     intrusive_list.h
     item.h
+    item.cpp
     memalloc-inl.h
     memalloc.h
     random.h
@@ -25,6 +25,8 @@ set (CACHELOT_SOURCES
     stats.h
     string_conv.h
     version.h
+    c_api.h
+    c_api.cpp
 )
 
 add_library (cachelot STATIC ${CACHELOT_SOURCES})

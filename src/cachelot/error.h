@@ -22,6 +22,8 @@ namespace cachelot {
         x(out_of_memory,        "Out of memory")                    \
         x(numeric_convert,      "Numeric conversion error")         \
         x(numeric_overflow,     "Numeric value is out of range")    \
+        x(key_too_long,         "Key is too long")                  \
+        x(item_too_big,         "Item size exceeds the page size")  \
         x(not_implemented,      "Operation does not supported")     \
         x(incomplete_request,   "Request packet is incomplete")     \
         x(broken_request,       "Request packet is broken")

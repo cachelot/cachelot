@@ -50,22 +50,19 @@ typedef array_type::const_iterator iterator;
 
 class CacheWrapper {
 public:
-    CacheWrapper() : m_cache(cache_memory, page_size, hash_initial, true) {}
+    CacheWrapper() : m_cache(cache::Cache::Create(cache_memory, page_size, hash_initial, true)) {}
 
     void set(iterator it) {
         slice k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
         slice v (std::get<1>(*it).c_str(), std::get<1>(*it).size());
         cache::ItemPtr item = nullptr;
         try {
-            item = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, cache::keepalive_forever);
+            item = m_cache.create_item(k, calc_hash(k), v.length(), /*flags*/0, cache::Item::infinite_TTL);
             item->assign_value(v);
             m_cache.do_set(item);
             bench_stats.num_set += 1;
         } catch (const std::exception &) {
             bench_stats.num_error += 1;
-            if (item) {
-                m_cache.destroy_item(item);
-            }
         }
     }
 
@@ -79,10 +76,9 @@ public:
 
     void del(iterator it) {
         slice k (std::get<0>(*it).c_str(), std::get<0>(*it).size());
-        error_code error; cache::Response cache_reply;
-        cache_reply = m_cache.do_delete(k, calc_hash(k));
+        bool found = m_cache.do_delete(k, calc_hash(k));
         bench_stats.num_del += 1;
-        auto & counter = (cache_reply == cache::DELETED) ? bench_stats.num_cache_hit : bench_stats.num_cache_miss;
+        auto & counter = found ? bench_stats.num_cache_hit : bench_stats.num_cache_miss;
         counter += 1;
     }
 private:

@@ -10,7 +10,10 @@
 #ifndef CACHELOT_COMMON_H_INCLUDED
 #  include <cachelot/common.h>
 #endif
-#include <boost/intrusive/detail/parent_from_member.hpp>
+#ifndef BOOST_INTRUSIVE_DETAIL_PARENT_FROM_MEMBER_HPP_INCLUDED
+#  include <boost/intrusive/detail/parent_from_member.hpp>
+#  define BOOST_INTRUSIVE_DETAIL_PARENT_FROM_MEMBER_HPP_INCLUDED
+#endif
 
 
 namespace cachelot {
@@ -32,8 +35,8 @@ namespace cachelot {
      */
     template <class T, intrusive_list_node T::*LinkPonter>
     class intrusive_list {
-        // Note: we don't use boost::intrusive_list as it requires that list hooks
-        // must be properly initilized all the time. It's not true where we use it.
+        // Note: we don't use boost::intrusive_list
+        // Boost intrusive_list hooks must be properly initilized all the time. It's not our case (memory manager internal nodes).
         typedef intrusive_list_node node_type;
     public:
         typedef T value_type;

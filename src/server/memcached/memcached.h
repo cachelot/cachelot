@@ -26,6 +26,10 @@
 #ifndef CACHELOT_MEMCACHED_ERROR_H_INCLUDED
 #  include <server/memcached/error.h>
 #endif
+#ifndef CACHELOT_MEMCACHED_PROTO_DEFS_H_INCLUDED
+#  include <server/memcached/proto_defs.h>
+#endif
+
 
 
 namespace cachelot {
