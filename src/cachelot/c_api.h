@@ -7,21 +7,6 @@
 //  Distributed under the terms of Simplified BSD License
 //  see LICENSE file
 
-
-/**
- * @page   c_api
- * @brief  Cachelot C API
- *
- * ## Cachelot C API
- *
- * @warning: This API is *not* thread safe
- * Thread safety was sacrificed for a sake of performance
- * (there is unreleased thread safe version. If somebody need it, please create GitHub Issue, it requires additional allocation though)
- *<br/>
- * ## Example
- * @TODO:(
- */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,7 +16,18 @@ extern "C" {
 #include <stdint.h>
 
 
-/// @defgroup api Public C API
+/**
+ * @defgroup c_api Cachelot C language API
+ *
+ * @warning This API is *not* thread safe
+ *
+ *
+ * Please keep in mind that Cachelot uses its own memory space. All stored items are in this separate space.
+ * Sometimes Cachelot may return pointer to an item in its memory to avoid unnecessary copying.
+ *
+ * @warning Such pointers are guarenteed to be valid only until the next call to Cachelot.
+ *
+ */
 /// @{
 
 struct cachelot_t;
@@ -43,9 +39,10 @@ typedef struct cachelot_t * CachelotPtr;
 
 /// Pointer to the cache Item
 typedef struct cachelot_item_t * CachelotItemPtr;
+/// Pointer to the read-only cache Item
 typedef const struct cachelot_item_t * CachelotConstItemPtr;
 
-/// Item never expires
+/// Special value for Item TTL - never expire
 extern const uint32_t cachelot_infinite_TTL;
 
 
@@ -67,8 +64,11 @@ typedef struct cachelot_options_t {
 
 /// Some calls may end up with an error
 typedef struct cachelot_error_t {
+    /// Error code (unique only across one category)
     int code;
+    /// Error category name
     const char * category;
+    /// Detailed error description
     char desription[255];
 } CachelotError;
 
@@ -86,10 +86,20 @@ CachelotPtr cachelot_init(CachelotOptions opts, CachelotError * out_error);
 /// Destroy previously created cache
 void cachelot_destroy(CachelotPtr c);
 
-/// Create new Item in the Cachelot memory region, allows to pass pre-calc hash
+/**
+ * Create new Item in the Cachelot memory region, allows to pass pre-calculated hash
+ *
+ * @warning returned pointer guaranteed to be valid only *until* the next Cachelot call
+ */
 CachelotItemPtr cachelot_create_item_raw(CachelotPtr c, CachelotItemKey key, const char * value, size_t valuelen, CachelotError * error);
 
-/// Destroy Item created with `cachelot_create_item`
+/**
+ * Destroy Item created with `cachelot_create_item`
+ *
+ * @note Usually it's not necessary to explicitly destroy an Item.
+ * Any call with an CachelotItemPtr argument will take ownership of the pointer.
+ * Although if Item was created and not passed as an argument
+ */
 void cachelot_destroy_item(CachelotPtr c, CachelotItemPtr i);
 
 /// Retrieve Item Time-To-Live in seconds
@@ -126,7 +136,6 @@ bool cachelot_add(CachelotPtr c, CachelotItemPtr i, CachelotError * error);
 
 //! @copydoc cachelot::cache::Cache::do_replace
 bool cachelot_replace(CachelotPtr c, CachelotItemPtr i, CachelotError * error);
-
 
 //! @copydoc cachelot::cache::Cache::do_append
 bool cachelot_append(CachelotPtr c, CachelotItemPtr i, CachelotError * error);

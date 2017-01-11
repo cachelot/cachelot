@@ -116,11 +116,6 @@ namespace cachelot {
         /**
          * One cache class to rule them all
          *
-         * @note Cache automaticaly manages lifetime of the stored items.
-         * But in cases when Item was *not stored* after call, *user is responsible for deallocating* Item by himself.
-         * Item may not be stored due to an error (the most likely out of memory) or due to invariant
-         * Operations like add/replace/cas/inc/dec may not store item because conditions were not met
-         * @see create_item() destroy_item()
          * @note Cache is *not* thread safe
          * @ingroup cache
          */
@@ -140,7 +135,7 @@ namespace cachelot {
             typedef dict_type::size_type size_type;
         public:
             /**
-             * static constructor function
+             * constructor
              *
              * @param memory_limit - amount of memory available for storage use
              * @param mem_page_size - size of the allocator memory page
@@ -167,13 +162,14 @@ namespace cachelot {
              * `get` -  retrieve item
              *
              * @return pointer to the Item or `nullptr` if none was found
-             * @warning pointer is only valid *until* the next cache API call
+             * @warning returned pointer guaranteed to be valid only *until* the next Cachelot call
              */
             ConstItemPtr do_get(const slice key, const hash_type hash) noexcept;
 
             /**
              * `set` - store item unconditionally
              *
+             * @warning item pointer will not be valid after the call
              */
             void do_set(ItemPtr item);
 
@@ -183,6 +179,8 @@ namespace cachelot {
              * @return
              * - `true` - item was stored
              * - `false` - key already exists
+             *
+             * @warning item pointer will not be valid after the call
              */
             bool do_add(ItemPtr item);
 
@@ -192,6 +190,8 @@ namespace cachelot {
              * @return
              * - `true` - item was stored
              * - `false` - no such key
+             *
+             * @warning item pointer will not be valid after the call
              */
             bool do_replace(ItemPtr item);
 
@@ -202,6 +202,8 @@ namespace cachelot {
              * - `[true, true]` - item was updated
              * - `[true, false]` - item was not updated as it has been modified since
              * - `[false, false]` - no such key
+             *
+             * @warning item pointer will not be valid after the call
              */
             tuple<bool, bool> do_cas(ItemPtr item, timestamp_type cas_unique);
 
@@ -211,6 +213,8 @@ namespace cachelot {
              * @return
              * - `true` - item was stored
              * - `false` - no such key
+             *
+             * @warning item pointer will not be valid after the call
              */
             bool do_append(ItemPtr item) { return do_extend(ExtendOperation::APPEND, item); }
 
@@ -220,6 +224,8 @@ namespace cachelot {
              * @return
              * - `true` - item was stored
              * - `false` - no such key
+             *
+             * @warning item pointer will not be valid after the call
              */
             bool do_prepend(ItemPtr item) { return do_extend(ExtendOperation::PREPEND, item); }
 
@@ -272,6 +278,8 @@ namespace cachelot {
 
             /**
              * Create new Item from the pre-allocated memory arena
+             *
+             * @warning returned pointer is only *valid until* next cachelot call
              */
             ItemPtr create_item(const slice key, const hash_type hash, size_t value_length, opaque_flags_type flags, seconds keepalive);
 
