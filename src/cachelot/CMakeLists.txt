@@ -4,13 +4,11 @@
 set (CACHELOT_SOURCES
     bits.h
     slice.h
-    cache.cpp
     cache.h
     common.cpp
     common.h
     debug_trace.h
     dict.h
-    error.cpp
     error.h
     expiration_clock.h
     hash_fnv1a.h
