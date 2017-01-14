@@ -83,11 +83,11 @@ or
 There are several variants of build:
 
 `-DCMAKE_BUILD_TYPE`  must be one of the:
-     - `Debug` - enable debug messages, assertions and disable optimization
-     - `Release` - release build
-     - `RelWithDebInfo` - release build with debug information enabled
-     - `MinSizeRel` - minimal size release
-     - `AddressSanitizer` - special build to run under [Address Sanitizer](https://code.google.com/p/address-sanitizer/) (compiler support and libasan required)
+- `Debug` - enable debug messages, assertions and disable optimization
+- `Release` - release build
+- `RelWithDebInfo` - release build with debug information enabled
+- `MinSizeRel` - minimal size release
+- `AddressSanitizer` - special build to run under [Address Sanitizer](https://code.google.com/p/address-sanitizer/) (compiler support and libasan required)
 
 ### Run tests or benchmarks ###
 All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
