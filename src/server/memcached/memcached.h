@@ -29,6 +29,9 @@
 #ifndef CACHELOT_MEMCACHED_PROTO_DEFS_H_INCLUDED
 #  include <server/memcached/proto_defs.h>
 #endif
+#ifndef CACHELOT_COMPRESSION_H_INCLUDED
+#  include <server/compression.h>
+#endif
 
 
 

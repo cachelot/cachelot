@@ -6,12 +6,14 @@
 
 #include <cachelot/common.h>
 #include <cachelot/cache.h>
+#include <server/settings.h>
 #include <cachelot/stats.h>
 #include <server/settings.h>
 #include <server/memcached/conversation.h>
 
 #include <iostream>
 #include <boost/program_options.hpp>
+
 #include <signal.h>
 
 using std::cerr;
@@ -19,6 +21,7 @@ using std::endl;
 using namespace cachelot;
 using std::string;
 namespace po = boost::program_options;
+
 
 namespace  {
 
@@ -90,6 +93,8 @@ namespace  {
                                                     "You may specify one of the suffixes (K,M,G) to use different units"
                                                     "Lesser pages leads to more accurate evictions, although page size affects maximal item size")
             ("hashtable,H", po::value<size_t>(),    "Initial hash table size (default 64K)")
+
+            ("compression-level,c",po::value<unsigned>(),"Level of the data compression from 0 (disabled) to the 9 (maximum)")
         ;
 
         po::variables_map varmap;
@@ -138,6 +143,9 @@ namespace  {
         if (not ispow2(settings.cache.initial_hash_table_size)) {
             throw invalid_configuration("the argument for option '--hashtable' must be power of 2");
         }
+        if (varmap.count("compression-level") == 1) {
+            settings.misc.compression_level = varmap["compression-level"].as<unsigned>();
+        }
         return EXIT_SUCCESS;
     }
 }
@@ -148,6 +156,7 @@ int main(int argc, char * argv[]) {
         if (parse_cmdline(argc, argv) != 0) {
             return EXIT_FAILURE;
         }
+        compression::init();
         // Cache Service
         auto the_cache = cache::Cache::Create(settings.cache.memory_limit,
                                               settings.cache.page_size,
@@ -202,12 +211,14 @@ int main(int argc, char * argv[]) {
         } while (not reactor.stopped());
 
 
+        compression::cleanup();
+
         return EXIT_SUCCESS;
+
     } catch (const std::exception & e) {
         cerr << "Error: " << e.what() << endl;
-        return EXIT_FAILURE;
     } catch (...) {
         cerr << "Unknown internal error!" << endl;
-        return EXIT_FAILURE;
     }
+    return EXIT_FAILURE;
 }

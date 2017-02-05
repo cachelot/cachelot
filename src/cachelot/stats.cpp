@@ -32,6 +32,13 @@ namespace cachelot {
             #undef PRINT_MEM_STAT
 
             std::cout << std::endl;
+
+            #define PRINT_COMPRESSION_STAT(stat_type, stat_name, stat_description) PRINT_STAT(compression, stat_type, stat_name, stat_description)
+            COMPRESSION_STATS(PRINT_COMPRESSION_STAT)
+            #undef PRINT_COMPRESSION_STAT
+
+            std::cout << std::endl;
+
         } catch (const std::exception &) { /* DO NOTHING */ }
     #endif // ADDRESS_SANITIZER
     }

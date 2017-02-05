@@ -8,10 +8,7 @@
 //  see LICENSE file
 
 
-#include <server/stream_server.h>
-#include <server/datagram_server.h>
-#include <server/memcached/proto_text.h>
-
+#include <server/memcached/proto_ascii.h>
 
 namespace cachelot {
 

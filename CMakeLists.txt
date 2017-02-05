@@ -63,7 +63,6 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
     set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-O2 -DNDEBUG -g")
     set (CMAKE_C_FLAGS_MINSIZEREL "-Os -DNDEBUG")
     set (CMAKE_C_FLAGS_ADDRESSSANITIZER "-fsanitize=address -O1 -g -DNDEBUG -DADDRESS_SANITIZER -fno-optimize-sibling-calls")
-
     set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES "")
     # - - GCC specific - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
@@ -137,25 +136,60 @@ set (cachelot_os_name "${CMAKE_SYSTEM_NAME} x${CACHELOT_PLATFORM_BITS}")
 configure_file (src/cachelot/version.h.in src/cachelot/version.h ESCAPE_QUOTES @ONLY)
 
 ###########################################################################
+#       Target output paths
+###########################################################################
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
+
+
+###########################################################################
 #       3rd party libraries
 ###########################################################################
 # - boost libraries - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 set (BOOST_MIN_VERSION, "1.53.0")
 set (USED_COMPONENTS unit_test_framework system program_options)
-set (Boost_USE_MULTITHREADED ON)
-set (Boost_USE_STATIC_LIBS ON)
+set (Boost_USE_MULTITHREADED TRUE)
+set (Boost_USE_STATIC_LIBS TRUE)
 add_definitions (-DBOOST_ALL_NO_LIB) # disable boost auto-linking feature as it does not work with all compilers
 find_package (Boost ${BOOST_MIN_VERSION} COMPONENTS ${USED_COMPONENTS} REQUIRED)
 include_directories (${INCLUDE_DIRECTORIES} ${Boost_INCLUDE_DIRS})
+
+# - Blosc: A blocking, shuffling and lossless compression library
+set (BLOSC_DIR "${PROJECT_BINARY_DIR}/src/thirdparty/c-blosc")
+set (COMPILER_SUPPORT_SSE2 TRUE)
+set (COMPILER_SUPPORT_AVX2 TRUE)
+set (HAVE_LZ4 TRUE)
+include_directories ("${BLOSC_DIR}/internal-complibs/lz4-1.7.0")
+
+set (DEACTIVATE_SNAPPY TRUE)
+set (DEACTIVATE_ZLIB TRUE)
+set (BLOSC_DEFAULT_BUILD_TYPE ${CACHELOT_BUILD})
+set (BUILD_TESTS FALSE)
+set (BUILD_STATIC TRUE)
+configure_file ("${BLOSC_DIR}/blosc/config.h.in"  "${BLOSC_DIR}/blosc/config.h" )
+include_directories("${BLOSC_DIR}/blosc/")
+add_subdirectory("${BLOSC_DIR}/blosc")
+set_target_properties(blosc_shared PROPERTIES EXCLUDE_FROM_ALL 1 EXCLUDE_FROM_DEFAULT_BUILD 1)
+
+unset (BUILD_TESTS)
+unset (BUILD_STATIC)
+unset (INTERNAL_LIBS)
+set (BLOSC_ENABLED TRUE)
+set (Blosc_LIBRARIES blosc_static)
+add_definitions (-DBLOSC_ENABLED)
+set (LZ4_SOURCES
+            "${BLOSC_DIR}/internal-complibs/lz4-1.7.0/lz4.c"
+            "${BLOSC_DIR}/internal-complibs/lz4-1.7.0/lz4hc.c"
+    )
+
 
 
 ###########################################################################
 #       Targets
 ###########################################################################
 message (STATUS "Cachelot setup ...")
-set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
-set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
-set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
+
 include_directories (src)
 # - - - cachelot library - - - - - - -
 add_subdirectory (src/cachelot)

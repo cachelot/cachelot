@@ -88,6 +88,13 @@ namespace cachelot {
             /// assign value to the item
             void assign_value(slice the_value) noexcept;
 
+
+            void * value_ptr() noexcept;
+
+
+            inline void set_value_length(size_t the_length) noexcept;
+
+
             /// assign value from the two parts
             void assign_compose(slice left, slice right) noexcept;
 
@@ -159,6 +166,16 @@ namespace cachelot {
             m_value_length = static_cast<decltype(m_value_length)>(the_value.length());
         }
 
+
+        inline void * Item::value_ptr() noexcept {
+            auto this_ = reinterpret_cast<uint8 *>(this);
+            return this_ + ValueOffset(this);
+        }
+
+
+        inline void Item::set_value_length(size_t the_length) noexcept {
+            m_value_length = static_cast<decltype(m_value_length)>(the_length);
+        }
 
         inline void Item::assign_compose(slice left, slice right) noexcept {
             debug_assert(left.length() + right.length() <= m_value_length);

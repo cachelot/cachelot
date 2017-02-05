@@ -36,7 +36,11 @@ namespace cachelot {
             size_t max_rcv_buffer_size = 32*1024*1024;
             size_t max_snd_buffer_size = 32*1024*1024;
         } net;
+        struct {
+            unsigned compression_level = 5u;
+        } misc;
     };
+
 
     extern struct settings settings;
 

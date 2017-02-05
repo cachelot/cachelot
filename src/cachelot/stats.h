@@ -72,7 +72,11 @@ namespace cachelot {
         X(uint64, curr_items,               "number of items in the cache") \
         X(bool, hash_is_expanding,          "hash table is expanding")
 
-    /// Stats storage struct
+    #define COMPRESSION_STATS(X) \
+        X(int64,  bytes_saved, "Amount of bytes saved due to the compression")  \
+        X(uint64, compression_errors, "Number of times when compression failed")  \
+        X(uint64, decompression_errors, "Number of times when decompression failed")
+
     struct stats {
         #define DECLARE_STAT(stat_type, stat_name, stat_description) stat_type stat_name = stat_type();
 
@@ -83,6 +87,10 @@ namespace cachelot {
         struct {
             MEMORY_STATS(DECLARE_STAT)
         } mem;
+
+        struct {
+            COMPRESSION_STATS(DECLARE_STAT)
+        } compression;
 
         #undef DECLARE_STAT
     };

@@ -3,8 +3,10 @@ set (CACHELOT_SERVER_SOURCES
         network.h
         socket_stream.h
         socket_datagram.h
-        settings.cpp
         settings.h
+        settings.cpp
+        compression.h
+        compression.cpp
         memcached/error.h
         memcached/proto_defs.h
         memcached/proto_ascii.h
@@ -18,5 +20,5 @@ set (CACHELOT_SERVER_SOURCES
         main.cpp
 )
 
-add_executable (cachelotd ${CACHELOT_SERVER_SOURCES})
-target_link_libraries (cachelotd cachelot ${Boost_LIBRARIES})
+add_executable (cachelotd ${CACHELOT_SERVER_SOURCES} ${LZ4_SOURCES})
+target_link_libraries (cachelotd cachelot ${Boost_LIBRARIES} ${Blosc_LIBRARIES})
