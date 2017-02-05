@@ -129,7 +129,6 @@ namespace cachelot {
         ///
         /// @return true if value was deleted and false if value was not found
         bool del(key_type key, hash_type hash) noexcept {
-            debug_assert(hash != 0);
             bool found; size_type pos;
             tie(found, pos) = entry_for(key, hash);
             if (found) {

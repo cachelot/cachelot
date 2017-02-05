@@ -293,6 +293,11 @@ namespace cachelot {
              */
             void publish_stats() noexcept;
 
+            /**
+             * Item eviction callback
+             */
+            std::function<void (ConstItemPtr)> on_eviction;
+
         private:
             /**
              * Extend (`prepend` or `append`) existing item with the new data
@@ -355,17 +360,23 @@ namespace cachelot {
             if (not ispow2(mem_page_size)) {
                 throw std::invalid_argument("mem_page_size must be power of 2");
             }
+            if (mem_page_size == 0) {
+                throw std::invalid_argument("mem_page_size must be non-zero");
+            }
             if (mem_page_size > std::numeric_limits<uint32>::max()) {
-                throw std::invalid_argument("mem_page_size is too big");
+                throw std::invalid_argument("mem_page_size is too big (max is INT32_MAX)");
+            }
+            if (mem_page_size < 256) {
+                throw std::invalid_argument("mem_page_size is too small (min 256b)");
+            }
+            if (memory_limit % mem_page_size != 0) {
+                throw std::invalid_argument("memory_limit must be divisible by mem_page_size");
             }
             if (not ispow2(initial_dict_size)) {
                 throw std::invalid_argument("initial_dict_size must be power of 2");
             }
             if (initial_dict_size > std::numeric_limits<dict_type::size_type>::max()) {
                 throw std::invalid_argument("initial_dict_size is too big");
-            }
-            if (memory_limit % mem_page_size != 0) {
-                throw std::invalid_argument("memory_limit divide by mem_page_size should be integer");
             }
             return Cache(memory_limit, mem_page_size, initial_dict_size, enable_evictions);
         }
@@ -637,10 +648,13 @@ namespace cachelot {
             if (size_required > m_allocator.page_size) {
                 throw system_error(error::item_too_big);
             }
-            static const auto on_delete = [=](void * ptr) noexcept -> void {
+            const auto on_delete = [=](void * ptr) noexcept -> void {
                 auto i = reinterpret_cast<Item *>(ptr);
                 debug_only(bool deleted = ) this->m_dict.del(i->key(), i->hash());
                 debug_assert(deleted);
+                if (on_eviction) {
+                    on_eviction(i);
+                }
             };
             memory = m_allocator.alloc_or_evict(size_required, m_evictions_enabled, on_delete);
             if (memory != nullptr) {

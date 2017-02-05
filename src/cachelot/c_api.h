@@ -45,6 +45,9 @@ typedef const struct cachelot_item_t * CachelotConstItemPtr;
 /// Special value for Item TTL - never expire
 extern const uint32_t cachelot_infinite_TTL;
 
+/// Item eviction callback type
+typedef void (*CachelotOnEvictedCallback)(CachelotConstItemPtr);
+
 
 /// Cache created with the options below
 typedef struct cachelot_options_t {
@@ -94,7 +97,7 @@ void cachelot_destroy(CachelotPtr c);
 CachelotItemPtr cachelot_create_item_raw(CachelotPtr c, CachelotItemKey key, const char * value, size_t valuelen, CachelotError * error);
 
 /**
- * Destroy Item created with `cachelot_create_item`
+ * Destroy Item created with `cachelot_create_item_raw`
  *
  * @note Usually it's not necessary to explicitly destroy an Item.
  * Any call with an CachelotItemPtr argument will take ownership of the pointer.
@@ -149,15 +152,25 @@ bool cachelot_delete(CachelotPtr c, CachelotItemKey key, CachelotError * error);
 //! @copydoc cachelot::cache::Cache::do_touch
 bool cachelot_touch(CachelotPtr c, CachelotItemKey key, uint32_t keepalive_sec, CachelotError * error);
 
-//! @copydoc cachelot::cache::Cache::do_flush_all
-void cachelot_flush_all(CachelotPtr c, CachelotError * error);
-
 //! @copydoc cachelot::cache::Cache::do_incr
 bool cachelot_incr(CachelotPtr c, CachelotItemKey key, uint64_t delta, uint64_t * result, CachelotError * error);
 
 //! @copydoc cachelot::cache::Cache::do_decr
 bool cachelot_decr(CachelotPtr c, CachelotItemKey key, uint64_t delta, uint64_t * result, CachelotError * error);
 
+//! @copydoc cachelot::cache::Cache::do_flush_all
+void cachelot_flush_all(CachelotPtr c, CachelotError * error);
+
+/// assign eviction callback
+///
+/// @code
+/// void OnEvictedCallback(CachelotConstItemPtr i);
+/// @endcode
+///
+/// setting `cb` argument to `NULL` will reset previously assigned callback
+void cachelot_on_eviction_callback(CachelotPtr c, CachelotOnEvictedCallback cb);
+
+/// default cachelot hash function
 uint32_t cachelot_hash(const char * key, size_t keylen);
 
 /// retrieve Cachelot version
