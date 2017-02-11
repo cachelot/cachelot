@@ -375,6 +375,7 @@ namespace cachelot {
      * @endcode
      */
     class memalloc::free_blocks_by_size {
+    public:
         // list of the same class size free blocks
         typedef intrusive_list<memalloc::block, &memalloc::block::group_by_size_link> size_class_list;
         //
@@ -604,6 +605,7 @@ namespace cachelot {
         debug_assert(ispow2(memory_limit));
         debug_assert(page_size > 0);
         debug_assert(ispow2(page_size));
+        debug_assert(log2u(page_size) >= free_blocks_by_size::first_power_of_2);
         debug_assert(memory_limit >= (page_size * 4));
         debug_assert(memory_limit % page_size == 0);
         STAT_SET(mem.limit_maxbytes, memory_limit);

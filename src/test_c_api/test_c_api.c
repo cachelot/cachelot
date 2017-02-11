@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <unistd.h>
@@ -41,7 +42,8 @@ bool check_value_eq(CachelotPtr c, const char * key, const char * value, Cachelo
     CachelotItemKey k = new_key(key);
     i = cachelot_get_unsafe(c, k, out_err);
     if (i == NULL) {
-        print_cachelot_error("Failed to retrieve item back", out_err);
+        printf("Failed to retrieve key '%s'", key);
+        print_cachelot_error(":", out_err);
         return false;
     }
     if (strncmp(cachelot_item_get_value(i), value, strlen(value)) != 0) {
@@ -246,34 +248,91 @@ bool test_item_functions(CachelotPtr c, CachelotError * out_err) {
     // Check key
     if (strncmp(key, cachelot_item_get_key(i1), strlen(key)) != 0 ) {
         printf("cachelot_item_get_key failed: '%s' != '%s'\n", key, cachelot_item_get_key(i1));
-        ret = false; goto clean;
+        ret = false; goto cleanup;
     }
     if (strlen(key) != cachelot_item_get_keylen(i1)) {
         printf("cachelot_item_get_key failed: '%zu' != '%zu'\n", strlen(key), cachelot_item_get_keylen(i1));
-        ret = false; goto clean;
+        ret = false; goto cleanup;
     }
     // Check value
     if (strncmp(value, cachelot_item_get_value(i1), strlen(value)) != 0 ) {
         printf("cachelot_item_get_value failed: '%s' != '%s'\n", value, cachelot_item_get_value(i1));
-        ret = false; goto clean;
+        ret = false; goto cleanup;
     }
     if (strlen(value) != cachelot_item_get_valuelen(i1)) {
         printf("cachelot_item_get_value failed: '%zu' != '%zu'\n", strlen(value), cachelot_item_get_valuelen(i1));
-        ret = false; goto clean;
+        ret = false; goto cleanup;
     }
     // Check TTL
     if (cachelot_item_get_ttl_seconds(i1) != cachelot_infinite_TTL) {
         printf("cachelot_item_(get/set)_ttl_seconds failed: '%u' != '%u'\n", cachelot_infinite_TTL, cachelot_item_get_ttl_seconds(i1));
-        ret = false; goto clean;
+        ret = false; goto cleanup;
     }
     cachelot_item_set_ttl_seconds(i1, 42);
     if (cachelot_item_get_ttl_seconds(i1) != 42) {
         printf("cachelot_item_(get/set)_ttl_seconds failed: '%u' != '%u'\n", 42, cachelot_item_get_ttl_seconds(i1));
-        ret = false; goto clean;
+        ret = false; goto cleanup;
     }
-clean:
+cleanup:
     cachelot_destroy_item(c, i1);
-    return true;
+    return ret;
+}
+
+
+static bool __test_cb_on_eviction_callback_succeded = true;
+static bool __at_this_point_callback_should_not_be_called = false;
+static const char * __large_value = "There must be value large enough to fill 256b page. So there will be one long value that will do it. The other values are just too small, so this one should be long enough.";
+void __test_cb_on_eviction_callback(CachelotConstItemPtr i) {
+    if (__at_this_point_callback_should_not_be_called) {
+        printf("on_eviction_callback was called, while it shouldn't\n");
+        __test_cb_on_eviction_callback_succeded = false;
+    }
+    // key=ItemX
+    if (cachelot_item_get_keylen(i) != 6 || strncmp("Item", cachelot_item_get_key(i), 4u) != 0) {
+        printf("on_eviction_callback unexpected key: '%s' != '%s'\n", "ItemXX", cachelot_item_get_key(i));
+        __test_cb_on_eviction_callback_succeded = false;
+    }
+
+    if (cachelot_item_get_valuelen(i) != strlen(__large_value) || strncmp(cachelot_item_get_value(i), __large_value, strlen(__large_value))) {
+        printf("on_eviction_callback unexpected value: '%s' != '%s'\n", __large_value, cachelot_item_get_value(i));
+        __test_cb_on_eviction_callback_succeded = false;
+    }
+}
+bool test_on_eviction_callback(CachelotError * out_err) {
+    const CachelotOptions smallCache = {
+        .memory_limit = 1024u,
+        .mem_page_size = 256u,
+        .initial_dict_size = 4u,
+        .enable_evictions = true,
+    };
+    CachelotPtr c = cachelot_init(smallCache, out_err);
+    if (c == NULL) {
+        print_cachelot_error("test on_eviction_callback: failed to create cache", out_err);
+        return false;
+    }
+    cachelot_on_eviction_callback(c, &__test_cb_on_eviction_callback);
+    bool ret = true;
+    for (int i = 0; i < 100; ++i) {
+        char theKey[8];
+        sprintf(theKey, "Item%02d", i);
+        CachelotItemPtr item = new_item(c, theKey, __large_value, out_err);
+        if (item == NULL) {
+            print_cachelot_error("test on_eviction_callback: failed to create item", out_err);
+        }
+        if (!cachelot_set(c, item, out_err) ) {
+            print_cachelot_error("test on_eviction_callback: failed to set new item", out_err);
+            ret = false; goto cleanup;
+        }
+        if (i == 80) {
+            __at_this_point_callback_should_not_be_called = true;
+            cachelot_on_eviction_callback(c, NULL);
+        }
+    }
+
+    ret = __test_cb_on_eviction_callback_succeded;
+    cleanup:
+        cachelot_destroy(c);
+    return ret;
 }
 
 
@@ -308,6 +367,11 @@ int main() {
     }
     if (! test_item_functions(cache, err)) {
         print_cachelot_error("expiration tests failed", err);
+        ret = 1;
+        goto cleanup;
+    }
+    if (! test_on_eviction_callback(err)) {
+        print_cachelot_error("on eviction callback tests failed", err);
         ret = 1;
         goto cleanup;
     }

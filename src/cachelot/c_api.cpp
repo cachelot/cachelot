@@ -335,6 +335,16 @@ extern "C" {
         }
     }
 
+    void cachelot_on_eviction_callback(CachelotPtr c, CachelotOnEvictedCallback cb) {
+        if (cb != nullptr) {
+            c->cache.on_eviction = [=](cache::ConstItemPtr i) {
+                cb(reinterpret_cast<CachelotConstItemPtr>(i));
+            };
+        } else {
+            c->cache.on_eviction = std::function<void (cache::ConstItemPtr)>{};
+        }
+    }
+
     uint32_t cachelot_hash(const char * key, size_t keylen) {
         cache::HashFunction calc_hash;
         return calc_hash(slice(key, keylen));

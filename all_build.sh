@@ -3,6 +3,7 @@
 BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer"
 
 . ./cleanup.sh
+PARALLEL="-j1"
 if [ TRAVIS == "yes" ]; then
   PARALLEL="-j2"
 else
@@ -12,9 +13,5 @@ for cfg in ${BUILD_CFGS}; do
   clean_build_files
   echo "Building ${cfg} ..."
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=${cfg} &&
-  make ${PARALLEL}
-  if [[ $? != 0 ]]; then
-    echo "*** ERROR: ${cfg} build failed"
-    exit 1
-  fi
+  make ${PARALLEL} || exit 1
 done
