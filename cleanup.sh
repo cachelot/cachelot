@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ROOT=$(dirname $(realpath ${BASH_SOURCE[0]}))
+ROOT=$(dirname $(readlink -f -- ${BASH_SOURCE[0]}))
 
 function clean_artifacts {
     rm -rf "${ROOT}/bin/*"

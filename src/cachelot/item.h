@@ -71,7 +71,7 @@ namespace cachelot {
             Item & operator= (Item &&) = delete;
         public:
             /// constructor
-            explicit Item(slice the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, seconds ttl, timestamp_type the_timestamp) noexcept;
+            explicit Item(slice the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, seconds the_ttl, timestamp_type the_timestamp) noexcept;
 
             /// Destroy existing Item
             static void Destroy(Item * item) noexcept;
@@ -122,13 +122,13 @@ namespace cachelot {
         };
 
 
-        inline Item::Item(slice the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, seconds ttl, timestamp_type the_timestamp) noexcept
+        inline Item::Item(slice the_key, hash_type the_hash, uint32 value_length, opaque_flags_type the_flags, seconds the_ttl, timestamp_type the_timestamp) noexcept
                 : m_timestamp(the_timestamp)
                 , m_hash(the_hash)
                 , m_value_length(value_length)
                 , m_opaque_flags(the_flags)
                 , m_key_length(the_key.length()) {
-            set_ttl(ttl);
+            set_ttl(the_ttl);
             debug_assert(unaligned_bytes(this, alignof(Item) == 0));
             debug_assert(the_key.length() <= max_key_length);
             debug_assert(value_length <= max_value_length);
