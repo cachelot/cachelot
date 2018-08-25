@@ -45,14 +45,14 @@ namespace cachelot {
 
         /// Test whether `bitno` is set (`bitno` counts from zero)
         template <typename IntType>
-        constexpr bool isset(const IntType value, const unsigned bitno) noexcept {
+        constexpr bool is_set(const IntType value, const unsigned bitno) noexcept {
             return value & (1 << bitno);
         }
 
         /// Test whether `bitno` is not set (`bitno` counts from zero)
         template <typename IntType>
-        constexpr bool isunset(const IntType value, const unsigned bitno) noexcept {
-            return not isset(value, bitno);
+        constexpr bool is_unset(const IntType value, const unsigned bitno) noexcept {
+            return not is_set(value, bitno);
         }
 
         /// Set given `bitno` to 1 (`bitno` counts from zero)
