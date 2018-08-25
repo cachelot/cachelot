@@ -459,7 +459,7 @@ namespace cachelot {
         /// check if table cell at `pos` is non empty according to the bit index
         /// @return `true` cell is marked as non empty, `false` otherwise
         bool bit_index_probe(position pos) const noexcept {
-            return bit::isset(first_level_bit_index, pos.pow_index) && bit::isset(second_level_bit_index[pos.pow_index], pos.sub_index);
+            return bit::is_set(first_level_bit_index, pos.pow_index) && bit::is_set(second_level_bit_index[pos.pow_index], pos.sub_index);
         }
 
         /// mark cell at `pos` as empty in bit index

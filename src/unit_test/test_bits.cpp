@@ -32,15 +32,15 @@ BOOST_AUTO_TEST_CASE(test_pow2_utils) {
 
 BOOST_AUTO_TEST_CASE(test_bit_basic) {
     uint32 i = 0;
-    BOOST_CHECK(bit::isunset(i, 0));
-    BOOST_CHECK(bit::isset(1, 0));
+    BOOST_CHECK(bit::is_unset(i, 0));
+    BOOST_CHECK(bit::is_set(1, 0));
     i = bit::set(i, 0);
     BOOST_CHECK_EQUAL(i, 1);
     i = bit::unset(i, 0);
     i = bit::set(i, 31);
     BOOST_CHECK_EQUAL(i, 0x80000000);
     BOOST_CHECK_EQUAL(bit::most_significant(i), 31);
-    BOOST_CHECK(bit::isset(i, 31));
+    BOOST_CHECK(bit::is_set(i, 31));
     i = bit::flip(i, 31);
     BOOST_CHECK(i == 0);
     BOOST_CHECK_EQUAL(bit::most_significant(0xFFFFFFFF), 31);
