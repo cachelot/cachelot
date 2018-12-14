@@ -13,7 +13,7 @@
 #endif
 
 #if HAVE_CONFIG_H
-#  include "config.h"
+#  include <cachelot/config.h>
 #endif
 
 // assertion
