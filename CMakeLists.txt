@@ -114,7 +114,7 @@ endif (CCACHE_FOUND)
 include (CheckCXXSymbolExists)
 check_cxx_symbol_exists (aligned_alloc stdlib.h HAVE_ALIGNED_ALLOC)
 check_cxx_symbol_exists (posix_memalign stdlib.h HAVE_POSIX_MEMALIGN)
-configure_file (src/cachelot/config.h.in src/cachelot/config.h)
+configure_file ("${CMAKE_SOURCE_DIR}/src/cachelot/config.h.in" "${CMAKE_SOURCE_DIR}/src/cachelot/config.h")
 add_definitions (-DHAVE_CONFIG_H=1)
 
 ###########################################################################
@@ -139,7 +139,7 @@ else (version_valid)
     set (cachelot_version_hash "XXX")
 endif ()
 set (cachelot_os_name "${CMAKE_SYSTEM_NAME} x${CACHELOT_PLATFORM_BITS}")
-configure_file (src/cachelot/version.h.in src/cachelot/version.h ESCAPE_QUOTES @ONLY)
+configure_file ("${CMAKE_SOURCE_DIR}/src/cachelot/version.h.in" "${CMAKE_SOURCE_DIR}/src/cachelot/version.h" ESCAPE_QUOTES @ONLY)
 
 ###########################################################################
 #       3rd party libraries
