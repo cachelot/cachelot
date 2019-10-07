@@ -1,25 +1,16 @@
 language: cpp
 sudo: required
-dist: trusty
+dist: bionic
 cache:
-  apt: true
+  ccache: true
 os:
-- linux
+  - linux
 
 before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -qq
-  - sudo apt-get install -qq libasan0 libboost-system1.55-dev libboost-test1.55-dev libboost-program-options1.55-dev
+  - sudo apt-get install -qq libasan5 libboost-system-dev libboost-test-dev libboost-program-options-dev
   - sudo service memcached stop
-install:
-  # clang 3.6, libc++
-  - if [ "$CXX" == "clang++" ]; then sudo apt-get -qq install clang-3.6 clang++-3.6 libstdc++6-4.4-dev; fi
-  - if [ "$CXX" == "clang++" ]; then sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 0; fi
-  - if [ "$CXX" == "clang++" ]; then sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 0; fi
-  - if [ "$CXX" == "clang++" ]; then sudo update-alternatives --set clang /usr/bin/clang-3.6; fi
-  - if [ "$CXX" == "clang++" ]; then sudo update-alternatives --set clang++ /usr/bin/clang++-3.6; fi
-  - if [ "$CXX" == "clang++" ]; then export CXXFLAGS="-stdlib=libstdc++"; fi
-  - if [ "$CXX" == "clang++" ]; then export LDFLAGS="-stdlib=libstdc++"; fi
 
 compiler:
   - clang
@@ -40,15 +31,14 @@ notifications:
 # coverity scan
 env:
   global:
-   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
-   #   via the "travis encrypt" command using the project repo's public key
-   - secure: "e7O6bLneIJFJek2ecx0LUdXTnYItv1oBLeCXWT1xZxKAV4uRJ9UayjAMye+NmTqdwZtM/vNH4XQZhpku58uK081G2Abxwy5eDPYzsscjX3u18fhJzgYsKrYdszznkvZbIWuCjLbKxWb5VosdUKFgOPdMvHWsVUUa0OtDfJuFO2odoV++KfiCpLcAd+KWogv+9bEl9NLth6VsO5FG72Dlkyu4sD2Uq74RDbpQgLvMjYycYjKCFh8OA7G4yUWR66uHVh01WgKhpIPOV+ao4Z8Ry1Tz5Pzn05CUye5sdybVIwvj1RUFIJSbs7Inse3dfIl6D/4rJ5ug/OdW0HPAj7W9eFzlj6SZeurZ/U1s98w6z1/ZBHaPiySug0S5zWuj3IFTT3/Y9LJleomoM4ZdjW9aBdqSxQPwmuWA34irIeQeHyvLMJ6ibCiBeOK+rqRmcM2s8Dp5SQ0929QwS64XjGuQil/sa490k0ud2S3QecMTk5VmUBIOfAo4TsKayLfPtGNEJMrDqJ8xqZoFSS0rf614BJt9XZwJKjqxX8X0xIyu+aV0jN/XdDa19Nr+jKjOLLQJUpDrtKtFsysE1y1ic8c0gSXrApgdlWpniKU5U4z+rcBOKUNzDckWFfRZ+Jfa79aaSMj8s4HoPYt00317jeJ5mQgXJCI8h8HCdxRkCdY+DcQ="
+    # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+    #   via the "travis encrypt" command using the project repo's public key
+    - secure: "e7O6bLneIJFJek2ecx0LUdXTnYItv1oBLeCXWT1xZxKAV4uRJ9UayjAMye+NmTqdwZtM/vNH4XQZhpku58uK081G2Abxwy5eDPYzsscjX3u18fhJzgYsKrYdszznkvZbIWuCjLbKxWb5VosdUKFgOPdMvHWsVUUa0OtDfJuFO2odoV++KfiCpLcAd+KWogv+9bEl9NLth6VsO5FG72Dlkyu4sD2Uq74RDbpQgLvMjYycYjKCFh8OA7G4yUWR66uHVh01WgKhpIPOV+ao4Z8Ry1Tz5Pzn05CUye5sdybVIwvj1RUFIJSbs7Inse3dfIl6D/4rJ5ug/OdW0HPAj7W9eFzlj6SZeurZ/U1s98w6z1/ZBHaPiySug0S5zWuj3IFTT3/Y9LJleomoM4ZdjW9aBdqSxQPwmuWA34irIeQeHyvLMJ6ibCiBeOK+rqRmcM2s8Dp5SQ0929QwS64XjGuQil/sa490k0ud2S3QecMTk5VmUBIOfAo4TsKayLfPtGNEJMrDqJ8xqZoFSS0rf614BJt9XZwJKjqxX8X0xIyu+aV0jN/XdDa19Nr+jKjOLLQJUpDrtKtFsysE1y1ic8c0gSXrApgdlWpniKU5U4z+rcBOKUNzDckWFfRZ+Jfa79aaSMj8s4HoPYt00317jeJ5mQgXJCI8h8HCdxRkCdY+DcQ="
 addons:
   coverity_scan:
     project:
       name: "cachelot/cachelot"
     notification_email: build@cachelot.io
-    build_command_prepend: "cmake -G \"Unix Makefiles\" -DCMAKE_BUILD_TYPE=Release"
-    build_command:   "make"
+    build_command_prepend: 'cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release'
+    build_command: "make"
     branch_pattern: coverity_scan
-
