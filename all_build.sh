@@ -12,6 +12,6 @@ fi
 for cfg in ${BUILD_CFGS}; do
   clean_build_files
   echo "Building ${cfg} ..."
-  cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=${cfg} &&
+  cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=${cfg} . &&
   make ${PARALLEL} || exit 1
 done

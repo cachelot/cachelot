@@ -13,6 +13,9 @@ endif ()
 project (cachelot)
 cmake_minimum_required (VERSION 2.8.3)
 
+set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_C_STANDARD 11)
+
 ###########################################################################
 #       Platform setup
 ###########################################################################
@@ -36,7 +39,7 @@ string (REGEX MATCH "x86_64" x86_64_CPU "${CMAKE_SYSTEM_PROCESSOR}")
 #       Compiler setup
 ###########################################################################
 #  TODO: Precompiled headers macro
-message (STATUS "Compiler ID: " ${CMAKE_CXX_COMPILER_ID})
+message (STATUS "Compiler: " ${CMAKE_CXX_COMPILER_ID} " v" ${CMAKE_CXX_COMPILER_VERSION})
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
 # - Visual Studio - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # warnings
@@ -45,10 +48,10 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
     add_definitions ("/wd4996") # function call with parameters that may be unsafe
     add_definitions (-DWIN32_LEAN_AND_MEAN) # limit amount of code in Windows.h to the minimum
     add_definitions (-DNOMINMAX) # disable min / max macro from Windows.h
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /EHsc /Zi")
-    set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MD /Ot")
-    set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /sdl /MDd /GS /Ob0 /Od /DEBUG /RTC1")
-    set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES "Dbghelp.lib")
+    set (CMAKE_C_FLAGS "/W4 /EHsc /Zi")
+    set (CMAKE_C_FLAGS_RELEASE "/MD /Ot")
+    set (CMAKE_C_FLAGS_DEBUG "/sdl /MDd /GS /Ob0 /Od /DEBUG /RTC1")
+    set (DEBUG_LIBRARIES "Dbghelp.lib")
 elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang"))
 # - GCC / Clang common - - - - - - - - - - - - - - - - - - - - - - - - - -
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4")
@@ -64,18 +67,9 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
     set (CMAKE_C_FLAGS_MINSIZEREL "-Os -DNDEBUG")
     set (CMAKE_C_FLAGS_ADDRESSSANITIZER "-fsanitize=address -O1 -g -DNDEBUG -DADDRESS_SANITIZER -fno-optimize-sibling-calls")
 
-    set (PLATFORM_SPECIFIC_DEBUG_LIBRARIES "")
-    # - - GCC specific - - - - - - - - - - - - - - - - - - - - - - - - - -
-    if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
-        set (GCC_VERSION ${CMAKE_CXX_COMPILER_VERSION})
-        message (STATUS "gcc version " ${GCC_VERSION})
-        if (GCC_VERSION VERSION_LESS 4.8)
-            message (FATAL_ERROR "gcc minimum version 4.8 is required")
-        endif ()
-       # - - Clang specific - - - - - - - - - - - - - - - - - - - - - - - -
-    elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
-        set (CLANG_VERSION ${CMAKE_CXX_COMPILER_VERSION})
-        message (STATUS "Clang version " ${CLANG_VERSION})
+    set (DEBUG_LIBRARIES "")
+    # - - Clang specific - - - - - - - - - - - - - - - - - - - - - - - -
+    if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
         set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c++98-compat -Wno-c++98-compat-pedantic")
         # set libc++ as a default std library (if available)
         if (NOT ${CMAKE_CXX_FLAGS} MATCHES "-stdlib=")
@@ -83,20 +77,18 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
             check_library_exists(c++ throw "" HAVE_LIBCPLUSPLUS)
             if (HAVE_LIBCPLUSPLUS)
                 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-                set (CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -stdlib=libc++ -lc++abi")
+                set (CMAKE_CXX_LINK_FLAGS "-stdlib=libc++ -lc++abi")
             endif ()
         endif ()
     endif ()
 else ()
     message (FATAL_ERROR "unknown compiler")
 endif ()
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS} -std=c++11")
-set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${CMAKE_C_FLAGS_DEBUG}")
-set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_C_FLAGS_RELEASE}")
-set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO "${CMAKE_CXX_FLAGS_RELWITHDEBUGINFO} ${CMAKE_C_FLAGS_RELWITHDEBUGINFO}")
-set (CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} ${CMAKE_C_FLAGS_MINSIZEREL}")
-set (CMAKE_CXX_FLAGS_ADDRESSSANITIZER "${CMAKE_CXX_FLAGS_ADDRESSSANITIZER} ${CMAKE_C_FLAGS_ADDRESSSANITIZER}")
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
+set (CMAKE_CXX_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
+set (CMAKE_CXX_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
+set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO ${CMAKE_C_FLAGS_RELWITHDEBUGINFO})
+set (CMAKE_CXX_FLAGS_MINSIZEREL ${CMAKE_C_FLAGS_MINSIZEREL})
+set (CMAKE_CXX_FLAGS_ADDRESSSANITIZER ${CMAKE_C_FLAGS_ADDRESSSANITIZER})
 
 ###########################################################################
 #       CCache configuration
