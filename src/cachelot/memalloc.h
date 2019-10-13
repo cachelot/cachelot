@@ -34,7 +34,7 @@ namespace cachelot {
     /// @{
 
    /**
-    * Allocator which works whith fixed amount of pre-allocated memory
+    * Allocator which works with fixed amount of pre-allocated memory
     *
     * Advantages:
     *  - allocated blocks can be evicted in order to satisfy new allocations
