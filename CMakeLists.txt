@@ -2,12 +2,12 @@
 #       Cmake basic setup
 ###########################################################################
 if (NOT CMAKE_GENERATOR STREQUAL "Unix Makefiles")
-    set (CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebugInfo;MinSizeRel;AddressSanitizer" CACHE TYPE INTERNAL FORCE)
+    set (CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebugInfo;MinSizeRel;AddressSanitizer;UBSanitizer" CACHE STRING INTERNAL FORCE)
     mark_as_advanced (CMAKE_CONFIGURATION_TYPES)
 else ()
     # Unix Makefiles support only single build configuration - release by default
     if (NOT CMAKE_BUILD_TYPE)
-        set (CMAKE_BUILD_TYPE RelWithDebugInfo CACHE TYPE INTERNAL FORCE)
+        set (CMAKE_BUILD_TYPE RelWithDebugInfo CACHE STRING INTERNAL FORCE)
     endif ()
 endif ()
 project (cachelot)
@@ -56,7 +56,7 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
 # - GCC / Clang common - - - - - - - - - - - - - - - - - - - - - - - - - -
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4")
     if (CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64_CPU)
-        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -msse2")
+        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -msse4")
         if (CACHELOT_PLATFORM_BITS EQUAL 64)
             set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -m64")
         endif ()
@@ -65,7 +65,8 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
     set (CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
     set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-O2 -DNDEBUG -g")
     set (CMAKE_C_FLAGS_MINSIZEREL "-Os -DNDEBUG")
-    set (CMAKE_C_FLAGS_ADDRESSSANITIZER "-fsanitize=address -O1 -g -DNDEBUG -DADDRESS_SANITIZER -fno-optimize-sibling-calls")
+    set (CMAKE_C_FLAGS_ADDRESSSANITIZER "-fsanitize=address -O2 -g -DNDEBUG -DADDRESS_SANITIZER -fno-optimize-sibling-calls")
+    set (CMAKE_C_FLAGS_UBSANITIZER "-fsanitize=undefined -O2 -g -DNDEBUG -DUB_SANITIZER -fno-optimize-sibling-calls")
 
     set (DEBUG_LIBRARIES "")
     # - - Clang specific - - - - - - - - - - - - - - - - - - - - - - - -
@@ -89,6 +90,7 @@ set (CMAKE_CXX_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
 set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO ${CMAKE_C_FLAGS_RELWITHDEBUGINFO})
 set (CMAKE_CXX_FLAGS_MINSIZEREL ${CMAKE_C_FLAGS_MINSIZEREL})
 set (CMAKE_CXX_FLAGS_ADDRESSSANITIZER ${CMAKE_C_FLAGS_ADDRESSSANITIZER})
+set (CMAKE_CXX_FLAGS_UBSANITIZER ${CMAKE_C_FLAGS_UBSANITIZER})
 
 ###########################################################################
 #       CCache configuration
@@ -112,9 +114,13 @@ add_definitions (-DHAVE_CONFIG_H=1)
 ###########################################################################
 #       version.h
 ###########################################################################
-execute_process(COMMAND git describe --tags --dirty=-git OUTPUT_VARIABLE cachelot_git_tag WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} OUTPUT_STRIP_TRAILING_WHITESPACE)
-set (git_version_regex "v([0-9]+)\\.([0-9]+)\\.([0-9]+)-([A-z]+)(-[0-9]+-)?(.*)$")
-string (REGEX MATCH "${git_version_regex}" version_valid "${cachelot_git_tag}")
+set (version_valid 0)
+find_package(Git QUIET)
+if (GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+    execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags --dirty=-git OUTPUT_VARIABLE cachelot_git_tag WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set (git_version_regex "v([0-9]+)\\.([0-9]+)\\.([0-9]+)-([A-z]+)(-[0-9]+-)?(.*)$")
+    string (REGEX MATCH "${git_version_regex}" version_valid "${cachelot_git_tag}")
+endif ()
 if (version_valid)
     string (REGEX REPLACE "${git_version_regex}" "\\1;\\2;\\3;\\4;\\6" parsed_version_list "${cachelot_git_tag}")
     list (GET parsed_version_list 0 cachelot_version_major)

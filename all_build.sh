@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer"
+BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer UBSanitizer"
 
 . ./cleanup.sh
 PARALLEL="-j1"

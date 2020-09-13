@@ -87,7 +87,8 @@ There are several variants of build:
 - `Release` - release build
 - `RelWithDebInfo` - release build with debug information enabled
 - `MinSizeRel` - minimal size release
-- `AddressSanitizer` - special build to run under [Address Sanitizer](https://code.google.com/p/address-sanitizer/) (compiler support and libasan required)
+- `AddressSanitizer` - special build to run under [Address Sanitizer](https://clang.llvm.org/docs/AddressSanitizer.html) (compiler support and libasan required)
+- `UBSanitizer` - special build to run under [Undefined Behavior Sanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html) (compiler support required)
 
 ### Run tests or benchmarks ###
 All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
