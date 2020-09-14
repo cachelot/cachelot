@@ -34,26 +34,31 @@ function run_tests {
         ;;
     Release)
         ${bindir}/unit_tests || exit 1
+        ${bindir}/test_c_api || exit 1
         ${bindir}/benchmark_cache || exit 1
         ${bindir}/benchmark_memalloc || exit 1
-        ${bindir}/test_c_api || exit 1
         ;;
     RelWithDebugInfo)
         ${bindir}/unit_tests || exit 1
+        ${bindir}/test_c_api || exit 1
         ${bindir}/benchmark_cache || exit 1
         ${bindir}/benchmark_memalloc || exit 1
-        ${bindir}/test_c_api || exit 1
         ;;
     MinSizeRel)
         ${bindir}/unit_tests || exit 1
+        ${bindir}/test_c_api || exit 1
         ${bindir}/benchmark_cache || exit 1
         ${bindir}/benchmark_memalloc || exit 1
-        ${bindir}/test_c_api || exit 1
         ;;
     AddressSanitizer)
         ${bindir}/unit_tests || exit 1
-        ${bindir}/benchmark_cache || exit 1
         ${bindir}/test_c_api || exit 1
+        ${bindir}/benchmark_cache || exit 1
+        ;;
+    UBSanitizer)
+        ${bindir}/unit_tests || exit 1
+        ${bindir}/test_c_api || exit 1
+        ${bindir}/benchmark_cache || exit 1
         ;;
     *)
         echo "Unknown build configuration";
@@ -62,11 +67,7 @@ function run_tests {
     esac
 }
 
-BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer"
-# FIXME: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=61693
-if [ "$CXX" == "g++" ]; then
-    BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel"
-fi
+BUILD_CFGS="Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer UBSanitizer"
 
 for cfg in ${BUILD_CFGS}; do
     run_tests "${cfg}"
@@ -74,4 +75,3 @@ done
 
 echo ""
 echo "*** All tests completed successfully"
-

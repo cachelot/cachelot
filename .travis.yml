@@ -1,6 +1,6 @@
 language: cpp
 sudo: required
-dist: bionic
+dist: focal
 cache:
   ccache: true
 os:
@@ -8,8 +8,7 @@ os:
 
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -qq
-  - sudo apt-get install -qq libasan5 libboost-system-dev libboost-test-dev libboost-program-options-dev
+  - sudo apt-get install -qq python2 libasan5 libboost-system-dev libboost-test-dev libboost-program-options-dev
   - sudo service memcached stop
 
 compiler:

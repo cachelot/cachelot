@@ -131,7 +131,7 @@ namespace cachelot {
                 UnsignedIntType xvalue;
                 if (negative) {
                     *dest++ = '-';
-                    xvalue = - value;
+                    xvalue = - static_cast<UnsignedIntType>(value);
                 } else {
                     xvalue = value;
                 }
