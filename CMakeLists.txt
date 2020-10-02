@@ -52,7 +52,7 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
     set (CMAKE_C_FLAGS_RELEASE "/MD /Ot")
     set (CMAKE_C_FLAGS_DEBUG "/sdl /MDd /GS /Ob0 /Od /DEBUG /RTC1")
     set (DEBUG_LIBRARIES "Dbghelp.lib")
-elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang"))
+elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "^(Apple)?Clang$"))
 # - GCC / Clang common - - - - - - - - - - - - - - - - - - - - - - - - - -
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4")
     if (CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64_CPU)
@@ -70,7 +70,7 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
 
     set (DEBUG_LIBRARIES "")
     # - - Clang specific - - - - - - - - - - - - - - - - - - - - - - - -
-    if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+    if (CMAKE_CXX_COMPILER_ID MATCHES "^(Apple)?Clang$")
         set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c++98-compat -Wno-c++98-compat-pedantic")
         # set libc++ as a default std library (if available)
         if (NOT ${CMAKE_CXX_FLAGS} MATCHES "-stdlib=")
@@ -83,7 +83,7 @@ elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (${CMAKE_CXX_COMPILER_ID} S
         endif ()
     endif ()
 else ()
-    message (FATAL_ERROR "unknown compiler")
+    message (FATAL_ERROR "unknown compiler: ${CMAKE_CXX_COMPILER_ID}")
 endif ()
 set (CMAKE_CXX_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
 set (CMAKE_CXX_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
@@ -108,7 +108,7 @@ endif (CCACHE_FOUND)
 include (CheckCXXSymbolExists)
 check_cxx_symbol_exists (aligned_alloc stdlib.h HAVE_ALIGNED_ALLOC)
 check_cxx_symbol_exists (posix_memalign stdlib.h HAVE_POSIX_MEMALIGN)
-configure_file ("${CMAKE_SOURCE_DIR}/src/cachelot/config.h.in" "${CMAKE_SOURCE_DIR}/src/cachelot/config.h")
+configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/src/cachelot/config.h.in" "${CMAKE_CURRENT_SOURCE_DIR}/src/cachelot/config.h")
 add_definitions (-DHAVE_CONFIG_H=1)
 
 ###########################################################################
@@ -137,7 +137,7 @@ else (version_valid)
     set (cachelot_version_hash "XXX")
 endif ()
 set (cachelot_os_name "${CMAKE_SYSTEM_NAME} x${CACHELOT_PLATFORM_BITS}")
-configure_file ("${CMAKE_SOURCE_DIR}/src/cachelot/version.h.in" "${CMAKE_SOURCE_DIR}/src/cachelot/version.h" ESCAPE_QUOTES @ONLY)
+configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/src/cachelot/version.h.in" "${CMAKE_CURRENT_SOURCE_DIR}/src/cachelot/version.h" ESCAPE_QUOTES @ONLY)
 
 ###########################################################################
 #       3rd party libraries
@@ -156,9 +156,9 @@ include_directories (${INCLUDE_DIRECTORIES} ${Boost_INCLUDE_DIRS})
 #       Targets
 ###########################################################################
 message (STATUS "Cachelot setup ...")
-set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
-set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
-set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
 include_directories (src)
 # - - - cachelot library - - - - - - -
 add_subdirectory (src/cachelot)
