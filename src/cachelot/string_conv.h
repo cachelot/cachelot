@@ -331,7 +331,7 @@ namespace cachelot {
                 return unsigned_value * sign;
             }
             if (unsigned_value == int64_boundary && sign == -1) {
-                return -unsigned_value;
+                return -(long long)unsigned_value;
             }
             out_error = error::numeric_overflow;
             return NO_RESULT;
