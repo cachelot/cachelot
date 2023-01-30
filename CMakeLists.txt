@@ -30,7 +30,7 @@ else ()
 endif ()
 message (STATUS "Platform: ${CMAKE_SYSTEM_NAME} x${CACHELOT_PLATFORM_BITS}")
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    add_definition (-D_WIN32_WINNT=0x05010000) # set NTDDI_WINXP as a target win version
+    add_definitions (-D_WIN32_WINNT=0x05010000) # set NTDDI_WINXP as a target win version
 endif ()
 string (REGEX MATCH "arm.*" ARM_CPU "${CMAKE_SYSTEM_PROCESSOR}")
 string (REGEX MATCH "x86_64" x86_64_CPU "${CMAKE_SYSTEM_PROCESSOR}")
