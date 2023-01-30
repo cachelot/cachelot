@@ -80,7 +80,7 @@ namespace cachelot {
             iterator & operator= (const iterator &) = default;
 
             explicit operator bool() const noexcept {
-                return m_table != nullptr && not m_table->empty_at(m_pos);
+                return m_table != nullptr && ! m_table->empty_at(m_pos);
             }
 
             const key_type key() const noexcept {
@@ -127,7 +127,7 @@ namespace cachelot {
             , m_expand_pos(0)
         {
             debug_assert(initial_size > 0);
-            if (not m_primary_tbl->ok()) {
+            if (! m_primary_tbl->ok()) {
                 throw std::bad_alloc();
             }
             debug_assert(pow2(m_hashpower) == m_primary_tbl->capacity());
@@ -142,7 +142,7 @@ namespace cachelot {
 
         /// @copydoc hash_table::get
         tuple<bool, mapped_type> get(const key_type key, const hash_type hash) const noexcept {
-            if (not is_expanding()) {
+            if (! is_expanding()) {
                 return m_primary_tbl->get(key, hash);
             } else {
                 tuple<bool, mapped_type> result = m_secondary_tbl->get(key, hash);
@@ -157,7 +157,7 @@ namespace cachelot {
 
         /// return either iterator referencing existing entry or pointer to insertion position
         tuple<bool, iterator> entry_for(key_type key, hash_type hash, bool readonly = false) {
-            if (not is_expanding()) {
+            if (! is_expanding()) {
                 return search_primary(key, hash, readonly);
             } else {
                 // dict expansion is in progress
@@ -169,17 +169,17 @@ namespace cachelot {
         iterator insert(iterator where, key_type key, hash_type hash, mapped_type value) noexcept {
             hash_table_type * table = where.m_table;
             debug_assert(raw_pointer(m_primary_tbl) == table ||  raw_pointer(m_secondary_tbl) == table);
-            debug_assert(not table->contains(key, hash));
+            debug_assert(! table->contains(key, hash));
             return iterator(table, table->insert(where.m_pos, key, hash, value));
         }
 
         /// @copydoc hash_table::del
         bool del(key_type key, hash_type hash) noexcept {
-            if (not is_expanding()) {
+            if (! is_expanding()) {
                 return m_primary_tbl->del(key, hash);
             } else {
                 bool deleted = m_secondary_tbl->del(key, hash);
-                if (not deleted) {
+                if (! deleted) {
                     deleted = m_primary_tbl->del(key, hash);
                 }
                 rehash_some();
@@ -206,7 +206,7 @@ namespace cachelot {
 
         /// @copydoc hash_table::contains
         bool contains(key_type key, hash_type hash) const noexcept {
-            if (not is_expanding()) {
+            if (! is_expanding()) {
                 return m_primary_tbl->contains(key, hash);
             } else {
                 return m_primary_tbl->contains(key, hash) || m_secondary_tbl->contains(key, hash);
@@ -250,14 +250,14 @@ namespace cachelot {
         tuple<bool, iterator> search_primary(key_type key, hash_type hash, bool readonly) {
             bool found; size_type at;
             tie(found, at) = m_primary_tbl->entry_for(key, hash);
-            if (not found) {
+            if (! found) {
                 if (m_primary_tbl->threshold_reached()) {
-                    if (not readonly) {
+                    if (! readonly) {
                         begin_expand();
                     }
                     // search for free entry again after resize
                     tie(found, at) = m_primary_tbl->entry_for(key, hash);
-                    debug_assert(not found);
+                    debug_assert(! found);
                 }
             }
             return make_tuple(found, iter(m_primary_tbl, at)); // TODO: weak_ptr?
@@ -273,7 +273,7 @@ namespace cachelot {
                     // move item to the primary table and return its position there
                     bool __; size_type new_pos;
                     tie(__, new_pos) = m_primary_tbl->entry_for(key, hash);
-                    debug_assert(not __); // not found in primary as it is in secondary already
+                    debug_assert(! __); // not found in primary as it is in secondary already
                     const entry_type & e = m_secondary_tbl->entry_at(old_pos);
                     new_pos = m_primary_tbl->insert(new_pos, e.key(), hash, e.value());
                     m_secondary_tbl->remove(old_pos);
@@ -286,7 +286,7 @@ namespace cachelot {
         }
 
         void begin_expand() {
-            debug_assert(not is_expanding());
+            debug_assert(! is_expanding());
             m_expand_pos = 0;
             m_primary_tbl.swap(m_secondary_tbl);
             m_primary_tbl.reset(new hash_table_type(pow2(m_hashpower + 1)));
@@ -319,7 +319,7 @@ namespace cachelot {
                 const hash_table_type * old = m_secondary_tbl.get();
                 hash_type hash = old->hash_at(m_expand_pos);
                 const entry_type & e = old->entry_at(m_expand_pos);
-                debug_assert(not m_primary_tbl->contains(e.key(), hash));
+                debug_assert(! m_primary_tbl->contains(e.key(), hash));
                 m_primary_tbl->put(e.key(), hash, e.value());
                 m_secondary_tbl->remove(m_expand_pos);
                 elements_moved += 1;

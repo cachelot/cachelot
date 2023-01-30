@@ -148,7 +148,7 @@ namespace cachelot {
         void remove_if(ConditionFun predicate) noexcept {
             size_type pos = 0;
             while (pos < capacity()) {
-            	if (not empty_at(pos)) {
+            	if (! empty_at(pos)) {
                     if (predicate(entry_at(pos).value())) {
                         remove(pos);
                         continue;
@@ -175,7 +175,7 @@ namespace cachelot {
             size_type distance = 0;
             // NOTE! we may give up before we find suitable slot, then `insert` will continue search from this point
             // lookup for non-existing item would take O(N) otherwise
-            while (not empty_at(pos) && distance <= get_distance(pos, hash_at(pos))) {
+            while (! empty_at(pos) && distance <= get_distance(pos, hash_at(pos))) {
                 if (hash_at(pos) == hash && eq(entry_at(pos).key(), key)) {
                     return tuple<bool, size_type>(true, pos);
                 } else {
@@ -188,12 +188,12 @@ namespace cachelot {
 
         /// insert entry starting from given pos that was returned by @ref hash_table::entry_for
         size_type insert(size_type pos, const key_type key, hash_type hash, mapped_type value) noexcept {
-            debug_assert(not threshold_reached()); debug_assert(hash != 0);
+            debug_assert(! threshold_reached()); debug_assert(hash != 0);
             entry_type entry(key, value);
             // how far we from the desired position
             size_type lookup_distance = get_distance(pos, hash);
-            while (not empty_at(pos)) {
-                debug_assert( not eq(entry_at(pos).key(), entry.key()) ); // entry must be unique
+            while (! empty_at(pos)) {
+                debug_assert( ! eq(entry_at(pos).key(), entry.key()) ); // entry must be unique
                 const size_type existing_entry_distance = get_distance(pos, hash_at(pos));
                 if (existing_entry_distance < lookup_distance) {
                     std::swap(hash, m_hashes[pos]);
@@ -212,14 +212,14 @@ namespace cachelot {
 
         /// remove element pos given pos
         void remove(const size_type pos) noexcept {
-            debug_assert(not empty_at(pos));
+            debug_assert(! empty_at(pos));
             debug_assert(m_size > 0);
             m_hashes[pos] = 0;
             m_size -= 1;
             // optimize following items
             size_type current_position = pos;
             size_type following_position = inc_pos(pos);
-            while (not empty_at(following_position) && get_distance(following_position, hash_at(following_position)) > 0) {
+            while (! empty_at(following_position) && get_distance(following_position, hash_at(following_position)) > 0) {
                 std::swap(m_hashes[current_position], m_hashes[following_position]);
                 swap(m_entries[current_position], m_entries[following_position]);
                 current_position = inc_pos(current_position);

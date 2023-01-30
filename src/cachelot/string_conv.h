@@ -229,7 +229,7 @@ namespace cachelot {
 
             // check that all chars are digits
             for (auto iter = str; iter < end; ++iter) {
-                if (not std::isdigit(*iter)) {
+                if (! std::isdigit(*iter)) {
                     out_error = error::numeric_convert;
                     return NO_RESULT;
                 }
@@ -345,7 +345,7 @@ namespace cachelot {
             static constexpr auto NO_RESULT = std::numeric_limits<UnsignedT>::max();
 
             auto u64_value = str_to_big_unsigned<ConstIterator>(str, end, out_error);
-            if (not out_error) {
+            if (! out_error) {
                 if (u64_value <= std::numeric_limits<UnsignedT>::max()) {
                     return static_cast<UnsignedT>(u64_value);
                 } else {
@@ -364,7 +364,7 @@ namespace cachelot {
             static constexpr auto NO_RESULT = std::numeric_limits<SignedT>::max();
 
             auto s64_value = str_to_big_signed<ConstIterator>(str, end, out_error);
-            if (not out_error) {
+            if (! out_error) {
                 if (std::numeric_limits<SignedT>::min() <= s64_value && s64_value <= std::numeric_limits<SignedT>::max()) {
                     return static_cast<SignedT>(s64_value);
                 } else {
@@ -407,7 +407,7 @@ namespace cachelot {
         static_assert(std::is_integral<Integer>::value, "Non-integer type");
         error_code err_code;
         auto result = internal::choose_str_to_int<Integer, ConstIterator, std::is_signed<Integer>::value>::convert(str, end, err_code);
-        if (not err_code) {
+        if (! err_code) {
             return result;
         } else {
             throw system_error(err_code);

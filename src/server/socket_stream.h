@@ -146,7 +146,7 @@ namespace cachelot { namespace net {
         m_socket.async_read_some(asio::buffer(m_recv_buf.begin_write(), m_recv_buf.available()),
             [=](const error_code error, const size_t bytes_received) {
                 slice receive_result;
-                if (not error) {
+                if (! error) {
                     self->m_recv_buf.confirm_write(bytes_received);
                     ConversationReply reply = handle_data(m_recv_buf, m_send_buf);
                     self->m_recv_buf.compact();
@@ -176,7 +176,7 @@ namespace cachelot { namespace net {
         auto self = this->shared_from_this();
         asio::async_write(m_socket, asio::buffer(m_send_buf.begin_read(), m_send_buf.non_read()), asio::transfer_all(),
             [=](error_code error, size_t bytes_sent) {
-                if (not error) {
+                if (! error) {
                     debug_assert(self->m_send_buf.non_read() == bytes_sent);
                     self->m_send_buf.confirm_read(bytes_sent);
                     self->m_send_buf.compact();
@@ -216,10 +216,10 @@ namespace cachelot { namespace net {
             auto new_conversation = static_cast<ImplType *>(this)->new_conversation();
             m_acceptor.async_accept(new_conversation->socket(),
                 [=](const error_code error) {
-                    if (not error) {
+                    if (! error) {
                         new_conversation->start();
                     }
-                    if (not m_ios.stopped()) {
+                    if (! m_ios.stopped()) {
                         this->async_accept();
                     }
                 });

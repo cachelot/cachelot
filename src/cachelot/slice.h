@@ -67,7 +67,7 @@ namespace cachelot {
 
         /// conversion to bool, empty range treat as `false`
         constexpr explicit operator bool() const noexcept {
-            return not empty();
+            return ! empty();
         }
 
         /// check if this range contents are the same as `other` (memory comparisson)
@@ -84,7 +84,7 @@ namespace cachelot {
 
         /// check if this range contents are the same as `other` (memory comparisson)
         bool operator!=(const slice & other) const noexcept {
-            return not operator==(other);
+            return ! operator==(other);
         }
 
         /// search for given range `what` in this slice

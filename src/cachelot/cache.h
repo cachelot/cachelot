@@ -351,13 +351,13 @@ namespace cachelot {
 
 
         inline Cache Cache::Create(size_t memory_limit, size_t mem_page_size, size_t initial_dict_size, bool enable_evictions) {
-            if (not ispow2(memory_limit)) {
+            if (! ispow2(memory_limit)) {
                 throw std::invalid_argument("memory_limit must be power of 2");
             }
             if (memory_limit < (mem_page_size * 4)) {
                 throw std::invalid_argument("memory_limit should be enough for at least 4 pages");
             }
-            if (not ispow2(mem_page_size)) {
+            if (! ispow2(mem_page_size)) {
                 throw std::invalid_argument("mem_page_size must be power of 2");
             }
             if (mem_page_size == 0) {
@@ -372,7 +372,7 @@ namespace cachelot {
             if (memory_limit % mem_page_size != 0) {
                 throw std::invalid_argument("memory_limit must be divisible by mem_page_size");
             }
-            if (not ispow2(initial_dict_size)) {
+            if (! ispow2(initial_dict_size)) {
                 throw std::invalid_argument("initial_dict_size must be power of 2");
             }
             if (initial_dict_size > std::numeric_limits<dict_type::size_type>::max()) {
@@ -405,7 +405,7 @@ namespace cachelot {
             if (found) {
                 ItemPtr item = at.value();
                 // validate item
-                if (not item->is_expired()) {
+                if (! item->is_expired()) {
                     m_allocator.touch(item);
                 } else {
                     m_dict.remove(at);
@@ -440,7 +440,7 @@ namespace cachelot {
             ItemAutoDelete _item_uniq_ptr(this, item);
             bool found; iterator at;
             tie(found, at) = retrieve_item(item->key(), item->hash());
-            if (not found) {
+            if (! found) {
                 STAT_INCR(cache.set_new, 1);
                 insert_item_at(at, _item_uniq_ptr);
             } else {
@@ -455,7 +455,7 @@ namespace cachelot {
             ItemAutoDelete _item_uniq_ptr(this, item);
             bool found; iterator at;
             tie(found, at) = retrieve_item(item->key(), item->hash());
-            if (not found) {
+            if (! found) {
                 insert_item_at(at, _item_uniq_ptr);
                 STAT_INCR(cache.add_stored, 1);
                 return true;
@@ -602,7 +602,7 @@ namespace cachelot {
             }
             bool found; iterator at;
             tie(found, at) = retrieve_item(key, hash);
-            if (not found) {
+            if (! found) {
                 if (op == ArithmeticOperation::INCR) {
                     STAT_INCR(cache.incr_misses, 1);
                 } else {

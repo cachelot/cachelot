@@ -258,7 +258,7 @@ namespace cachelot {
                     }
                     send_buf << CRLF << i->value() << CRLF;
                 }
-            } while (not args.empty());
+            } while (! args.empty());
             send_buf << END << CRLF;
             return net::SEND_REPLY_AND_READ;
         }
@@ -387,7 +387,7 @@ namespace cachelot {
 
 
         inline net::ConversationReply handle_statistics_command(Command, slice args, io_buffer & send_buf, cache::Cache & cache_api) {
-            if (not args.empty()) {
+            if (! args.empty()) {
                 throw system_error(error::not_implemented);
             }
             cache_api.publish_stats();
@@ -409,7 +409,7 @@ namespace cachelot {
 
 
         inline net::ConversationReply handle_version_command(Command, slice args, io_buffer & send_buf, cache::Cache &) {
-            if (not args.empty()) {
+            if (! args.empty()) {
                 throw system_error(error::crlf_expected);
             }
             send_buf << VERSION << SPACE << CACHELOT_VERSION_FULL << CRLF;
@@ -429,7 +429,7 @@ namespace cachelot {
 
 
         inline net::ConversationReply reply_with_response(io_buffer & send_buf, Response response, bool noreply) {
-            if (not noreply) {
+            if (! noreply) {
                 send_buf << response << CRLF;
                 return net::SEND_REPLY_AND_READ;
             } else {

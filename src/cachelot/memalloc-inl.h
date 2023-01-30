@@ -316,7 +316,7 @@ namespace cachelot {
             auto this_ = reinterpret_cast<const uint8 *>(this);
             debug_assert(this_ >= page_begin);
             debug_assert(this_ + size_with_header() <= page_end);
-            if (not check_neighbours) {
+            if (! check_neighbours) {
                 return;
             }
             if (this_ > page_begin) {
@@ -530,7 +530,7 @@ namespace cachelot {
                 if (bit_index_probe(pos)) {
                     block * blk = nullptr;
                     auto & size_class = size_classes_table[pos.absolute()];
-                    if (not size_class.empty()) {
+                    if (! size_class.empty()) {
                         debug_assert(attempt == 1 || size_class.front()->size() >= size);
                         if (size_class.front()->size() >= size) {
                             blk = size_class.pop_front();

@@ -46,13 +46,13 @@ namespace cachelot {
 
         /// return head of the list
         pointer front() noexcept {
-            debug_assert(not empty());
+            debug_assert(! empty());
             return pointer_from_link(dummy_link.next);
         }
 
         /// return tail of the list
         pointer back() noexcept {
-            debug_assert(not empty());
+            debug_assert(! empty());
             return pointer_from_link(dummy_link.prev);
         }
 
@@ -76,7 +76,7 @@ namespace cachelot {
 
         /// remove head of the list
         pointer pop_front() noexcept {
-            debug_assert(not empty());
+            debug_assert(! empty());
             node_type * link = dummy_link.next;
             unlink(link);
             return pointer_from_link(link);
@@ -84,7 +84,7 @@ namespace cachelot {
 
         /// remove tail of the list
         pointer pop_back() noexcept {
-            debug_assert(not empty());
+            debug_assert(! empty());
             node_type * link = dummy_link.prev;
             debug_assert(link->next == &dummy_link);
             unlink(link);
@@ -146,7 +146,7 @@ namespace cachelot {
         /// check whether list contains block `item`
         bool has(pointer item) const noexcept {
             debug_assert(item != nullptr);
-            if (not is_linked(item)) {
+            if (! is_linked(item)) {
                 return false;
             }
             const node_type * node = &dummy_link;
