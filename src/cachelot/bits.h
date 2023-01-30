@@ -11,12 +11,23 @@
 namespace cachelot {
 
     namespace internal {
+#if defined(_MSC_VER)
+#include <intrin.h>
+
+        // count leading zeroes family as GCC / Clang intrinsic
+        template <typename Int32_T> constexpr unsigned clz32(Int32_T i) noexcept { unsigned long Index = 0; return _BitScanReverse(&Index, i); }
+        template <typename Int64_T> constexpr unsigned clz64(Int64_T i) noexcept { unsigned long Index = 0; return _BitScanReverse64(&Index, i); }
+        // find first set family as GCC / Clang intrinsic
+        template <typename Int32_T> constexpr unsigned ffs32(Int32_T i) noexcept { return __lzcnt(i); }
+        template <typename Int64_T> constexpr unsigned ffs64(Int64_T i) noexcept { return __lzcnt64(i); }
+#else
         // count leading zeroes family as GCC / Clang intrinsic
         template <typename Int32_T> constexpr unsigned clz32(Int32_T i) noexcept { return __builtin_clz(i); }
         template <typename Int64_T> constexpr unsigned clz64(Int64_T i) noexcept { return __builtin_clzll(i); }
         // find first set family as GCC / Clang intrinsic
         template <typename Int32_T> constexpr unsigned ffs32(Int32_T i) noexcept { return __builtin_ffs(i); }
         template <typename Int64_T> constexpr unsigned ffs64(Int64_T i) noexcept { return __builtin_ffsll(i); }
+#endif
 
         template <typename IntType,
                   typename std::enable_if<std::is_integral<IntType>::value && sizeof(IntType) == 4>::type * = nullptr>
@@ -122,7 +133,7 @@ namespace cachelot {
 
     /// return number of bytes necessary to align `size` according to the given `alignment`
     constexpr size_t unaligned_bytes(const size_t size, const size_t alignment) noexcept {
-        return ((size + (alignment - 1u)) & -alignment) - size;
+        return ((size + (alignment - 1u)) & -((long long)alignment)) - size;
     }
 
     /// return number of bytes necessary to align given `addr` according to the given `alignment`
