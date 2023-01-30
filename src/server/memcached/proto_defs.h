@@ -21,7 +21,7 @@ namespace cachelot { namespace memcached {
         x(APPEND)               \
         x(CAS)                  \
         x(DECR)                 \
-        x(DELETE)               \
+        x(DEL)                  \
         x(GET)                  \
         x(GETS)                 \
         x(INCR)                 \

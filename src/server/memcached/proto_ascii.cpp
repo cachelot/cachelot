@@ -16,6 +16,9 @@ namespace cachelot {
         constexpr slice OK =  slice::from_literal("OK");
 
         /// Memcached error types
+#if defined(_MSC_VER)
+#undef ERROR // ERROR defined with GDI declarations
+#endif
         constexpr slice ERROR = slice::from_literal("ERROR"); ///< unknown command
         constexpr slice CLIENT_ERROR = slice::from_literal("CLIENT_ERROR"); ///< request is ill-formed
         constexpr slice SERVER_ERROR = slice::from_literal("SERVER_ERROR"); ///< internal server error
@@ -155,7 +158,7 @@ namespace cachelot {
                     reply = handle_storage_command(command, args, recv_buf, send_buf, cache_api);
                     break;
                 // delete
-                case Command::DELETE:
+                case Command::DEL:
                     reply = handle_delete_command(command, args, send_buf, cache_api);
                     break;
                 // arithmetic
@@ -473,7 +476,7 @@ namespace cachelot {
                 case 6:
                     switch (first_char) {
                     case 'a': return is_6("append", command) ? Command::APPEND : Command::UNDEFINED;
-                    case 'd': return is_6("delete", command) ? Command::DELETE : Command::UNDEFINED;
+                    case 'd': return is_6("delete", command) ? Command::DEL : Command::UNDEFINED;
                     default : return Command::UNDEFINED;
                     }
                 case 7:
