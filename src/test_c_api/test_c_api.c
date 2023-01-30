@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#if defined(_MSC_VER)
+#include <windows.h>
+#define sleep Sleep
+#else
 #include <unistd.h>
-
+#endif
 #include <cachelot/c_api.h>
 
 
