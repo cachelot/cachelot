@@ -47,14 +47,14 @@ BOOST_AUTO_TEST_CASE(test_hash_table_operations) {
     tie(found, value) = the_dict.get(the_key, the_hash);
     BOOST_CHECK(found && value == the_value);
     // check that now hash_table is non-empty
-    BOOST_CHECK(not the_dict.empty());
+    BOOST_CHECK(! the_dict.empty());
     // attempt to add second value with the same key must return false
     BOOST_CHECK(the_dict.put(the_key, the_hash, the_value) == false);
     // delete stored value
     BOOST_CHECK(the_dict.del(the_key, the_hash) == true);
     // check that value was deleted
     tie(found, value) = the_dict.get(the_key, the_hash);
-    BOOST_CHECK(not found);
+    BOOST_CHECK(! found);
     // attempt to delete non-existing value must return false
     BOOST_CHECK(the_dict.del(the_key, the_hash) == false);
     // unconditionally store value
