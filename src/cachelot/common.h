@@ -110,6 +110,8 @@ namespace cachelot {
         } else {
             return nullptr;
         }
+    #elif defined(_MSC_VER)
+        return _aligned_malloc(size, alignment);
     #else
     #  error "aligned_alloc function not found"
     #endif
