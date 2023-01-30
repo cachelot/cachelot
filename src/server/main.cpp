@@ -183,14 +183,18 @@ int main(int argc, char * argv[]) {
         boost::asio::signal_set signals(reactor);
         signals.add(SIGTERM);
         signals.add(SIGINT);
+#if !defined(_MSC_VER)
         signals.add(SIGQUIT);
         signals.add(SIGUSR1);
+#endif
         signals.async_wait([&reactor](const error_code& error, int signal_number) {
             if (error) { return; }
             switch (signal_number) {
+#if !defined(_MSC_VER)
             case SIGUSR1:
                 PrintStats();
                 break;
+#endif
             default:
                 reactor.stop();
             }
