@@ -8,8 +8,11 @@ import socket
 import logging
 import os
 import errno
-import cPickle as pickle
-from cStringIO import StringIO
+try:
+   import cPickle as pickle
+except:
+   import pickle
+import io
 
 
 log = logging.getLogger(__name__)
@@ -257,7 +260,7 @@ class Client(object):
     def __send(self, cmd):
         assert self.is_connected(), 'Not connected'
         try:
-            self._sock.sendall(cmd)
+            self._sock.sendall(str.encode(cmd))
         except:
             self._sock = None
             raise
@@ -270,7 +273,7 @@ class Client(object):
                 chunk = self._sock.recv(4096)
                 if not chunk:
                     raise ConnectionAbortedException()
-                self._socket_buffer += chunk
+                self._socket_buffer += chunk.decode()
                 term_pos = self._socket_buffer.find(CMD_TERMINATOR)
             result = self._socket_buffer[:term_pos]
             self._socket_buffer = self._socket_buffer[term_pos + len(CMD_TERMINATOR):]

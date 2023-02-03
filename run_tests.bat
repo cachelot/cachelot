@@ -1,24 +1,9 @@
 @ECHO OFF
 
 REM ===========================================================================
-REM Check MSVC environment
-REM ===========================================================================
-IF [%VCToolsVersion%] == [] (
-	ECHO ================================================================================
-	ECHO Visual Studio env not detected. Abort.
-	ECHO ================================================================================
-	ECHO.
-	EXIT /B 99
-) ELSE (
-	ECHO ================================================================================
-	ECHO Visual Studio CMD ver: %VSCMD_VER%
-	ECHO Visual Studio Tools ver: %VCToolsVersion%
-	ECHO ================================================================================
-	ECHO.
-)
-
 REM Detect Python
-python --version 2>NUL
+REM ===========================================================================
+python --version > NUL 2>&1
 IF ERRORLEVEL 1 (
 	ECHO Python not installed. Abort.
 	ECHO.
@@ -32,7 +17,7 @@ SET "BUILD_CFGS=Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer UBSan
 
 FOR %%c IN (%BUILD_CFGS%) DO (
     CALL :run_tests %%c
-	IF ERRORLEVEL NEQ 0 (
+	IF NOT ERRORLEVEL 0 (
 		EXIT /B %ERRORLEVEL%
 	)
 )
@@ -51,14 +36,14 @@ REM ===========================================================================
 SET buildCfg=%~1
 START %MYDIR%bin/%buildCfg%/cachelotd
 SET "PID="
-FOR /F "tokens=2" %A IN ('"TASKLIST /NH /FI "IMAGENAME eq cachelotd*" | FINDSTR /i cachelotd"') DO SET pid=%A
+FOR /F "tokens=2" %%A IN ('"TASKLIST /NH /FI "IMAGENAME eq cachelotd*" | FINDSTR /i cachelotd"') DO SET pid=%%A
 REM ensure listen socket is up
-TIMEOUT /T 1 /NOBREAK > NUL
+TIMEOUT /T 1 /NOBREAK > NUL 2>&1
 python %MYDIR%test/server_test.py
 SET ret=%ERRORLEVEL%
-TASKKILL /PID %pid%
+TASKKILL /PID %pid% > NUL 2>&1
 REM ensure process is down
-TIMEOUT /T 1 /NOBREAK > NUL
+TIMEOUT /T 1 /NOBREAK > NUL 2>&1
 EXIT /B %ret%
 
 
@@ -67,13 +52,13 @@ SET buildCfg=%~1
 ECHO *** [%buildCfg%]
 SET bindir=%MYDIR%bin/%buildCfg%
 IF NOT EXIST "%bindir%" (
-	ECHO *** [ - skipped -]
+	ECHO *** [- skipped -]
 	EXIT /B 0
 )
 REM Run basic smoke tests
 CALL :server_test %buildCfg%
-IF ERRORLEVEL NEQ 0 (
-	EXIT /B %ERRORLEVEL%
+IF NOT ERRORLEVEL 0 (
+	EXIT /B ERRORLEVEL
 )
 
 REM Run other tests/benchmarks depending on build type

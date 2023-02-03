@@ -34,7 +34,7 @@ FOR %%c IN (%BUILD_CFGS%) DO (
 	CALL cleanup.bat clean_build_files
 	ECHO Building %%c ...
 	cmake -DCMAKE_TOOLCHAIN_FILE=%VCPKG%/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=%%c .
-	msbuild ALL_BUILD.vcxproj /p:Configuration=%%c
+	cmake --build .
 )
 
 EXIT /B 0
