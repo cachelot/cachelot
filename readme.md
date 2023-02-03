@@ -45,20 +45,21 @@ Then you can connect to the port 11211 and speak memcached protocol
     >quit
 
 ## Cross-platform ##
-Cachelot is tested on Alpine Linux (Docker), CentOS 7, Ubuntu Trusty and MacOS.
+Cachelot is tested on Alpine Linux (Docker), CentOS 7, Ubuntu Trusty, macOS and Windows 10/11.
 
 32bit ARM and x86-64 supported.
-
-Windows build is upcoming.
 
 ## How To Hack ##
 
 ### Prerequisites ###
 
- * C++11 capable compiler
+ * C++11 capable compiler ([gcc](https://gcc.gnu.org/), [Clang](https://clang.llvm.org/) or [MSVC](https://visualstudio.microsoft.com/fr/vs/features/cplusplus/))
  * [Boost libraries](http://boost.org/)
- * [cmake](http://cmake.org/)
+ * [CMake](http://cmake.org/)
  * optionally [Doxygen](http://doxygen.org/) to build docs
+ * For windows:
+   * [vcpkg](https://vcpkg.io/) for Boost
+   * [Python Anaconda](https://www.anaconda.com/) or embedded Python in Visual Studio for test scripts
 
 ### Build ###
 
@@ -72,13 +73,22 @@ Next
 
 Generate project files for your favorite IDE or Makefile by running `cmake -G "{target}"` in the cachelot root directory.
 
-For example:
+For example (Linux):
 
-    $ cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release && make
+    $ cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+    $ make
 
-or
+or (macOS):
 
-    $ cmake -G "Xcode"
+    $ cmake -G "Xcode" -DCMAKE_BUILD_TYPE=Release
+    $ make
+
+or (Windows):
+
+    C:\> cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release
+    C:\> cmake --build .
+        OR
+    C:\> msbuild ALL_BUILD.vcxproj
 
 There are several variants of build:
 
@@ -90,8 +100,45 @@ There are several variants of build:
 - `AddressSanitizer` - special build to run under [Address Sanitizer](https://clang.llvm.org/docs/AddressSanitizer.html) (compiler support and libasan required)
 - `UBSanitizer` - special build to run under [Undefined Behavior Sanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html) (compiler support required)
 
+Dedicated script are available to respectively `clean` and `build all` configurations:
+
+Linux and macOS:
+
+    $ ./cleanup.sh
+    $ ./all_build.sh
+
+Windows:
+
+    C:\> cleanup.bat
+    C:\> all_build.bat
+
+### Windows specificity ###
+Additional libraries under Windows have to be installed and declared one by one.
+To do that Microsoft proposes a dedicated tool named `vcpkg` which is in charge of downloading, compiling and deploying libraries like Boost.
+
+vcpkg have to installed on the computer to be able to install libraries.
+Follow these [instructions](https://vcpkg.io/en/getting-started.html) to download and install vcpkg.
+
+After installation, run the command `vcpkg integrate install` to integrate vcpkg in the system (**required admin privieges**).
+
+Then, vcpkg is ready to be used with Visual Studio and CMake. If the vcpkg installation folder is for example `c:\vcpkg\` the CMake toolchain could be completed like:
+
+`-DCMAKE_TOOLCHAIN_FILE=c:/vcpkg/scripts/buildsystems/vcpkg.cmake`
+
+Note: The script `all_build.bat` automatically detect vcpkg installation folder.
+
 ### Run tests or benchmarks ###
 All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
+
+Dedicated test script if available for automatically run the tests:
+
+Linux and macOS:
+
+    $ ./run_tests.sh
+
+Windows:
+
+    C:\> run_tests.bat
 
 ### Subscribe to Cachelot blog ###
 [cachelot.io/blog](http://cachelot.io/blog/)
