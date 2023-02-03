@@ -12,12 +12,12 @@ namespace cachelot {
 
     namespace internal {
 #if defined(_MSC_VER)
-        // count leading zeroes family as GCC / Clang intrinsic
-        template <typename Int32_T> constexpr unsigned clz32(Int32_T i) noexcept { unsigned long Index = 0; return _BitScanReverse(&Index, i); }
-        template <typename Int64_T> constexpr unsigned clz64(Int64_T i) noexcept { unsigned long Index = 0; return _BitScanReverse64(&Index, i); }
-        // find first set family as GCC / Clang intrinsic
-        template <typename Int32_T> constexpr unsigned ffs32(Int32_T i) noexcept { return __lzcnt(i); }
-        template <typename Int64_T> constexpr unsigned ffs64(Int64_T i) noexcept { return __lzcnt64(i); }
+        // count leading zeroes family as MSVC intrinsic
+        template <typename Int32_T> constexpr unsigned clz32(Int32_T i) noexcept { return __lzcnt(i); }
+        template <typename Int64_T> constexpr unsigned clz64(Int64_T i) noexcept { return __lzcnt64(i); }
+        // find first set family as MSVC intrinsic
+        template <typename Int32_T> constexpr unsigned ffs32(Int32_T i) noexcept { unsigned long Index = 0; _BitScanForward(&Index, i); return Index + 1; }
+        template <typename Int64_T> constexpr unsigned ffs64(Int64_T i) noexcept { unsigned long Index = 0; _BitScanForward64(&Index, i); return Index + 1; }
 #else
         // count leading zeroes family as GCC / Clang intrinsic
         template <typename Int32_T> constexpr unsigned clz32(Int32_T i) noexcept { return __builtin_clz(i); }

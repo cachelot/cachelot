@@ -607,7 +607,7 @@ namespace cachelot {
     inline memalloc::memalloc(const size_t memory_limit, const uint32 the_page_size)
         : arena_size(memory_limit)
         , page_size(the_page_size)
-        , m_arena(nullptr, &std::free) {
+        , m_arena(nullptr, &aligned_free) {
         debug_assert(ispow2(memory_limit));
         debug_assert(page_size > 0);
         debug_assert(ispow2(page_size));
