@@ -12,8 +12,6 @@ namespace cachelot {
 
     namespace internal {
 #if defined(_MSC_VER)
-#include <intrin.h>
-
         // count leading zeroes family as GCC / Clang intrinsic
         template <typename Int32_T> constexpr unsigned clz32(Int32_T i) noexcept { unsigned long Index = 0; return _BitScanReverse(&Index, i); }
         template <typename Int64_T> constexpr unsigned clz64(Int64_T i) noexcept { unsigned long Index = 0; return _BitScanReverse64(&Index, i); }
