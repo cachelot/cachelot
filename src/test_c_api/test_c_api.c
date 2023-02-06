@@ -3,7 +3,7 @@
 #include <string.h>
 #if defined(_MSC_VER)
 #include <windows.h>
-#define sleep Sleep
+#define sleep(s) Sleep(s * 1000)
 #else
 #include <unistd.h>
 #endif
