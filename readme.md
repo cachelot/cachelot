@@ -100,15 +100,23 @@ There are several variants of build:
 - `AddressSanitizer` - special build to run under [Address Sanitizer](https://clang.llvm.org/docs/AddressSanitizer.html) (compiler support and libasan required)
 - `UBSanitizer` - special build to run under [Undefined Behavior Sanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html) (compiler support required)
 
-Dedicated script are available to respectively `clean` and `build all` configurations:
+Dedicated scripts are available to respectively `clean`, `build` and `build all` configurations:
 
 Linux and macOS:
 
+    $ # Build Debug configuration
+    $ ./build.sh Debug
+
+    $ # Build all configurations
     $ ./cleanup.sh
     $ ./all_build.sh
 
 Windows:
 
+    C:\> REM Build Debug configuration
+    C:\> build.bat Debug
+
+    C:\> REM Build all configurations
     C:\> cleanup.bat
     C:\> all_build.bat
 
@@ -119,13 +127,21 @@ To do that Microsoft proposes a dedicated tool named `vcpkg` which is in charge 
 vcpkg have to installed on the computer to be able to install libraries.
 Follow these [instructions](https://vcpkg.io/en/getting-started.html) to download and install vcpkg.
 
-After installation, run the command `vcpkg integrate install` to integrate vcpkg in the system (**required admin privieges**).
+After installation, run the following command to integrate vcpkg in the system (**required admin privieges**).
 
-Then, vcpkg is ready to be used with Visual Studio and CMake. If the vcpkg installation folder is for example `c:\vcpkg\` the CMake toolchain could be completed like:
+    C:\> vcpkg integrate install
 
-`-DCMAKE_TOOLCHAIN_FILE=c:/vcpkg/scripts/buildsystems/vcpkg.cmake`
+Cachelot requires Boost libraries. To install them with vcpkg, simply call this command:
 
-Note: The script `all_build.bat` automatically detect vcpkg installation folder.
+    C:\> vcpkg install boost:x64-windows
+
+*Note:* All dependencies required by Boost will be automatically installed too.
+
+Then, vcpkg is ready to be used with Visual Studio and CMake. If the vcpkg installation folder is for example `C:\vcpkg\` the CMake toolchain could be completed like:
+
+`-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake`
+
+*Note:* The script `build.bat` automatically detect vcpkg installation folder.
 
 ### Run tests or benchmarks ###
 All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
