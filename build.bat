@@ -41,6 +41,6 @@ IF [%CONF%]==[] (
 
 ECHO Building %CONF% ...
 cmake -DCMAKE_TOOLCHAIN_FILE=%VCPKG%/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=%CONF% .
-cmake --build .
+cmake --build . --config %CONF%
 
 EXIT /B 0

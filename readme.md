@@ -73,7 +73,7 @@ Next
 
 Generate project files for your favorite IDE or Makefile by running `cmake -G "{target}"` in the cachelot root directory.
 
-For example (Linux):
+For example, compiling `Release` configuration (Linux):
 
     $ cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
     $ make
@@ -86,7 +86,7 @@ or (macOS):
 or (Windows):
 
     C:\> cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release
-    C:\> cmake --build .
+    C:\> cmake --build . --config Release
         OR
     C:\> msbuild ALL_BUILD.vcxproj
 
