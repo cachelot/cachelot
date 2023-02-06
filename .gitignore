@@ -20,3 +20,4 @@ src/cachelot/config.h
 src/cachelot/version.h
 .vscode
 *.dir/
+*.vs/

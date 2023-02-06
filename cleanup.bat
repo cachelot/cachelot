@@ -43,9 +43,9 @@ REM Functions declaration
 REM ===========================================================================
 
 :clean_artifacts
-RMDIR /S /Q "%ROOT%bin/*" 2>NUL
-RMDIR /S /Q "%ROOT%lib/*" 2>NUL
-RMDIR /S /Q "%ROOT%doc/Doxygen/*" 2>NUL
+RMDIR /S /Q "%ROOT%bin" 2>NUL
+RMDIR /S /Q "%ROOT%lib" 2>NUL
+RMDIR /S /Q "%ROOT%doc/Doxygen" 2>NUL
 EXIT /B 0
 
 :clean_build_files
