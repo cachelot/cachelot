@@ -43,7 +43,7 @@ namespace cachelot {
 
         /// validate the Item key
         inline void validate_key(const slice key) {
-            if (! key) {
+            if (not key) {
                 throw system_error(error::key_expected);
             }
             if (key.length() > cache::Item::max_key_length) {

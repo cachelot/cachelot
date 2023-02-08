@@ -26,7 +26,7 @@ BOOST_AUTO_TEST_CASE(test_dict_basic) {
         stock_map.insert(std::make_pair(key, value));
         bool found; dict_type::iterator at; auto hash = hasher(key);
         tie(found, at) = the_dict.entry_for(key, hash);
-        BOOST_CHECK(! found);
+        BOOST_CHECK(not found);
         the_dict.insert(at, key, hash, value);
         BOOST_CHECK(the_dict.contains(key, hash));
     }
@@ -42,7 +42,7 @@ BOOST_AUTO_TEST_CASE(test_dict_basic) {
         BOOST_CHECK(found);
         BOOST_CHECK_EQUAL(kv.second, dict_value);
         BOOST_CHECK(the_dict.del(key, hash));
-        BOOST_CHECK(! the_dict.contains(key, hash));
+        BOOST_CHECK(not the_dict.contains(key, hash));
     }
     BOOST_CHECK_EQUAL(the_dict.size(), 0);
 }

@@ -333,7 +333,7 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
             std::memset(ptr, 'X', allocation_size);
 
             // free one of previously allocated blocks with 40% probability
-            if (! allocations.empty() && probably(40)) {
+            if (not allocations.empty() && probably(40)) {
                 auto prev_alloc = random_choise(allocations);
                 do_free(*prev_alloc);
                 // remove pointer from the vector
@@ -342,14 +342,14 @@ BOOST_AUTO_TEST_CASE(memalloc_stress_test) {
             }
 
             // reallocate one of previously allocated blocks with 60% probability
-            if (! allocations.empty() && probably(60)) {
+            if (not allocations.empty() && probably(60)) {
                 auto prev_alloc = random_choise(allocations);
                 const auto new_size = random_size();
                 do_realloc(*prev_alloc, new_size);
             }
         }
         // free all previously allocated memory
-        while (! allocations.empty()) {
+        while (not allocations.empty()) {
             void * ptr = allocations.back();
             do_free(ptr);
             allocations.pop_back();

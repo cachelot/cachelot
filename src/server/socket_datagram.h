@@ -87,7 +87,7 @@ namespace cachelot { namespace net {
         m_socket.async_receive_from(asio::buffer(m_recv_buf.begin_write(), m_recv_buf.available()), m_remote_endpoint,
             [=] (const error_code error, size_t bytes_recvd) noexcept {
                 m_recv_buf.confirm_write(bytes_recvd);
-                if (! error) {
+                if (not error) {
                     try {
                         if (handle_data(m_recv_buf, m_send_buf) == SEND_REPLY_AND_READ) {
                             async_send_all(m_remote_endpoint);

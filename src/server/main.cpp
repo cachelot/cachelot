@@ -58,7 +58,7 @@ namespace  {
         if (memory_amount == 0) {
             throw invalid_configuration("zero memory amount");
         }
-        if (! ispow2(memory_amount)) {
+        if (not ispow2(memory_amount)) {
             throw invalid_configuration("memory amount must be power of 2");
         }
         arg = boost::any(po_memory{memory_amount});
@@ -117,9 +117,9 @@ namespace  {
         if (varmap.count("socket")) {
             settings.net.unix_socket = varmap["socket"].as<string>();
         }
-        settings.net.has_unix_socket = ! settings.net.unix_socket.empty();
-        settings.cache.has_evictions = ! varmap["oum-error"].as<bool>();
-        settings.cache.has_CAS = ! varmap["no-cas"].as<bool>();
+        settings.net.has_unix_socket = not settings.net.unix_socket.empty();
+        settings.cache.has_evictions = not varmap["oum-error"].as<bool>();
+        settings.cache.has_CAS = not varmap["no-cas"].as<bool>();
         if (varmap.count("memory")) {
             settings.cache.memory_limit = varmap["memory"].as<po_memory>().n;
         }
@@ -135,7 +135,7 @@ namespace  {
         if (varmap.count("hashtable")) {
             settings.cache.initial_hash_table_size = varmap["hashtable"].as<size_t>();
         }
-        if (! ispow2(settings.cache.initial_hash_table_size)) {
+        if (not ispow2(settings.cache.initial_hash_table_size)) {
             throw invalid_configuration("the argument for option '--hashtable' must be power of 2");
         }
         return EXIT_SUCCESS;
@@ -203,7 +203,7 @@ int main(int argc, char * argv[]) {
         // Run reactor loop
         do {
             reactor.run();
-        } while (! reactor.stopped());
+        } while (not reactor.stopped());
 
 
         return EXIT_SUCCESS;

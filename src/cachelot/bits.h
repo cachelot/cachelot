@@ -28,19 +28,19 @@ namespace cachelot {
 #endif
 
         template <typename IntType,
-                  typename std::enable_if<std::is_integral<IntType>::value && sizeof(IntType) == 4>::type * = nullptr>
+                  typename std::enable_if<std::is_integral<IntType>::value and sizeof(IntType) == 4>::type * = nullptr>
         constexpr unsigned clz(IntType i) noexcept { return clz32<IntType>(i); }
 
         template <typename IntType,
-                  typename std::enable_if<std::is_integral<IntType>::value && sizeof(IntType) == 8>::type * = nullptr>
+                  typename std::enable_if<std::is_integral<IntType>::value and sizeof(IntType) == 8>::type * = nullptr>
         constexpr unsigned clz(IntType i) noexcept { return clz64<IntType>(i); }
 
         template <typename IntType,
-        typename std::enable_if<std::is_integral<IntType>::value && sizeof(IntType) == 4>::type * = nullptr>
+        typename std::enable_if<std::is_integral<IntType>::value and sizeof(IntType) == 4>::type * = nullptr>
         constexpr unsigned ffs(IntType i) noexcept { return ffs32<IntType>(i); }
 
         template <typename IntType,
-        typename std::enable_if<std::is_integral<IntType>::value && sizeof(IntType) == 8>::type * = nullptr>
+        typename std::enable_if<std::is_integral<IntType>::value and sizeof(IntType) == 8>::type * = nullptr>
         constexpr unsigned ffs(IntType i) noexcept { return ffs64<IntType>(i); }
 
     }
@@ -61,7 +61,7 @@ namespace cachelot {
         /// Test whether `bitno` is not set (`bitno` counts from zero)
         template <typename IntType>
         constexpr bool is_unset(const IntType value, const unsigned bitno) noexcept {
-            return ! is_set(value, bitno);
+            return not is_set(value, bitno);
         }
 
         /// Set given `bitno` to 1 (`bitno` counts from zero)
