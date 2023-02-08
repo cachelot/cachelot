@@ -52,6 +52,7 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
     set (CMAKE_C_FLAGS_RELEASE "/MD /Ot")
     set (CMAKE_C_FLAGS_DEBUG "/ZI /sdl /MDd /GS /Ob0 /Od /DEBUG /RTC1")
     set (DEBUG_LIBRARIES "Dbghelp.lib")
+    add_compile_options (/permissive-)
 elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "^(Apple)?Clang$"))
 # - GCC / Clang common - - - - - - - - - - - - - - - - - - - - - - - - - -
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4")
