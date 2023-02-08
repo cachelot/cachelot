@@ -5,6 +5,18 @@ if [ -z "$1" ]; then
   exit 99
 fi
 
+MATCH=false
+for cfg in "Debug" "Release" "RelWithDebugInfo" "MinSizeRel" "AddressSanitizer" "UBSanitizer"; do
+  if [[ "${cfg,,}" == "${1,,}" ]]; then
+    MATCH=true
+  fi
+done
+if [ $MATCH == false ]; then
+  echo "\"$1\" configuration not recognized. Abort."
+  exit 99
+fi
+
+
 PARALLEL="-j1"
 if [ TRAVIS == "yes" ]; then
   PARALLEL="-j2"

@@ -39,6 +39,15 @@ IF [%CONF%]==[] (
 	EXIT /B 99
 )
 
+FOR %%A IN ("Debug" "Release" "RelWithDebugInfo" "MinSizeRel" "AddressSanitizer" "UBSanitizer") DO (
+	IF /I "%CONF%"=="%%~A" GOTO MATCH
+)
+ECHO "%CONF%" configuration not recognized. Abort.
+ECHO.
+EXIT /B 99
+
+
+:MATCH
 ECHO Building %CONF% ...
 cmake -DCMAKE_TOOLCHAIN_FILE=%VCPKG%/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=%CONF% .
 cmake --build . --config %CONF%
