@@ -13,11 +13,23 @@ try:
 except:
    import pickle
 import io
+import locale
 
 
 log = logging.getLogger(__name__)
 
 CMD_TERMINATOR = '\r\n'
+
+# Get locale, depending of OS
+#LOCALE = locale.getpreferredencoding(False)
+if os.name == 'nt':
+    # Windows: Latin 1
+    LOCALE = 'iso-8859-1'
+else:
+    # Linux/macOS: UTF-8
+    LOCALE = 'utf-8'
+print('OS = ' + os.name + ', LOCALE = ' + LOCALE)
+
 
 class ConnectionAbortedException(socket.error):
     def __init__(self):
@@ -260,7 +272,10 @@ class Client(object):
     def __send(self, cmd):
         assert self.is_connected(), 'Not connected'
         try:
-            self._sock.sendall(str.encode(cmd))
+            if isinstance(cmd, bytes):
+                self._sock.sendall(cmd)
+            else:
+                self._sock.sendall(bytes(cmd, LOCALE))
         except:
             self._sock = None
             raise
@@ -273,7 +288,13 @@ class Client(object):
                 chunk = self._sock.recv(4096)
                 if not chunk:
                     raise ConnectionAbortedException()
-                self._socket_buffer += chunk.decode()
+                if isinstance(chunk, bytes):
+                    if os.name == 'nt':
+                        self._socket_buffer += chunk.decode(LOCALE)
+                    else:
+                        self._socket_buffer += str(chunk)
+                else:
+                    self._socket_buffer += chunk
                 term_pos = self._socket_buffer.find(CMD_TERMINATOR)
             result = self._socket_buffer[:term_pos]
             self._socket_buffer = self._socket_buffer[term_pos + len(CMD_TERMINATOR):]
@@ -289,7 +310,13 @@ class Client(object):
                 chunk = self._sock.recv(4096)
                 if not chunk:
                     raise ConnectionAbortedException()
-                self._socket_buffer += chunk
+                if isinstance(chunk, bytes):
+                    if os.name == 'nt':
+                        self._socket_buffer += chunk.decode(LOCALE)
+                    else:
+                        self._socket_buffer += str(chunk)
+                else:
+                    self._socket_buffer += chunk
             result = self._socket_buffer[:size]
             self._socket_buffer = self._socket_buffer[size:]
             return result

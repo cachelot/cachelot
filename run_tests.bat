@@ -17,7 +17,7 @@ SET "BUILD_CFGS=Debug Release RelWithDebugInfo MinSizeRel AddressSanitizer UBSan
 
 FOR %%c IN (%BUILD_CFGS%) DO (
     CALL :run_tests %%c
-	IF NOT ERRORLEVEL 0 (
+	IF ERRORLEVEL 1 (
 		EXIT /B %ERRORLEVEL%
 	)
 )
@@ -57,8 +57,8 @@ IF NOT EXIST "%bindir%" (
 )
 REM Run basic smoke tests
 CALL :server_test %buildCfg%
-IF NOT ERRORLEVEL 0 (
-	EXIT /B ERRORLEVEL
+IF ERRORLEVEL 1 (
+	EXIT /B %ERRORLEVEL%
 )
 
 REM Run other tests/benchmarks depending on build type
