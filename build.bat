@@ -40,7 +40,7 @@ IF [%CONF%]==[] (
 )
 
 FOR %%A IN ("Debug" "Release" "RelWithDebugInfo" "MinSizeRel" "AddressSanitizer" "UBSanitizer") DO (
-	IF /I "%CONF%"=="%%~A" GOTO MATCH
+	IF "%CONF%"=="%%~A" GOTO MATCH
 )
 ECHO "%CONF%" configuration not recognized. Abort.
 ECHO.

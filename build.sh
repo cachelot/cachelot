@@ -7,7 +7,7 @@ fi
 
 MATCH=false
 for cfg in "Debug" "Release" "RelWithDebugInfo" "MinSizeRel" "AddressSanitizer" "UBSanitizer"; do
-  if [[ "${cfg,,}" == "${1,,}" ]]; then
+  if [[ "$cfg" == "$1" ]]; then
     MATCH=true
   fi
 done
