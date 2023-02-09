@@ -100,6 +100,20 @@ There are several variants of build:
 - `AddressSanitizer` - special build to run under [Address Sanitizer](https://clang.llvm.org/docs/AddressSanitizer.html) (compiler support and libasan required)
 - `UBSanitizer` - special build to run under [Undefined Behavior Sanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html) (compiler support required)
 
+`-DCMAKE_INSTALL_PREFIX` could also be added to specify the installation folder.
+
+Linux and macOS:
+
+    $ cmake <...> -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/cachelot
+    $ make
+    $ make install
+
+Windows:
+
+    C:\> cmake <...> -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=C:/cachelot
+    C:\> cmake --build . --config Release
+    C:\> cmake --install . --config Release
+
 Dedicated scripts are available to respectively `clean`, `build` and `build all` configurations:
 
 Linux and macOS:
