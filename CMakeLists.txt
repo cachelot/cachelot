@@ -183,3 +183,16 @@ add_subdirectory (src/benchmark)
 # - - - C API test - - - - - - - - - -
 add_subdirectory (src/test_c_api)
 
+
+###########################################################################
+#       Install
+###########################################################################
+
+set (INSTALL_CMAKEDIR share/${PROJECT_NAME})
+install (TARGETS cachelot EXPORT cachelotTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install (EXPORT cachelotTargets DESTINATION ${INSTALL_CMAKEDIR})
+
+include (CMakePackageConfigHelpers)
+
+configure_package_config_file (${PROJECT_SOURCE_DIR}/cmake/cachelot-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/cachelot-config.cmake INSTALL_DESTINATION ${INSTALL_CMAKEDIR})
+install (FILES ${CMAKE_CURRENT_BINARY_DIR}/cachelot-config.cmake DESTINATION ${INSTALL_CMAKEDIR})

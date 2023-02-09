@@ -21,4 +21,5 @@ src/cachelot/version.h
 .vscode/
 *.dir/
 *.vs/
-install_manifest.txt 
+install_manifest.txt
+cachelot-config.cmake
