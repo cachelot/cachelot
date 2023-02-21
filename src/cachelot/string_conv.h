@@ -131,7 +131,7 @@ namespace cachelot {
                 UnsignedIntType xvalue;
                 if (negative) {
                     *dest++ = '-';
-                    xvalue = - (long long)static_cast<UnsignedIntType>(value);
+                    xvalue = - (intptr_t)static_cast<UnsignedIntType>(value);
                 } else {
                     xvalue = value;
                 }
@@ -331,7 +331,7 @@ namespace cachelot {
                 return unsigned_value * sign;
             }
             if (unsigned_value == int64_boundary && sign == -1) {
-                return -(long long)unsigned_value;
+                return -(intptr_t)unsigned_value;
             }
             out_error = error::numeric_overflow;
             return NO_RESULT;

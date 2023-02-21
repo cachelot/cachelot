@@ -131,7 +131,7 @@ namespace cachelot {
 
     /// return number of bytes necessary to align `size` according to the given `alignment`
     constexpr size_t unaligned_bytes(const size_t size, const size_t alignment) noexcept {
-        return ((size + (alignment - 1u)) & -((long long)alignment)) - size;
+        return ((size + (alignment - 1u)) & -((intptr_t)alignment)) - size;
     }
 
     /// return number of bytes necessary to align given `addr` according to the given `alignment`
