@@ -110,11 +110,21 @@ namespace cachelot {
         } else {
             return nullptr;
         }
+    #elif defined(_MSC_VER)
+        return _aligned_malloc(size, alignment);
     #else
     #  error "aligned_alloc function not found"
     #endif
     }
     #endif // aligned_alloc
+
+    inline void aligned_free(void * memblock) noexcept {
+    #if defined(_MSC_VER)
+        _aligned_free(memblock);
+    #else
+       std::free(memblock);
+    #endif
+    }
 
     constexpr size_t cpu_l1d_cache_line = 64;
     constexpr int the_answer_to_life_the_universe_and_everything = 42;

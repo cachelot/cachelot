@@ -30,7 +30,7 @@ else ()
 endif ()
 message (STATUS "Platform: ${CMAKE_SYSTEM_NAME} x${CACHELOT_PLATFORM_BITS}")
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    add_definition (-D_WIN32_WINNT=0x05010000) # set NTDDI_WINXP as a target win version
+    add_definitions (-D_WIN32_WINNT=0x06010000) # set NTDDI_WIN7 as a target win version
 endif ()
 string (REGEX MATCH "arm.*" ARM_CPU "${CMAKE_SYSTEM_PROCESSOR}")
 string (REGEX MATCH "x86_64" x86_64_CPU "${CMAKE_SYSTEM_PROCESSOR}")
@@ -48,10 +48,11 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
     add_definitions ("/wd4996") # function call with parameters that may be unsafe
     add_definitions (-DWIN32_LEAN_AND_MEAN) # limit amount of code in Windows.h to the minimum
     add_definitions (-DNOMINMAX) # disable min / max macro from Windows.h
-    set (CMAKE_C_FLAGS "/W4 /EHsc /Zi")
+    set (CMAKE_C_FLAGS "/W4 /EHsc")
     set (CMAKE_C_FLAGS_RELEASE "/MD /Ot")
-    set (CMAKE_C_FLAGS_DEBUG "/sdl /MDd /GS /Ob0 /Od /DEBUG /RTC1")
+    set (CMAKE_C_FLAGS_DEBUG "/ZI /sdl /MDd /GS /Ob0 /Od /DEBUG /RTC1")
     set (DEBUG_LIBRARIES "Dbghelp.lib")
+    add_compile_options (/permissive-)
 elseif ((${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "^(Apple)?Clang$"))
 # - GCC / Clang common - - - - - - - - - - - - - - - - - - - - - - - - - -
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -fstrict-overflow -fstrict-aliasing -Wshadow -Wstrict-aliasing -Wstrict-overflow=4")
@@ -159,6 +160,17 @@ message (STATUS "Cachelot setup ...")
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib/${CMAKE_BUILD_TYPE}")
+if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
+# - Visual Studio - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    # Deactivate intermediate directory
+    set (CMAKE_INTDIR "")
+    set (CMAKE_CFG_INTDIR "")
+    # Setup output directory specifically for current configuration
+    string (TOUPPER ${CMAKE_BUILD_TYPE} UPPERBUILD )
+    set (CMAKE_RUNTIME_OUTPUT_DIRECTORY_${UPPERBUILD} "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    set (CMAKE_LIBRARY_OUTPUT_DIRECTORY_${UPPERBUILD} "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
+    set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${UPPERBUILD} "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+endif ()
 include_directories (src)
 # - - - cachelot library - - - - - - -
 add_subdirectory (src/cachelot)
@@ -171,3 +183,16 @@ add_subdirectory (src/benchmark)
 # - - - C API test - - - - - - - - - -
 add_subdirectory (src/test_c_api)
 
+
+###########################################################################
+#       Install
+###########################################################################
+
+set (INSTALL_CMAKEDIR share/${PROJECT_NAME})
+install (TARGETS cachelot EXPORT cachelotTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install (EXPORT cachelotTargets DESTINATION ${INSTALL_CMAKEDIR})
+
+include (CMakePackageConfigHelpers)
+
+configure_package_config_file (${PROJECT_SOURCE_DIR}/cmake/cachelot-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/cachelot-config.cmake INSTALL_DESTINATION ${INSTALL_CMAKEDIR})
+install (FILES ${CMAKE_CURRENT_BINARY_DIR}/cachelot-config.cmake DESTINATION ${INSTALL_CMAKEDIR})

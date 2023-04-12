@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(test_free_blocks_by_size) {
 BOOST_AUTO_TEST_CASE(test_pages) {
     constexpr size_t page_size = 4;
     constexpr size_t arena_size = 16;
-    std::unique_ptr<uint8, decltype(&std::free)> memory_arena((uint8 *)aligned_alloc(page_size, arena_size), &std::free);
+    std::unique_ptr<uint8, decltype(&std::free)> memory_arena((uint8 *)aligned_alloc(page_size, arena_size), &aligned_free);
     uint8 * const arena_begin = memory_arena.get();
     uint8 * const arena_end = memory_arena.get() + arena_size;
     memalloc::pages fixture(4, arena_begin, arena_end);

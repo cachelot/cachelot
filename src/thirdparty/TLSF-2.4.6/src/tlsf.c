@@ -169,14 +169,19 @@
 
 #ifdef USE_PRINTF
 #include <stdio.h>
-# define PRINT_MSG(fmt, args...) printf(fmt, ## args)
-# define ERROR_MSG(fmt, args...) printf(fmt, ## args)
+# if defined(_MSC_VER)
+#  define PRINT_MSG(fmt, ...) printf(fmt ##)
+#  define ERROR_MSG(fmt, ...) printf(fmt ##)
+# else
+#  define PRINT_MSG(fmt, args...) printf(fmt, ## args)
+#  define ERROR_MSG(fmt, args...) printf(fmt, ## args)
+# endif
 #else
 # if !defined(PRINT_MSG)
-#  define PRINT_MSG(fmt, args...)
+#  define PRINT_MSG(fmt, ...)
 # endif
 # if !defined(ERROR_MSG)
-#  define ERROR_MSG(fmt, args...)
+#  define ERROR_MSG(fmt, ...)
 # endif
 #endif
 

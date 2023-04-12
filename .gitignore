@@ -1,8 +1,8 @@
-bin
-lib
-ipch
+bin/
+lib/
+ipch/
 build_files
-doc
+doc/
 CMakeFiles
 CMakeScripts
 CMakeCache.txt
@@ -18,3 +18,8 @@ Makefile
 .hgignore
 src/cachelot/config.h
 src/cachelot/version.h
+.vscode/
+*.dir/
+*.vs/
+install_manifest.txt
+cachelot-config.cmake

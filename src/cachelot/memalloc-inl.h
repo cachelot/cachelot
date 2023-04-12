@@ -165,14 +165,20 @@ namespace cachelot {
 
     /// single allocation chunk with metadata
     class memalloc::block {
+#if defined(_MSC_VER)
+#pragma pack(push, 1)
+#endif
         struct {
             uint32 size : 31;   /// amount of memory available to user
-            bool used : 1;      /// indicate whether block is used
+            uint32 used : 1;      /// indicate whether block is used
             uint32 left_adjacent_offset;  /// offset of previous block in continuous arena
             /// debug marker to identify corrupted memory
             debug_only(uint32 dbg_marker1;)
             debug_only(uint32 dbg_marker2;)
         } meta;
+#if defined(_MSC_VER)
+#pragma pack(pop)
+#endif
 
         union {
             /// link for circular list of blocks in free_blocks_by_size table
@@ -601,7 +607,7 @@ namespace cachelot {
     inline memalloc::memalloc(const size_t memory_limit, const uint32 the_page_size)
         : arena_size(memory_limit)
         , page_size(the_page_size)
-        , m_arena(nullptr, &std::free) {
+        , m_arena(nullptr, &aligned_free) {
         debug_assert(ispow2(memory_limit));
         debug_assert(page_size > 0);
         debug_assert(ispow2(page_size));
