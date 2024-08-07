@@ -158,7 +158,8 @@ Then, vcpkg is ready to be used with Visual Studio and CMake. If the vcpkg insta
 *Note:* The script `build.bat` automatically detect vcpkg installation folder.
 
 ### Run tests or benchmarks ###
-All binaries (main executable, unit tests, etc.) will be in `bin/{build_type}`.
+Tests need to be enabled via `-DBUILD_TESTS=ON`. All binaries (main executable,
+unit tests, etc.) will be in `bin/{build_type}`.
 
 Dedicated test script if available for automatically run the tests:
 
